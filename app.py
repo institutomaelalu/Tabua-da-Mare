@@ -20,28 +20,30 @@ st.markdown(f"""
     <hr style="border: 1px solid {COR_VERDE};">
     """, unsafe_allow_html=True)
 
-# 2. Configuração de Critérios e Banco de Dados
+# 2. Configuração de Critérios (Ajustados conforme seus arquivos)
 CATEGORIAS = [
-    "Frequência", "Aprendizagem de leitura", "Aprendizagem de escrita", 
-    "Organização e cuidado com materiais", "Participação e envolvimento", 
-    "Respeito aos combinados", "Clareza e desenvoltura", "Interesse por coisas novas"
+    "Aprendizagem de Leitura e Escrita",
+    "Organização e cuidado com os materiais de uso individual ou coletivo",
+    "Participação, resolução e envolvimento nas atividades propostas",
+    "Respeito aos combinados/regras",
+    "Pergunta e responde questões com clareza e desenvoltura",
+    "Compartilha materiais, brinquedos, jogos, etc.",
+    "Demonstra interesse por coisas novas",
+    "Participa de atividades em grupo com respeito, opinião própria, liderança e proatividade"
 ]
 
 ALUNOS_FILE = "alunos.csv"
 AVAL_FILE = "avaliacoes.csv"
 
 def inicializar_arquivos():
-    # Garantir arquivo de ALUNOS
     if not os.path.exists(ALUNOS_FILE):
         pd.DataFrame(columns=["Nome", "Idade", "Turno"]).to_csv(ALUNOS_FILE, index=False)
     else:
         df_check = pd.read_csv(ALUNOS_FILE)
-        # Se a coluna 'Turno' não existir no arquivo salvo, nós a adicionamos
         if "Turno" not in df_check.columns:
-            df_check["Turno"] = "Matutino" # Valor padrão para não quebrar
+            df_check["Turno"] = "Matutino"
             df_check.to_csv(ALUNOS_FILE, index=False)
 
-    # Garantir arquivo de AVALIAÇÕES
     if not os.path.exists(AVAL_FILE):
         pd.DataFrame(columns=["Aluno", "Trimestre"] + CATEGORIAS).to_csv(AVAL_FILE, index=False)
 
@@ -63,8 +65,6 @@ if menu == "Registrar Aluno":
                 novo = pd.DataFrame([[nome, idade, turno]], columns=["Nome", "Idade", "Turno"])
                 pd.concat([df, novo], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
                 st.success(f"{nome} cadastrado!")
-            else:
-                st.warning("Digite o nome.")
 
 # --- LANÇAR NOTAS ---
 elif menu == "Lançar Avaliação":
@@ -79,7 +79,6 @@ elif menu == "Lançar Avaliação":
             notas = {c: st.slider(c, 1, 5, 3) for c in CATEGORIAS}
             if st.form_submit_button("Salvar Notas"):
                 df_av = pd.read_csv(AVAL_FILE)
-                # Remove se já existir nota idêntica para atualizar
                 df_av = df_av[~((df_av['Aluno'] == aluno) & (df_av['Trimestre'] == trim))]
                 nova_nota = pd.DataFrame([[aluno, trim] + list(notas.values())], columns=["Aluno", "Trimestre"] + CATEGORIAS)
                 pd.concat([df_av, nova_nota], ignore_index=True).to_csv(AVAL_FILE, index=False)
@@ -90,53 +89,46 @@ elif menu == "Painel de Evolução":
     df_alunos = pd.read_csv(ALUNOS_FILE)
     df_av = pd.read_csv(AVAL_FILE)
 
-    if df_alunos.empty:
-        st.warning("Nenhum aluno registrado.")
-    elif df_av.empty:
-        st.info("Nenhuma avaliação lançada.")
+    if df_alunos.empty or df_av.empty:
+        st.info("Aguardando registros e avaliações.")
     else:
-        # Filtros encadeados
         col1, col2, col3 = st.columns(3)
         with col1:
             turno_f = st.selectbox("1. Filtrar Turno", ["Matutino", "Vespertino"])
         
-        # Filtro de alunos do turno escolhido
         alunos_turno = df_alunos[df_alunos["Turno"] == turno_f]["Nome"].unique()
         
         if len(alunos_turno) == 0:
-            st.error(f"Não há alunos no turno {turno_f}.")
+            st.warning(f"Sem alunos no turno {turno_f}.")
         else:
             with col2:
                 aluno_f = st.selectbox("2. Selecionar Aluno", alunos_turno)
             
-            # Filtro de trimestres disponíveis para o aluno
             trims_aluno = df_av[df_av["Aluno"] == aluno_f]["Trimestre"].unique()
             
             if len(trims_aluno) == 0:
-                st.error("Este aluno não tem avaliações.")
+                st.error("Este aluno ainda não tem avaliações.")
             else:
                 with col3:
                     trim_f = st.selectbox("3. Escolha o Trimestre", trims_aluno)
 
-                # DADOS E GRÁFICOS
                 dados = df_av[(df_av["Aluno"] == aluno_f) & (df_av["Trimestre"] == trim_f)].iloc[0]
                 valores = [dados[c] for c in CATEGORIAS]
 
+                # --- GRÁFICO SENOIDAL CORRIGIDO ---
                 st.subheader(f"🌊 Maré: {aluno_f} - {trim_f}")
-                
-                # Gráfico Senoidal Suave
                 x_idx = np.arange(len(CATEGORIAS))
                 x_smooth = np.linspace(0, len(CATEGORIAS) - 1, 300)
                 y_smooth = np.interp(x_smooth, x_idx, valores)
 
                 fig_wave = go.Figure(go.Scatter(
                     x=x_smooth, y=y_smooth, mode='lines',
-                    line=dict(shape='spline', smoothing=1.5, width=6, color=COR_AZUL),
+                    line=dict(shape='spline', smoothing=1.3, width=6, color=COR_AZUL), # Smoothing alterado para 1.3
                     fill='tozeroy', fillcolor=f"rgba(92, 198, 208, 0.2)"
                 ))
                 fig_wave.update_layout(
-                    xaxis=dict(tickmode='array', tickvals=list(range(len(CATEGORIAS))), ticktext=CATEGORIAS),
-                    yaxis=dict(range=[0, 5.5]), plot_bgcolor='white', height=400
+                    xaxis=dict(tickmode='array', tickvals=list(range(len(CATEGORIAS))), ticktext=[c[:20]+"..." for c in CATEGORIAS]),
+                    yaxis=dict(range=[0, 5.5], gridcolor="#f0f0f0"), plot_bgcolor='white', height=400
                 )
                 st.plotly_chart(fig_wave, use_container_width=True)
 

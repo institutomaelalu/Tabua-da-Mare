@@ -1,0 +1,102 @@
+import streamlit as st
+import pandas as pd
+import os
+from datetime import datetime
+
+# Configurações iniciais
+st.set_page_config(page_title="Educafoco - Alfabetização", layout="wide")
+
+# Arquivo para salvar os dados (Simulação de Banco de Dados)
+DATA_FILE = "dados_alunos.csv"
+AVAL_FILE = "avaliacoes_trimestrais.csv"
+
+# Função para inicializar arquivos se não existirem
+for file in [DATA_FILE, AVAL_FILE]:
+    if not os.path.exists(file):
+        pd.DataFrame().to_csv(file, index=False)
+
+# --- MENU LATERAL ---
+menu = st.sidebar.selectbox("Navegação", ["Dashboard", "Cadastrar Aluno", "Avaliação Trimestral"])
+
+# --- 1. CADASTRO DE ALUNO ---
+if menu == "Cadastrar Aluno":
+    st.header("📝 Registro de Novo Aluno")
+    with st.form("form_cadastro"):
+        nome = st.text_input("Nome Completo do Aluno")
+        idade = st.number_input("Idade", min_value=4, max_value=12, step=1)
+        turma = st.selectbox("Turma", ["1º Ano A", "1º Ano B", "2º Ano A", "Reforço"])
+        
+        btn_cadastrar = st.form_submit_button("Salvar Cadastro")
+        
+        if btn_cadastrar:
+            novo_aluno = pd.DataFrame([[nome, idade, turma]], columns=["Nome", "Idade", "Turma"])
+            df_alunos = pd.read_csv(DATA_FILE)
+            df_alunos = pd.concat([df_alunos, novo_aluno], ignore_index=True)
+            df_alunos.to_csv(DATA_FILE, index=False)
+            st.success(f"Aluno {nome} cadastrado com sucesso!")
+
+# --- 2. AVALIAÇÃO TRIMESTRAL ---
+elif menu == "Avaliação Trimestral":
+    st.header("📊 Verificação de Aprendizagem")
+    
+    df_alunos = pd.read_csv(DATA_FILE)
+    if df_alunos.empty:
+        st.warning("Cadastre um aluno primeiro!")
+    else:
+        with st.form("form_avaliacao"):
+            aluno_sel = st.selectbox("Selecione o Aluno", df_alunos["Nome"].unique())
+            trimestre = st.radio("Trimestre", ["1º Trimestre", "2º Trimestre", "3º Trimestre"], horizontal=True)
+            
+            st.divider()
+            st.subheader("Critérios de Avaliação")
+            col1, col2 = st.columns(2)
+            
+            # Opções de escala para facilitar a análise
+            escala = ["Não Iniciado", "Em Desenvolvimento", "Desenvolvido", "Consolidado"]
+            
+            with col1:
+                freq = st.slider("Frequência (%)", 0, 100, 100)
+                leitura = st.select_slider("Aprendizagem de Leitura", options=escala)
+                escrita = st.select_slider("Aprendizagem de Escrita", options=escala)
+                materiais = st.select_slider("Cuidado com Materiais", options=escala)
+            
+            with col2:
+                participacao = st.select_slider("Participação e Engajamento", options=escala)
+                regras = st.select_slider("Respeito às Regras", options=escala)
+                clareza = st.select_slider("Clareza na Fala/Respostas", options=escala)
+                interesse = st.select_slider("Interesse pelo Novo", options=escala)
+
+            obs = st.text_area("Observações Adicionais")
+            
+            btn_salvar_aval = st.form_submit_button("Salvar Avaliação")
+            
+            if btn_salvar_aval:
+                dados_aval = pd.DataFrame([{
+                    "Aluno": aluno_sel, "Trimestre": trimestre, "Data": datetime.now().strftime("%d/%m/%Y"),
+                    "Frequencia": freq, "Leitura": leitura, "Escrita": escrita, 
+                    "Materiais": materiais, "Participacao": participacao, "Regras": regras,
+                    "Clareza": clareza, "Interesse": interesse, "Obs": obs
+                }])
+                df_avals = pd.read_csv(AVAL_FILE)
+                df_avals = pd.concat([df_avals, dados_aval], ignore_index=True)
+                df_avals.to_csv(AVAL_FILE, index=False)
+                st.success(f"Avaliação de {aluno_sel} salva!")
+
+# --- 3. DASHBOARD ---
+elif menu == "Dashboard":
+    st.header("📈 Evolução dos Alunos")
+    if os.path.exists(AVAL_FILE):
+        df_view = pd.read_csv(AVAL_FILE)
+        if not df_view.empty:
+            aluno_dash = st.selectbox("Filtrar por Aluno", df_view["Aluno"].unique())
+            df_aluno = df_view[df_view["Aluno"] == aluno_dash]
+            
+            st.write(f"Histórico de {aluno_dash}")
+            st.dataframe(df_aluno, use_container_width=True)
+            
+            # Gráfico Simples de Evolução da Frequência
+            import plotly.express as px
+            fig = px.line(df_aluno, x="Trimestre", y="Frequencia", title="Evolução da Frequência", markers=True)
+            st.plotly_chart(fig)
+        else:
+            st.info("Nenhuma avaliação registrada ainda.")

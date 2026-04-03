@@ -4,20 +4,26 @@ import plotly.graph_objects as go
 import numpy as np
 import os
 
-# Configuração da página e Identidade Visual
+# 1. Configuração de Estilo e Identidade Visual
 st.set_page_config(page_title="Tábua da Maré - Instituto Mãe Lalu", layout="wide")
 
+# Cores oficiais
+COR_VERDE = "#a8cf45"
+COR_AZUL = "#5cc6d0"
+
 st.markdown(f"""
-    <div style='text-align: center; padding: 10px;'>
-        <h1 style='font-size: 45px; margin-bottom: 0;'>
-            <span style='color: #a8cf45;'>Instituto</span> <span style='color: #5cc6d0;'>Mãe</span> <span style='color: #a8cf45;'>Lalu</span>
+    <div style='text-align: center; padding: 20px;'>
+        <h1 style='margin-bottom: 0;'>
+            <span style='color: {COR_VERDE};'>Instituto</span> 
+            <span style='color: {COR_AZUL};'>Mãe</span> 
+            <span style='color: {COR_VERDE};'>Lalu</span>
         </h1>
-        <h2 style='color: #5cc6d0; font-weight: 300; margin-top: 0;'>🌊 Tábua da Maré: Acompanhamento Único</h2>
+        <h3 style='color: {COR_AZUL}; font-weight: 300; margin-top: 0;'>🌊 Tábua da Maré</h3>
     </div>
-    <hr style="border: 1px solid #a8cf45;">
+    <hr style="border: 1px solid {COR_VERDE};">
     """, unsafe_allow_html=True)
 
-# --- CONFIGURAÇÕES DE DADOS ---
+# 2. Inicialização do Banco de Dados
 ALUNOS_FILE = "alunos.csv"
 AVAL_FILE = "avaliacoes.csv"
 CATEGORIAS = ["Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]
@@ -30,77 +36,96 @@ def init_db():
 
 init_db()
 
-# --- MENU ---
-menu = st.sidebar.radio("Navegação", ["Painel de Evolução", "Cadastrar Aluno", "Lançar Avaliação"])
+# 3. Navegação Lateral
+menu = st.sidebar.radio("Menu", ["Painel de Evolução", "Cadastrar Aluno", "Lançar Avaliação"])
 
-# [Omissão das funções de cadastro e lançamento por brevidade - permanecem as mesmas]
+# --- MODULO DE CADASTRO ---
+if menu == "Cadastrar Aluno":
+    st.header("📝 Novo Registro")
+    with st.form("cadastro"):
+        nome = st.text_input("Nome do Aluno")
+        idade = st.number_input("Idade", 4, 15)
+        turno = st.selectbox("Turno", ["Matutino", "Vespertino"])
+        if st.form_submit_button("Salvar"):
+            df = pd.read_csv(ALUNOS_FILE)
+            pd.concat([df, pd.DataFrame([[nome, idade, turno]], columns=df.columns)]).to_csv(ALUNOS_FILE, index=False)
+            st.success("Registrado!")
 
-if menu == "Painel de Evolução":
+# --- MODULO DE LANÇAMENTO ---
+elif menu == "Lançar Avaliação":
+    st.header("📊 Lançar Notas")
+    df_alunos = pd.read_csv(ALUNOS_FILE)
+    if not df_alunos.empty:
+        with st.form("notas"):
+            aluno = st.selectbox("Selecione o Aluno", df_alunos["Nome"])
+            trim = st.selectbox("Trimestre", ["1º Trim", "2º Trim", "3º Trim"])
+            scores = {c: st.slider(c, 1, 5, 3) for c in CATEGORIAS}
+            if st.form_submit_button("Salvar Avaliação"):
+                df_av = pd.read_csv(AVAL_FILE)
+                df_av = df_av[~((df_av['Aluno'] == aluno) & (df_av['Trimestre'] == trim))]
+                pd.concat([df_av, pd.DataFrame([[aluno, trim] + list(scores.values())], columns=df_av.columns)]).to_csv(AVAL_FILE, index=False)
+                st.info("Notas salvas!")
+
+# --- PAINEL DE EVOLUÇÃO (FILTROS SOLICITADOS) ---
+elif menu == "Painel de Evolução":
+    df_alunos = pd.read_csv(ALUNOS_FILE)
     df_av = pd.read_csv(AVAL_FILE)
-    if not df_av.empty:
-        aluno_sel = st.selectbox("Selecione o Aluno", df_av["Aluno"].unique())
+    
+    if df_av.empty:
+        st.warning("Nenhum dado encontrado.")
+    else:
+        # Filtros em Colunas
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            turno_sel = st.selectbox("1. Filtrar Turno", ["Matutino", "Vespertino"])
         
-        # Filtro de Trimestres (Multiselect para comparar)
-        trims_sel = st.multiselect("Selecione os Trimestres para comparar", 
-                                   ["1º Trim", "2º Trim", "3º Trim"], 
-                                   default=df_av[df_av["Aluno"] == aluno_sel]["Trimestre"].unique())
+        # Filtrar alunos que pertencem ao turno e possuem avaliação
+        alunos_do_turno = df_alunos[df_alunos["Turno"] == turno_sel]["Nome"].tolist()
+        avaliados = df_av[df_av["Aluno"].isin(alunos_do_turno)]["Aluno"].unique()
         
-        st.subheader(f"📊 Movimento da Maré: {aluno_sel}")
+        with c2:
+            aluno_sel = st.selectbox("2. Selecionar Aluno", avaliados)
+        
+        with c3:
+            trimestres_disp = df_av[df_av["Aluno"] == aluno_sel]["Trimestre"].unique()
+            trim_sel = st.selectbox("3. Escolha o Trimestre", trimestres_disp)
+
+        # Dados para o gráfico
+        row = df_av[(df_av["Aluno"] == aluno_sel) & (df_av["Trimestre"] == trim_sel)].iloc[0]
+        notas = [row[c] for c in CATEGORIAS]
+
+        # Gráfico de Maré Senoidal (Suavizado)
+        st.subheader(f"🌊 Tábua da Maré Individual: {aluno_sel}")
         
         fig = go.Figure()
-        cores_trim = {"1º Trim": "#5cc6d0", "2º Trim": "#a8cf45", "3º Trim": "#0077b6"}
         
-        for trim in trims_sel:
-            df_trim = df_av[(df_av["Aluno"] == aluno_sel) & (df_av["Trimestre"] == trim)]
-            
-            if not df_trim.empty:
-                notas = [df_trim.iloc[0][c] for c in CATEGORIAS]
-                
-                # Criando a curva suave (Interpolação para parecer onda de seno)
-                x_indices = np.arange(len(CATEGORIAS))
-                x_suave = np.linspace(0, len(CATEGORIAS) - 1, 200)
-                y_suave = np.interp(x_suave, x_indices, notas)
-                
-                # Adicionando a linha da Maré
-                fig.add_trace(go.Scatter(
-                    x=x_suave, 
-                    y=y_suave,
-                    mode='lines',
-                    name=trim,
-                    line=dict(shape='spline', smoothing=1.3, width=5, color=cores_trim[trim]),
-                    fill='tozeroy',
-                    fillcolor=f"rgba{tuple(list(int(cores_trim[trim].lstrip('#')[j:j+2], 16) for j in (0, 2, 4)) + [0.1])}"
-                ))
+        # Interpolação Spline para criar a curva de seno/cosseno
+        x_indices = np.arange(len(CATEGORIAS))
+        x_suave = np.linspace(0, len(CATEGORIAS) - 1, 300)
+        y_suave = np.interp(x_suave, x_indices, notas) # Base
+        
+        fig.add_trace(go.Scatter(
+            x=x_suave, y=y_suave,
+            mode='lines',
+            line=dict(shape='spline', smoothing=1.5, width=6, color=COR_AZUL),
+            fill='tozeroy',
+            fillcolor=f"rgba(92, 198, 208, 0.2)",
+            name=trim_sel
+        ))
 
         fig.update_layout(
-            xaxis=dict(
-                tickmode='array',
-                tickvals=list(range(len(CATEGORIAS))),
-                ticktext=CATEGORIAS,
-                gridcolor='#eee'
-            ),
-            yaxis=dict(range=[0, 5.5], title="Nível de Desenvolvimento", gridcolor='#eee'),
-            plot_bgcolor='white',
-            height=500,
-            hovermode="x unified"
+            xaxis=dict(tickmode='array', tickvals=list(range(len(CATEGORIAS))), ticktext=CATEGORIAS),
+            yaxis=dict(range=[0, 5.5], title="Nível"),
+            plot_bgcolor='white', height=450
         )
         st.plotly_chart(fig, use_container_width=True)
 
-        # Gráfico Radar Individual de cada trimestre abaixo
+        # Gráfico Radar (Ficha de Apoio)
         st.divider()
-        st.subheader("🕸️ Ficha Individual (Radar)")
-        cols = st.columns(len(trims_sel))
-        for idx, trim in enumerate(trims_sel):
-            with cols[idx]:
-                df_trim = df_av[(df_av["Aluno"] == aluno_sel) & (df_av["Trimestre"] == trim)]
-                fig_radar = go.Figure(go.Scatterpolar(
-                    r=[df_trim.iloc[0][c] for c in CATEGORIAS],
-                    theta=CATEGORIAS,
-                    fill='toself',
-                    fillcolor=f"rgba{tuple(list(int(cores_trim[trim].lstrip('#')[j:j+2], 16) for j in (0, 2, 4)) + [0.4])}",
-                    line=dict(color=cores_trim[trim])
-                ))
-                fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 5])), showlegend=False, title=trim)
-                st.plotly_chart(fig_radar, use_container_width=True)
-    else:
-        st.info("Nenhum dado lançado.")
+        st.subheader("🕸️ Gráfico Radar de Competências")
+        fig_radar = go.Figure(go.Scatterpolar(
+            r=notas, theta=CATEGORIAS, fill='toself',
+            fillcolor=f"rgba(168, 207, 69, 0.4)", line=dict(color=COR_VERDE)
+        ))
+        fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 5])), showlegend=False)
+        st.plotly_chart(fig_radar, use_container_width=True)

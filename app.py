@@ -28,20 +28,14 @@ st.markdown(f"""
         height: 42px; font-size: 11px !important; border: none !important;
         transition: all 0.3s;
     }}
+    .login-card {{
+        background: linear-gradient(135deg, {C_AZUL}22, {C_ROSA}22);
+        padding: 30px; border-radius: 20px; border: 2px solid #f0f0f0;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Conexão de Escrita (Google Sheets API)
-def get_gspread_client():
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-    return gspread.authorize(creds)
-
-# 3. Definições de Banco de Dados
-CATEGORIAS = ["Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]
-AVAL_FILE = "avaliacoes.csv" # Avaliações podem continuar em CSV ou migrar depois
-if not os.path.exists(AVAL_FILE): pd.DataFrame(columns=["Aluno", "Trimestre"] + CATEGORIAS).to_csv(AVAL_FILE, index=False)
-
+# 2. Funções de Banco de Dados (Leitura e Escrita)
 TURMAS_CONFIG = {
     "SALA ROSA": {"cor": C_ROSA, "key": "sala_rosa"},
     "SALA AMARELA": {"cor": C_AMARELO, "key": "sala_amarela"},
@@ -49,6 +43,14 @@ TURMAS_CONFIG = {
     "SALA AZUL": {"cor": C_AZUL, "key": "sala_azul"},
     "CIRAND. MUNDO": {"cor": C_ROXO, "key": "cirand_mundo"},
 }
+
+CATEGORIAS = ["Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]
+AVAL_FILE = "avaliacoes.csv"
+
+def get_gspread_client():
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+    return gspread.authorize(creds)
 
 def safe_read(worksheet_name):
     try:
@@ -64,23 +66,23 @@ def safe_read(worksheet_name):
         df.columns = [str(c).strip().upper() for c in df.columns]
         if "PADRINHO" in df.columns: df = df.rename(columns={"PADRINHO": "PADRINHO/MADRINHA"})
         return df.fillna("")
-    except Exception as e:
-        st.error(f"Erro ao ler planilha: {e}")
+    except:
         return pd.DataFrame()
 
-# 4. Autenticação básica
+# 3. Autenticação
 if "logado" not in st.session_state: st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
 if 'sel_mat' not in st.session_state: st.session_state.sel_mat = "SALA ROSA"
 if 'sel_pad' not in st.session_state: st.session_state.sel_pad = "SALA ROSA"
 
 if not st.session_state.logado:
+    st.markdown("<br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1.2, 1])
     with c2:
-        st.markdown(f'<h2 style="text-align: center; color: {C_AZUL};">Acesso</h2>', unsafe_allow_html=True)
+        st.markdown(f'<div class="login-card"><h2 style="text-align: center; color: {C_AZUL}; margin:0;">Bem-vindo!</h2></div>', unsafe_allow_html=True)
         with st.form("login"):
-            u = st.text_input("Usuário").strip().upper()
-            s = st.text_input("Chave", type="password")
-            if st.form_submit_button("ENTRAR"):
+            u = st.text_input("👤 Usuário").strip().upper()
+            s = st.text_input("🔑 Chave", type="password")
+            if st.form_submit_button("ENTRAR NO SISTEMA"):
                 if u == "ADMIN" and s == "123":
                     st.session_state.update({"logado": True, "perfil": "admin", "nome_usuario": "Coordenação"})
                     st.rerun()
@@ -92,10 +94,10 @@ if not st.session_state.logado:
                     else: st.error("Acesso negado.")
     st.stop()
 
-# --- MENU ---
+# --- SIDEBAR ---
 st.sidebar.write(f"👤 **{st.session_state.nome_usuario}**")
 if st.session_state.perfil == "admin":
-    menu = st.sidebar.radio("Navegação", ["👤 Cadastro", "📝 Matrículas", "🤝 Apadrinhamento", "📊 Avaliações", "🌊 Evolução", "🌊 Tábua da Maré"])
+    menu = st.sidebar.radio("Navegação", ["👤 Cadastro", "📝 Matrículas", "🤝 Apadrinhamento", "📊 Lançar Avaliação", "🌊 Evolução", "🌊 Tábua da Maré"])
 else:
     menu = "🌊 Evolução"
 
@@ -105,42 +107,38 @@ if st.sidebar.button("🚪 Sair"):
 
 st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Instituto</span> <span style='color:{C_AZUL}'>Mãe</span> <span style='color:{C_VERDE}'>Lalu</span></h1></div><hr>", unsafe_allow_html=True)
 
-# --- LÓGICA DE CADASTRO DIRETO NO GOOGLE SHEETS ---
+# --- FUNCIONALIDADES ---
+
 if menu == "👤 Cadastro":
-    st.markdown(f"<h3 style='color:{C_ROSA}'>👤 Novo Cadastro de Aluno</h3>", unsafe_allow_html=True)
-    with st.form("cad_sheets"):
-        n = st.text_input("Nome Completo do Aluno").upper()
-        i = st.text_input("Idade")
-        comu = st.text_input("Comunidade").upper()
-        t = st.selectbox("Sala Destino", list(TURMAS_CONFIG.keys()))
-        tn = st.selectbox("Turno", ["A", "B"])
+    st.markdown(f"<h3 style='color:{C_ROSA}'>👤 Novo Cadastro no Google Sheets</h3>", unsafe_allow_html=True)
+    with st.form("cad_form"):
+        c1, c2 = st.columns(2)
+        n = c1.text_input("Nome").upper()
+        i = c2.text_input("Idade")
+        comu = c1.text_input("Comunidade").upper()
+        t = c2.selectbox("Sala", list(TURMAS_CONFIG.keys()))
+        tn = c1.selectbox("Turno", ["A", "B"])
         
-        if st.form_submit_button("Realizar Matrícula"):
+        if st.form_submit_button("Finalizar Matrícula"):
             if n and i:
-                with st.spinner("Gravando no Google Sheets..."):
-                    try:
-                        client = get_gspread_client()
-                        # ID da sua planilha (extraído da URL que você passou)
-                        sh = client.open_by_key("1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4")
-                        
-                        # Dados formatados para a linha
-                        nova_linha = [n, t, tn, i, comu, ""] # Nome, Turma, Turno, Idade, Comunidade, Padrinho vazio
-                        
-                        # 1. Grava na aba da Sala Específica
-                        sh.worksheet(t).append_row(nova_linha)
-                        
-                        # 2. Grava na aba GERAL
-                        sh.worksheet("GERAL").append_row(nova_linha)
-                        
-                        st.success(f"Matrícula de {n} realizada com sucesso em ambas as abas!")
-                    except Exception as e:
-                        st.error(f"Erro ao gravar: {e}")
-            else: st.warning("Preencha Nome e Idade.")
+                with st.spinner("Gravando dados..."):
+                    client = get_gspread_client()
+                    sh = client.open_by_key("1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4")
+                    nova_linha = [n, t, tn, i, comu, ""] # Nome, Turma, Turno, Idade, Comu, Padrinho vazio
+                    sh.worksheet(t).append_row(nova_linha)
+                    sh.worksheet("GERAL").append_row(nova_linha)
+                    st.success(f"Matrícula de {n} salva com sucesso!")
+            else: st.warning("Preencha os campos obrigatórios.")
 
 elif menu == "📝 Matrículas":
-    st.markdown(f"<h3 style='color:{C_VERDE}'>📋 Quadro de Matrículas (Tempo Real)</h3>", unsafe_allow_html=True)
-    sel = st.selectbox("Selecione a Sala para Visualizar", ["GERAL"] + list(TURMAS_CONFIG.keys()))
-    df = safe_read(sel)
+    st.markdown(f"<h3 style='color:{C_VERDE}'>📋 Quadro de Matrículas</h3>", unsafe_allow_html=True)
+    cols_btn = st.columns(5)
+    for i, (sala, cfg) in enumerate(TURMAS_CONFIG.items()):
+        if cols_btn[i].button(sala, key=f"btn_mat_{sala}"): 
+            st.session_state.sel_mat = sala
+            st.rerun()
+    
+    df = safe_read(st.session_state.sel_mat)
     if not df.empty:
         st.dataframe(df, use_container_width=True)
 
@@ -148,36 +146,74 @@ elif menu == "🤝 Apadrinhamento":
     st.markdown(f"<h3 style='color:{C_AZUL}'>🤝 Gestão de Apadrinhamento</h3>", unsafe_allow_html=True)
     df_g = safe_read("GERAL")
     
-    # Filtro apenas para quem não tem padrinho
     sem_pad = df_g[df_g["PADRINHO/MADRINHA"].isin(["", "0", "nan", "NAN", None])]
     
-    with st.expander("✨ Vincular Novo Padrinho/Madrinha", expanded=True):
+    with st.expander("✨ Vincular Novo Padrinho", expanded=True):
         if not sem_pad.empty:
             c1, c2, c3 = st.columns([2, 2, 1])
-            al_sel = c1.selectbox("Aluno sem Padrinho", sorted(sem_pad["ALUNO"].unique()))
+            al_vinc = c1.selectbox("Aluno sem Padrinho", sorted(sem_pad["ALUNO"].unique()))
             pad_nome = c2.text_input("Nome do Padrinho/Madrinha").upper()
-            
-            if c3.button("Vincular"):
+            if c3.button("Confirmar"):
                 if pad_nome:
-                    with st.spinner("Atualizando planilhas..."):
-                        client = get_gspread_client()
-                        sh = client.open_by_key("1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4")
-                        
-                        # Precisamos achar a linha do aluno na aba GERAL e na aba da SALA dele
-                        # Para simplificar, vamos atualizar na aba GERAL (Coluna F)
-                        aba_g = sh.worksheet("GERAL")
-                        celula = aba_g.find(al_sel)
-                        aba_g.update_cell(celula.row, 6, pad_nome) # Coluna 6 é Padrinho
-                        
-                        # Tenta atualizar na aba da sala também
-                        info_aluno = sem_pad[sem_pad["ALUNO"] == al_sel].iloc[0]
-                        aba_s = sh.worksheet(info_aluno["TURMA"])
-                        celula_s = aba_s.find(al_sel)
-                        aba_s.update_cell(celula_s.row, 6, pad_nome)
-                        
-                        st.success(f"{pad_nome} agora é padrinho de {al_sel}!")
-                        st.rerun()
-                else: st.warning("Digite o nome do padrinho.")
-        else: st.info("Todos os alunos já possuem padrinhos.")
+                    client = get_gspread_client()
+                    sh = client.open_by_key("1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4")
+                    
+                    # Atualiza na aba GERAL (Coluna 6 = F)
+                    aba_g = sh.worksheet("GERAL")
+                    cell = aba_g.find(al_vinc)
+                    aba_g.update_cell(cell.row, 6, pad_nome)
+                    
+                    # Atualiza na aba da Sala
+                    turma_aluno = sem_pad[sem_pad["ALUNO"] == al_vinc]["TURMA"].values[0]
+                    aba_s = sh.worksheet(turma_aluno)
+                    cell_s = aba_s.find(al_vinc)
+                    aba_s.update_cell(cell_s.row, 6, pad_nome)
+                    
+                    st.success("Vínculo atualizado!")
+                    st.rerun()
+        else: st.info("Todos os alunos têm padrinhos.")
 
-# ... (Restante do código de Avaliações e Gráficos permanece igual ao anterior)
+elif menu == "📊 Lançar Avaliação":
+    st.markdown(f"<h3 style='color:{C_AMARELO}'>📊 Lançar Notas</h3>", unsafe_allow_html=True)
+    df_g = safe_read("GERAL")
+    with st.form("aval"):
+        al = st.selectbox("Aluno", sorted(df_g["ALUNO"].unique()))
+        tr = st.selectbox("Trimestre", ["1º Trimestre", "2º Trimestre", "3º Trimestre"])
+        cols_nt = st.columns(2)
+        notas = {cat: cols_nt[idx % 2].slider(cat, 1, 5, 3) for idx, cat in enumerate(CATEGORIAS)}
+        if st.form_submit_button("Salvar Avaliação"):
+            df_av = pd.read_csv(AVAL_FILE) if os.path.exists(AVAL_FILE) else pd.DataFrame(columns=["Aluno", "Trimestre"] + CATEGORIAS)
+            df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Trimestre'] == tr))]
+            pd.concat([df_av, pd.DataFrame([[al, tr] + [float(v) for v in notas.values()]], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
+            st.success("Avaliação salva!")
+
+elif menu == "🌊 Evolução":
+    st.markdown(f"<h3 style='color:{C_AZUL}'>🌊 Evolução dos Afilhados</h3>", unsafe_allow_html=True)
+    df_g = safe_read("GERAL")
+    df_av = pd.read_csv(AVAL_FILE) if os.path.exists(AVAL_FILE) else pd.DataFrame()
+    
+    padrinho = st.session_state.nome_usuario if st.session_state.perfil == "padrinho" else st.selectbox("Padrinho:", sorted(df_g["PADRINHO/MADRINHA"].unique()))
+    
+    afilhas = df_g[df_g["PADRINHO/MADRINHA"].astype(str).str.upper() == padrinho.upper()]
+    if not afilhas.empty:
+        al_s = st.selectbox("Afilhado:", afilhas["ALUNO"].unique())
+        df_al = df_av[df_av["Aluno"] == al_s]
+        if not df_al.empty:
+            tri = st.selectbox("Trimestre", df_al["Trimestre"].unique())
+            row = df_al[df_al["Trimestre"] == tri].iloc[0]
+            fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], fill='tozeroy', line=dict(color=C_AZUL, width=4, shape='spline')))
+            fig.update_layout(yaxis=dict(range=[0, 5.5]), height=400)
+            st.plotly_chart(fig, use_container_width=True)
+    else: st.warning("Nenhum afilhado encontrado.")
+
+elif menu == "🌊 Tábua da Maré":
+    st.markdown(f"<h3 style='color:{C_VERDE}'>🌊 Tábua da Maré - Interno</h3>", unsafe_allow_html=True)
+    if os.path.exists(AVAL_FILE):
+        df_av = pd.read_csv(AVAL_FILE)
+        al_s = st.selectbox("Pesquisar Aluno:", sorted(df_av["Aluno"].unique()))
+        df_al = df_av[df_av["Aluno"] == al_s]
+        if not df_al.empty:
+            tri = st.selectbox("Trimestre", df_al["Trimestre"].unique())
+            row = df_al[df_al["Trimestre"] == tri].iloc[0]
+            fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], fill='tozeroy', line=dict(color=C_VERDE, width=4, shape='spline')))
+            st.plotly_chart(fig, use_container_width=True)

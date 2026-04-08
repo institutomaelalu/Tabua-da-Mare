@@ -14,44 +14,33 @@ st.markdown(f"""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     .stApp {{ background-color: #ffffff; font-family: 'Inter', sans-serif; }}
     
-    .main-header {{ 
-        text-align: center; 
-        padding-top: 45px; 
-        padding-bottom: 15px;
-    }}
-    .main-header h1 {{ 
-        margin: 0; 
-        font-size: 42px !important; 
-        font-weight: 800;
-    }}
+    .main-header {{ text-align: center; padding-top: 30px; padding-bottom: 5px; }}
+    .main-header h1 {{ margin: 0; font-size: 40px !important; font-weight: 800; line-height: 1.1; }}
 
-    /* Ajuste de Espaçamentos */
-    .block-container {{ padding-top: 1.2rem !important; }}
-    [data-testid="stVerticalBlock"] > div {{ padding-bottom: 0.8rem !important; }}
-    .stSelectbox, .stCheckbox, .stSlider {{ margin-bottom: 10px !important; }}
-    [data-testid="stHorizontalBlock"] {{ gap: 0.8rem !important; margin-bottom: 8px !important; }}
+    /* Redução de Espaçamentos */
+    .block-container {{ padding-top: 0.5rem !important; }}
+    [data-testid="stVerticalBlock"] > div {{ padding-bottom: 0rem !important; margin-bottom: -15px !important; }}
+    .stSelectbox, .stCheckbox, .stSlider {{ margin-bottom: -20px !important; }}
+    [data-testid="stHorizontalBlock"] {{ gap: 0.5rem !important; margin-bottom: -10px !important; }}
+    hr {{ margin: 0.2rem 0 !important; }}
 
     /* Tabelas */
     .custom-table {{
         width: 100%; border-collapse: separate; border-spacing: 0;
         border: 1px solid #f0f0f0; border-radius: 10px;
-        overflow: hidden; font-size: 13px; margin-top: 10px;
+        overflow: hidden; font-size: 13px; margin-top: 5px;
     }}
-    .custom-table thead th {{ background-color: #ffffff; padding: 12px; text-align: left; border-bottom: 2px solid #f8f8f8; }}
+    .custom-table thead th {{ background-color: #ffffff; padding: 10px; text-align: left; border-bottom: 2px solid #f8f8f8; }}
     .th-rosa {{ color: {C_ROSA} !important; font-weight: 700; }}
     .th-verde {{ color: {C_VERDE} !important; font-weight: 700; }}
     .th-azul {{ color: {C_AZUL} !important; font-weight: 700; }}
     .th-amarelo {{ color: {C_AMARELO} !important; font-weight: 700; }}
-    .custom-table tbody td {{ padding: 10px; border-bottom: 1px solid #fafafa; color: #666 !important; font-weight: 500; }}
+    .custom-table tbody td {{ padding: 8px 10px; border-bottom: 1px solid #fafafa; color: #777 !important; font-weight: 500; }}
     
-    /* Botões Padrão */
     div.stButton > button {{
         width: 100%; border-radius: 8px !important; border: 1px solid #eee !important;
-        font-weight: 600 !important; height: 40px; font-size: 12px !important;
-        transition: all 0.3s;
+        font-weight: 600 !important; height: 38px; font-size: 12px !important;
     }}
-    
-    hr {{ margin: 0.8rem 0 !important; }}
     </style>
     
     <div class="main-header">
@@ -62,7 +51,7 @@ st.markdown(f"""
     <hr style="border: 0; height: 2px; background-image: linear-gradient(to right, {C_ROSA}, {C_VERDE}, {C_AZUL}, {C_AMARELO});">
     """, unsafe_allow_html=True)
 
-# 2. Callbacks e Dados
+# 2. Inicialização e Dados
 def set_mat(t): st.session_state.f_mat = t
 def set_pad(t): st.session_state.f_pad = t
 
@@ -132,7 +121,6 @@ if menu == "📝 Matrículas":
     cols_t = st.columns(6)
     cols_t[0].button("Todas", on_click=set_mat, args=("Todas",))
     st.markdown(f"<style>div[data-testid='stHorizontalBlock'] > div:nth-child(1) button {{ background-color: {'#333' if st.session_state.f_mat == 'Todas' else '#eee'} !important; color: white !important; }}</style>", unsafe_allow_html=True)
-    
     for i, (sala, conf) in enumerate(TURMAS_CONFIG.items(), 2):
         cols_t[i-1].button(sala, key=f"m_{sala}", on_click=set_mat, args=(sala,))
         is_sel = st.session_state.f_mat == sala
@@ -140,7 +128,7 @@ if menu == "📝 Matrículas":
     
     df = safe_read(st.session_state.f_mat if st.session_state.f_mat != "Todas" else "GERAL")
     f1, f2 = st.columns(2)
-    with f1: f_tn = st.selectbox("Filtrar Turma (A/B)", ["Todos", "A", "B"])
+    with f1: f_tn = st.selectbox("Turno (A/B)", ["Todos", "A", "B"])
     with f2: f_cm = st.selectbox("Comunidade", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]))
     
     df_f = df.copy()
@@ -158,9 +146,9 @@ elif menu == "🤝 Apadrinhamento":
     
     df = safe_read(st.session_state.f_pad)
     f1, f2, f3 = st.columns([1, 1, 1])
-    with f1: f_tn_p = st.selectbox("Filtrar Turma (A/B) ", ["Todos", "A", "B"])
+    with f1: f_tn_p = st.selectbox("Turma (A/B) ", ["Todos", "A", "B"])
     with f2: f_cm_p = st.selectbox("Comunidade ", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]))
-    with f3: check = st.checkbox("Apenas sem padrinho")
+    with f3: check = st.checkbox("Sem padrinho/madrinha")
     
     df_f = df.copy()
     if f_tn_p != "Todos": df_f = df_f[df_f["TURMA"].astype(str).str.strip().str.upper() == f_tn_p]
@@ -169,33 +157,30 @@ elif menu == "🤝 Apadrinhamento":
     
     render_styled_table(df_f[["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]])
 
-    st.write("---")
-    with st.expander("📝 Gerenciar Padrinho/Madrinha"):
+    with st.expander("📝 Gerenciar Padrinhos"):
         with st.form("form_pad"):
-            al_sel = st.selectbox("Selecione o Aluno", sorted(df["ALUNO"].unique()))
+            al_sel = st.selectbox("Aluno", sorted(df["ALUNO"].unique()))
             novo_p = st.text_input("Nome do Padrinho/Madrinha")
-            if st.form_submit_button("Atualizar Padrinho"):
+            if st.form_submit_button("Atualizar"):
                 df_p = pd.read_csv(PADRINHOS_FILE)
                 df_p = df_p[df_p["ALUNO"] != al_sel]
                 pd.concat([df_p, pd.DataFrame([[al_sel, novo_p]], columns=["ALUNO", "PADRINHO_EDITADO"])], ignore_index=True).to_csv(PADRINHOS_FILE, index=False)
-                st.success("Padrinho atualizado!")
+                st.success("Atualizado!")
                 st.rerun()
 
 elif menu == "📊 Lançar Avaliação":
     st.markdown(f"<h3 style='color:{C_AMARELO};'>📊 Lançar Notas</h3>", unsafe_allow_html=True)
     df_g = safe_read("GERAL")
-    if not df_g.empty:
-        with st.form("aval_form"):
-            c1, c2 = st.columns(2)
-            al = c1.selectbox("Aluno", sorted([str(x) for x in df_g["ALUNO"].unique() if x]))
-            tr = c2.selectbox("Trimestre", ["1º Trimestre", "2º Trimestre", "3º Trimestre"])
-            st.write("---")
-            notas = {cat: st.slider(cat, 1, 5, 3) for cat in CATEGORIAS}
-            if st.form_submit_button("Salvar Avaliação"):
-                df_av = pd.read_csv(AVAL_FILE)
-                df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Trimestre'] == tr))]
-                pd.concat([df_av, pd.DataFrame([[al, tr] + [float(v) for v in notas.values()]], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
-                st.success("Salvo!")
+    with st.form("aval_form"):
+        c1, c2 = st.columns(2)
+        al = c1.selectbox("Aluno", sorted([str(x) for x in df_g["ALUNO"].unique() if x]))
+        tr = c2.selectbox("Trimestre", ["1º Trimestre", "2º Trimestre", "3º Trimestre"])
+        notas = {cat: st.slider(cat, 1, 5, 3) for cat in CATEGORIAS}
+        if st.form_submit_button("Salvar Avaliação"):
+            df_av = pd.read_csv(AVAL_FILE)
+            df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Trimestre'] == tr))]
+            pd.concat([df_av, pd.DataFrame([[al, tr] + [float(v) for v in notas.values()]], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
+            st.success("Salvo!")
 
 elif menu == "🌊 Evolução Individual":
     st.markdown(f"<h3 style='color:{C_AZUL};'>🌊 Evolução Individual</h3>", unsafe_allow_html=True)
@@ -204,12 +189,14 @@ elif menu == "🌊 Evolução Individual":
         if not df_av.empty:
             al_s = st.selectbox("Escolha o Aluno", sorted(df_av["Aluno"].unique()))
             df_al = df_av[df_av["Aluno"] == al_s]
-            tri_s = st.selectbox("Trimestre", df_al["Trimestre"].unique())
-            row = df_al[df_al["Trimestre"] == tri_s].iloc[0]
-            y_vals = [float(row[cat]) for cat in CATEGORIAS]
-            fig = go.Figure(go.Scatter(x=CATEGORIAS, y=y_vals, mode='lines+markers+text', text=[str(int(v)) for v in y_vals], textposition="top center", fill='tozeroy', line=dict(color=C_AZUL, width=4, shape='spline')))
-            fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=450, plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=40, b=0))
-            st.plotly_chart(fig, use_container_width=True)
+            if not df_al.empty:
+                tri_s = st.selectbox("Trimestre", df_al["Trimestre"].unique())
+                row = df_al[df_al["Trimestre"] == tri_s].iloc[0]
+                y_vals = [float(row[cat]) for cat in CATEGORIAS]
+                fig = go.Figure(go.Scatter(x=CATEGORIAS, y=y_vals, mode='lines+markers+text', text=[str(int(v)) for v in y_vals], textposition="top center", fill='tozeroy', line=dict(color=C_AZUL, width=4, shape='spline')))
+                fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=400, plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=30, b=0))
+                st.plotly_chart(fig, use_container_width=True)
+        else: st.info("Sem avaliações.")
 
 elif menu == "👤 Cadastro":
     st.markdown(f"<h3 style='color:{C_ROSA};'>👤 Novo Cadastro</h3>", unsafe_allow_html=True)

@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import os
 
-# 1. Configuração e Estilo
+# 1. Configuração e Estilo Visual
 st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 
 C_ROSA, C_VERDE, C_AZUL, C_AMARELO = "#ff81ba", "#a8cf45", "#5cc6d0", "#ffc713"
@@ -16,7 +16,7 @@ st.markdown(f"""
     .main-title {{ text-align: center; padding: 10px 0; }}
     .main-title h1 {{ font-size: 30px; margin: 0; font-weight: 800; }}
     
-    /* Botões de Sala - Layout em linha */
+    /* Botões de Sala */
     div[data-testid="stHorizontalBlock"] {{ align-items: center !important; gap: 0.3rem !important; }}
     .stButton > button {{
         width: 100%; border-radius: 8px !important; border: 1px solid #eee !important;
@@ -24,22 +24,21 @@ st.markdown(f"""
         text-transform: uppercase;
     }}
     
-    /* Tabelas */
+    /* Tabelas com Cabeçalho Colorido */
     .custom-table {{
         width: 100%; border-collapse: separate; border-spacing: 0;
         border: 1px solid #f2f2f2; border-radius: 10px; font-size: 13px; margin-top: 10px;
     }}
-    .custom-table thead th {{ background-color: #fafafa; color: #888; padding: 10px; text-align: left; border-bottom: 2px solid #eee; }}
-    .custom-table tbody td {{ padding: 8px 10px; border-bottom: 1px solid #f8f8f8; }}
+    .custom-table thead th {{ padding: 12px; text-align: left; border-bottom: 2px solid #eee; background-color: #fafafa; }}
+    
+    /* Cores Específicas do Cabeçalho */
+    .th-aluno {{ color: {C_AZUL} !important; }}
+    .th-turma {{ color: {C_VERDE} !important; }}
+    .th-idade {{ color: {C_AMARELO} !important; }}
+    .th-comunidade {{ color: {C_ROSA} !important; }}
+    .th-padrinho {{ color: {C_AZUL} !important; }}
 
-    /* Cores das Fontes */
-    .txt-rosa {{ color: {C_ROSA} !important; font-weight: 600; }}
-    .txt-verde {{ color: {C_VERDE} !important; font-weight: 600; }}
-    .txt-azul {{ color: {C_AZUL} !important; font-weight: 600; }}
-    
-    /* Sliders Suaves */
     .stSlider {{ padding: 0px 5px !important; }}
-    
     hr {{ margin: 0.5rem 0 !important; border: 0; height: 2px; background: linear-gradient(to right, {C_ROSA}, {C_VERDE}, {C_AZUL}, {C_AMARELO}); }}
     </style>
     
@@ -53,18 +52,17 @@ st.markdown(f"""
     <hr>
     """, unsafe_allow_html=True)
 
-# 2. Banco de Dados e Lógica
+# 2. Banco de Dados e Inicialização
 CATEGORIAS = ["Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]
 ALUNOS_FILE, AVAL_FILE, PADRINHOS_FILE = "alunos.csv", "avaliacoes.csv", "padrinhos_local.csv"
 
 def init_db():
-    if not os.path.exists(ALUNOS_FILE): pd.DataFrame(columns=["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE"]).to_csv(ALUNOS_FILE, index=False)
-    if not os.path.exists(AVAL_FILE): pd.DataFrame(columns=["Aluno", "Trimestre"] + CATEGORIAS).to_csv(AVAL_FILE, index=False)
-    if not os.path.exists(PADRINHOS_FILE): pd.DataFrame(columns=["ALUNO", "PADRINHO_EDITADO"]).to_csv(PADRINHOS_FILE, index=False)
+    for f, cols in {ALUNOS_FILE: ["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE"], 
+                    AVAL_FILE: ["Aluno", "Trimestre"] + CATEGORIAS,
+                    PADRINHOS_FILE: ["ALUNO", "PADRINHO_EDITADO"]}.items():
+        if not os.path.exists(f): pd.DataFrame(columns=cols).to_csv(f, index=False)
 init_db()
 
-def set_mat(t): st.session_state.f_mat = t
-def set_pad(t): st.session_state.f_pad = t
 if 'f_mat' not in st.session_state: st.session_state.f_mat = "Todas"
 if 'f_pad' not in st.session_state: st.session_state.f_pad = "SALA ROSA"
 
@@ -83,7 +81,6 @@ def safe_read(worksheet_name):
         if sheet_key in st.secrets.get("connections", {}).get("gsheets", {}):
             url = st.secrets["connections"]["gsheets"][sheet_key]
             url_csv = url.split("/edit")[0] + "/export?format=csv"
-            if "gid=" in url: url_csv += f"&gid={url.split('gid=')[1]}"
             df_sheet = pd.read_csv(url_csv)
             df_sheet.columns = [str(c).strip().upper() for c in df_sheet.columns]
             df = df_sheet
@@ -100,74 +97,80 @@ def safe_read(worksheet_name):
         return full.fillna("")
     except: return df.fillna("")
 
-def render_styled_table(df):
+def render_styled_table(df, cor_fixa=None):
     if df.empty: return st.info("Nenhum dado encontrado.")
-    font_colors = ["txt-rosa", "txt-verde", "txt-azul"]
+    
+    # Cabeçalho Colorido
+    header_map = {"ALUNO": "th-aluno", "TURMA": "th-turma", "IDADE": "th-idade", "COMUNIDADE": "th-comunidade", "PADRINHO/MADRINHA": "th-padrinho"}
     cols = [c for c in df.columns if "UNNAMED" not in c.upper()]
-    html = '<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in cols]) + '</tr></thead><tbody>'
+    
+    html = '<table class="custom-table"><thead><tr>'
+    for c in cols:
+        cls = header_map.get(c, "")
+        html += f'<th class="{cls}">{c}</th>'
+    html += '</tr></thead><tbody>'
+    
+    # Corpo com Cor Dinâmica
+    cores_alternadas = [C_ROSA, C_VERDE, C_AZUL, C_AMARELO]
     for i, row in df.iterrows():
-        c_class = font_colors[i % len(font_colors)]
-        html += f'<tr>' + "".join([f'<td class="{c_class}">{row[v]}</td>' for v in cols]) + '</tr>'
+        cor_linha = cor_fixa if cor_fixa else cores_alternadas[i % len(cores_alternadas)]
+        html += f'<tr>' + "".join([f'<td style="color:{cor_linha}; font-weight:600;">{row[v]}</td>' for v in cols]) + '</tr>'
     st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 
-# 3. Interface
+# 3. Navegação
 menu = st.sidebar.radio("Navegação", ["👤 Novo Cadastro", "📝 Matrículas", "🤝 Apadrinhamento", "📊 Lançar Avaliação", "🌊 Evolução Individual"])
 
 if menu == "👤 Novo Cadastro":
-    st.markdown(f"<h3 style='color:{C_ROSA};'>👤 Matricular Novo Aluno</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color:{C_ROSA};'>👤 Novo Cadastro</h3>", unsafe_allow_html=True)
     with st.form("cad_form", clear_on_submit=True):
         c1, c2 = st.columns(2)
         with c1: n, i, comu = st.text_input("Nome Completo"), st.text_input("Idade"), st.text_input("Comunidade")
         with c2: t, tn = st.selectbox("Turma", ["1º ANO A", "1º ANO B", "2º ANO A", "2º ANO B", "3º ANO A", "3º ANO B", "4º ANO A", "4º ANO B", "5º ANO A", "5º ANO B"]), st.selectbox("Turno", ["MATUTINO", "VESPERTINO"])
-        if st.form_submit_button("Concluir Matrícula"):
+        if st.form_submit_button("Salvar Matrícula"):
             df_l = pd.read_csv(ALUNOS_FILE)
             pd.concat([df_l, pd.DataFrame([[n.upper(), t, tn, i, comu]], columns=df_l.columns)], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
-            st.success("Salvo!")
+            st.success("Salvo com sucesso!")
 
 elif menu == "📝 Matrículas":
     st.markdown(f"<h3 style='color:{C_VERDE};'>📋 Quadro de Matrículas</h3>", unsafe_allow_html=True)
     cols_t = st.columns(6)
-    cols_t[0].button("Todas", on_click=set_mat, args=("Todas",))
-    st.markdown(f"<style>div[data-testid='stHorizontalBlock'] > div:nth-child(1) button {{ background-color: {'#333' if st.session_state.f_mat == 'Todas' else '#eee'} !important; color: white !important; }}</style>", unsafe_allow_html=True)
-    for i, (sala, conf) in enumerate(TURMAS_CONFIG.items(), 2):
-        cols_t[i-1].button(sala, key=f"m_{sala}", on_click=set_mat, args=(sala,))
-        is_sel = st.session_state.f_mat == sala
-        st.markdown(f"<style>div[data-testid='stHorizontalBlock'] > div:nth-child({i}) button {{ background-color: {conf['cor'] if is_sel else '#eee'} !important; color: {conf['txt'] if is_sel else '#888'} !important; }}</style>", unsafe_allow_html=True)
+    if cols_t[0].button("Todas"): st.session_state.f_mat = "Todas"
+    for i, (sala, conf) in enumerate(TURMAS_CONFIG.items(), 1):
+        if cols_t[i].button(sala): st.session_state.f_mat = sala
     
     df = safe_read(st.session_state.f_mat if st.session_state.f_mat != "Todas" else "GERAL")
     c1, c2 = st.columns(2)
-    # Filtro Dinâmico de Turma (Opções A e B)
-    turmas_disponiveis = sorted([str(x) for x in df["TURMA"].unique() if x])
-    with c1: f_turma = st.selectbox("Filtrar Turma (A/B)", ["Todas"] + turmas_disponiveis, key="f_tur_mat")
+    with c1: f_turma = st.selectbox("Filtrar Turma (A/B)", ["Todas"] + sorted([str(x) for x in df["TURMA"].unique() if x]))
     with c2: f_cm = st.selectbox("Filtrar Comunidade", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]))
     
     df_f = df.copy()
     if f_turma != "Todas": df_f = df_f[df_f["TURMA"] == f_turma]
     if f_cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_cm]
-    render_styled_table(df_f[["ALUNO", "TURMA", "IDADE", "COMUNIDADE"]])
+    
+    cor_sala = TURMAS_CONFIG.get(st.session_state.f_mat, {}).get("cor")
+    render_styled_table(df_f[["ALUNO", "TURMA", "IDADE", "COMUNIDADE"]], cor_fixa=cor_sala)
 
 elif menu == "🤝 Apadrinhamento":
-    st.markdown(f"<h3 style='color:{C_AZUL};'>🤝 Gestão de Apadrinhamento</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color:{C_AZUL};'>🤝 Apadrinhamento</h3>", unsafe_allow_html=True)
     cols_p = st.columns(5)
     for i, (sala, conf) in enumerate(TURMAS_CONFIG.items()):
-        cols_p[i].button(sala, key=f"p_{sala}", on_click=set_pad, args=(sala,))
-        is_sel = st.session_state.f_pad == sala
-        st.markdown(f"<style>div[data-testid='stHorizontalBlock'] > div:nth-child({i+1}) button {{ background-color: {conf['cor'] if is_sel else '#eee'} !important; color: {conf['txt'] if is_sel else '#888'} !important; }}</style>", unsafe_allow_html=True)
+        if cols_p[i].button(sala, key=f"btn_p_{sala}"): st.session_state.f_pad = sala
     
     df = safe_read(st.session_state.f_pad)
     c1, c2, c3 = st.columns([2, 2, 1])
-    turmas_p_disp = sorted([str(x) for x in df["TURMA"].unique() if x])
-    with c1: f_turma_p = st.selectbox("Filtrar Turma (A/B)", ["Todas"] + turmas_p_disp, key="f_tur_pad")
-    with c2: f_cm_p = st.selectbox("Filtrar Comunidade", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]))
-    with c3: check = st.checkbox("Sem padrinho")
+    with c1: f_turma_p = st.selectbox("Filtrar Turma (A/B)", ["Todas"] + sorted([str(x) for x in df["TURMA"].unique() if x]), key="p_t")
+    with c2: f_cm_p = st.selectbox("Filtrar Comunidade", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]), key="p_c")
+    with c3: sem_p = st.checkbox("Sem Padrinho")
     
     df_f = df.copy()
     if f_turma_p != "Todas": df_f = df_f[df_f["TURMA"] == f_turma_p]
     if f_cm_p != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_cm_p]
-    if check: df_f = df_f[df_f["PADRINHO/MADRINHA"].astype(str).str.strip().isin(["", "nan", "None", "0"])]
-    render_styled_table(df_f[["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]])
+    if sem_p: df_f = df_f[df_f["PADRINHO/MADRINHA"].astype(str).str.strip().isin(["", "nan", "0"])]
     
-    with st.expander("📝 Editar Padrinho/Madrinha"):
+    cor_sala = TURMAS_CONFIG.get(st.session_state.f_pad, {}).get("cor")
+    render_styled_table(df_f[["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]], cor_fixa=cor_sala)
+    
+    with st.expander("📝 Editar Padrinho"):
         with st.form("edit_pad"):
             al_e = st.selectbox("Aluno", sorted([str(x) for x in df["ALUNO"].unique() if x]))
             novo_p = st.text_input("Nome do Padrinho/Madrinha")
@@ -187,13 +190,12 @@ elif menu == "📊 Lançar Avaliação":
         notas = {}
         sc1, sc2 = st.columns(2)
         for i, cat in enumerate(CATEGORIAS):
-            with sc1 if i < 4 else sc2:
-                notas[cat] = st.slider(cat, 1, 5, 3)
+            with sc1 if i < 4 else sc2: notas[cat] = st.slider(cat, 1, 5, 3)
         if st.form_submit_button("Salvar Avaliação"):
             df_av = pd.read_csv(AVAL_FILE)
             df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Trimestre'] == tr))]
             pd.concat([df_av, pd.DataFrame([[al, tr] + [float(v) for v in notas.values()]], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
-            st.success("Avaliação salva!")
+            st.success("Salvo!")
 
 elif menu == "🌊 Evolução Individual":
     st.markdown(f"<h3 style='color:{C_AZUL};'>🌊 Evolução Individual</h3>", unsafe_allow_html=True)

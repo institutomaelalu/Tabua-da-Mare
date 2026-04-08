@@ -55,30 +55,35 @@ def init_db():
 init_db()
 
 TURMAS_CORES = {
-    "SALA ROSA": {"bg_off": "#ffeef2", "txt_off": "#d63384", "bg_on": "#d63384", "txt_on": "#ffffff"},
-    "SALA AMARELA": {"bg_off": "#fff9db", "txt_off": "#856404", "bg_on": "#ffd600", "txt_on": "#000000"},
-    "SALA VERDE": {"bg_off": "#ebfbee", "txt_off": "#087f5b", "bg_on": "#087f5b", "txt_on": "#ffffff"},
-    "SALA AZUL": {"bg_off": "#e7f5ff", "txt_off": "#1971c2", "bg_on": "#1971c2", "txt_on": "#ffffff"},
-    "CIRAND. MUNDO": {"bg_off": "#e8eaf6", "txt_off": "#1a237e", "bg_on": "#1a237e", "txt_on": "#ffffff"},
+    "SALA ROSA": {"bg_off": "#ffeef2", "txt_off": "#d63384", "bg_on": "#d63384", "txt_on": "#ffffff", "key": "sala_rosa"},
+    "SALA AMARELA": {"bg_off": "#fff9db", "txt_off": "#856404", "bg_on": "#ffd600", "txt_on": "#000000", "key": "sala_amarela"},
+    "SALA VERDE": {"bg_off": "#ebfbee", "txt_off": "#087f5b", "bg_on": "#087f5b", "txt_on": "#ffffff", "key": "sala_verde"},
+    "SALA AZUL": {"bg_off": "#e7f5ff", "txt_off": "#1971c2", "bg_on": "#1971c2", "txt_on": "#ffffff", "key": "sala_azul"},
+    "CIRAND. MUNDO": {"bg_off": "#e8eaf6", "txt_off": "#1a237e", "bg_on": "#1a237e", "txt_on": "#ffffff", "key": "cirand_mundo"},
 }
 
 def safe_read(worksheet_name):
-    # Tenta ler do Google Sheets
+    df = pd.DataFrame(columns=["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"])
     try:
-        sheet_key = worksheet_name.lower().replace(" ", "_").replace(".", "")
-        if worksheet_name == "GERAL": sheet_key = "geral"
+        # Mapeamento manual das chaves para evitar erro de leitura
+        if worksheet_name == "GERAL":
+            sheet_key = "geral"
+        else:
+            sheet_key = TURMAS_CORES.get(worksheet_name, {}).get("key")
         
-        url = st.secrets["connections"]["gsheets"][sheet_key]
-        url_csv = url.split("/edit")[0] + "/export?format=csv"
-        if "gid=" in url: url_csv += f"&gid={url.split('gid=')[1]}"
-        
-        df = pd.read_csv(url_csv)
-        df.columns = [str(c).strip().upper() for c in df.columns]
+        if sheet_key and sheet_key in st.secrets["connections"]["gsheets"]:
+            url = st.secrets["connections"]["gsheets"][sheet_key]
+            url_csv = url.split("/edit")[0] + "/export?format=csv"
+            if "gid=" in url: url_csv += f"&gid={url.split('gid=')[1]}"
+            
+            df_sheet = pd.read_csv(url_csv)
+            df_sheet.columns = [str(c).strip().upper() for c in df_sheet.columns]
+            df = df_sheet
+            
     except Exception as e:
-        # Se falhar o Google, cria um DF vazio com colunas padrão para não travar os filtros
-        df = pd.DataFrame(columns=["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"])
+        st.error(f"Erro ao acessar aba {worksheet_name}: Verifique o link no secrets.")
     
-    # Sempre tenta unir com os dados locais salvos no Streamlit Cloud
+    # União com dados locais
     try:
         df_local = pd.read_csv(ALUNOS_FILE)
         df_pad = pd.read_csv(PADRINHOS_FILE)
@@ -90,18 +95,16 @@ def safe_read(worksheet_name):
             df_local_sala = df_local[df_local["TURMA"].str.contains(sala_filtro, na=False, case=False)]
             full = pd.concat([df, df_local_sala], ignore_index=True)
             
-        # Aplica edições de padrinhos
         if "ALUNO" in full.columns:
             full["ALUNO"] = full["ALUNO"].astype(str).str.strip().str.upper()
             for _, r in df_pad.iterrows():
-                al_nome = str(r["ALUNO"]).strip().upper()
-                full.loc[full["ALUNO"] == al_nome, "PADRINHO/MADRINHA"] = r["PADRINHO_EDITADO"]
+                full.loc[full["ALUNO"] == str(r["ALUNO"]).strip().upper(), "PADRINHO/MADRINHA"] = r["PADRINHO_EDITADO"]
         return full.fillna("")
     except:
         return df.fillna("")
 
 def render_styled_table(df, context_color=None):
-    if df.empty: return st.warning("Nenhum dado encontrado.")
+    if df.empty: return st.warning("Nenhum dado encontrado para esta seleção.")
     def get_row_class(row_val, context):
         val = (context if context else str(row_val)).upper()
         if 'ROSA' in val: return 'row-rosa'
@@ -130,13 +133,12 @@ if menu == "👤 1. Novo Cadastro":
         if st.form_submit_button("Salvar"):
             df_l = pd.read_csv(ALUNOS_FILE)
             pd.concat([df_l, pd.DataFrame([[n.upper(), t, tn, i, comu]], columns=df_l.columns)], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
-            st.success("Salvo com sucesso!")
+            st.success("Salvo!")
 
 elif menu == "📝 2. Matrículas":
     st.header("📋 Quadro de Matrículas")
     if 'f_mat' not in st.session_state: st.session_state.f_mat = "Todas"
     
-    # Botões de Turma Lado a Lado
     cols_t = st.columns(6)
     if cols_t[0].button("Todas", key="btn_todas", type="primary" if st.session_state.f_mat == "Todas" else "secondary"):
         st.session_state.f_mat = "Todas"
@@ -146,13 +148,12 @@ elif menu == "📝 2. Matrículas":
         if cols_t[i].button(sala, key=f"mat_{sala}"): st.session_state.f_mat = sala
         st.markdown(f"<style>div[data-testid='stHorizontalBlock'] > div:nth-child({i+1}) button {{ background-color: {cores['bg_on'] if is_sel else cores['bg_off']} !important; color: {cores['txt_on'] if is_sel else cores['txt_off']} !important; }}</style>", unsafe_allow_html=True)
 
-    df = safe_read("GERAL")
+    df = safe_read(st.session_state.f_mat if st.session_state.f_mat != "Todas" else "GERAL")
     f1, f2 = st.columns(2)
     with f1: f_tn = st.selectbox("Turno", ["Todos"] + sorted([str(x) for x in df["TURNO"].unique() if x]))
     with f2: f_cm = st.selectbox("Comunidade", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]))
     
     df_f = df.copy()
-    if st.session_state.f_mat != "Todas": df_f = df_f[df_f["TURMA"] == st.session_state.f_mat]
     if f_tn != "Todos": df_f = df_f[df_f["TURNO"] == f_tn]
     if f_cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_cm]
     render_styled_table(df_f[["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE"]])
@@ -200,11 +201,10 @@ elif menu == "📊 4. Avaliação":
             notas = {c: st.slider(c, 1, 5, 3) for c in CATEGORIAS}
             if st.form_submit_button("Gravar Avaliação"):
                 df_av = pd.read_csv(AVAL_FILE)
-                # Remove duplicata antes de salvar
                 df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Trimestre'] == tr))]
                 nova_linha = pd.DataFrame([[al, tr] + [float(v) for v in notas.values()]], columns=df_av.columns)
                 pd.concat([df_av, nova_linha], ignore_index=True).to_csv(AVAL_FILE, index=False)
-                st.success("Avaliação salva!")
+                st.success("Salva!")
 
 elif menu == "🌊 5. Evolução":
     st.header("🌊 Evolução Individual")
@@ -215,10 +215,7 @@ elif menu == "🌊 5. Evolução":
             df_al = df_av[df_av["Aluno"] == al_s]
             tri_s = st.selectbox("Selecione o Trimestre", df_al["Trimestre"].unique())
             row = df_al[df_al["Trimestre"] == tri_s].iloc[0]
-            
             y_vals = [float(row[c]) for c in CATEGORIAS]
             fig = go.Figure(go.Scatter(x=CATEGORIAS, y=y_vals, mode='lines+markers', fill='tozeroy', line=dict(color=COR_AZUL_INST, width=3)))
             fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=450)
             st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Nenhuma avaliação registrada no sistema.")

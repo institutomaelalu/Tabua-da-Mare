@@ -60,24 +60,25 @@ def safe_read(worksheet_name):
             df.columns = [str(c).strip() for c in df.columns]
             return df
         return pd.DataFrame()
-    except Exception as e:
-        st.error(f"Erro ao acessar {worksheet_name}.")
+    except:
         return pd.DataFrame()
 
-# --- FUNÇÃO DE ESTILIZAÇÃO ---
+# --- FUNÇÃO DE ESTILIZAÇÃO (LAYOUT COLORIDO) ---
 def stylize_df(df):
     def apply_room_color(row):
         turma = str(row.get('TURMA', '')).strip().upper()
+        # Cores vibrantes para o fundo e contraste no texto
         colors = {
-            'SALA ROSA': 'background-color: #ffd1dc; color: #000000',
-            'SALA AMARELA': 'background-color: #fff9c4; color: #000000',
-            'SALA VERDE': 'background-color: #c8e6c9; color: #000000',
-            'SALA AZUL': 'background-color: #e3f2fd; color: #000000',
-            'CIRAND. MUNDO': 'background-color: #1a237e; color: #ffffff',
+            'SALA ROSA': 'background-color: #FFC0CB; color: #8B008B; font-weight: bold;',
+            'SALA AMARELA': 'background-color: #FFFACD; color: #8B8B00; font-weight: bold;',
+            'SALA VERDE': 'background-color: #98FB98; color: #006400; font-weight: bold;',
+            'SALA AZUL': 'background-color: #ADD8E6; color: #00008B; font-weight: bold;',
+            'CIRAND. MUNDO': 'background-color: #191970; color: #FFFFFF; font-weight: bold;',
         }
-        style = colors.get(turma, '')
+        style = colors.get(turma, 'background-color: white; color: black;')
         return [style] * len(row)
     
+    # Retorna o Styler do Pandas
     return df.style.apply(apply_room_color, axis=1)
 
 # 4. Navegação Lateral
@@ -117,19 +118,17 @@ if menu == "🌊 Painel de Evolução":
             fig.update_layout(xaxis=dict(tickmode='array', tickvals=list(range(len(CATEGORIAS))), ticktext=CATEGORIAS), yaxis=dict(range=[0, 5.5]), plot_bgcolor='white', height=400, showlegend=False)
             st.plotly_chart(fig, use_container_width=True)
 
-# --- 2. MATRÍCULAS (GERAL) - FILTROS ATUALIZADOS ---
+# --- 2. MATRÍCULAS (GERAL) ---
 elif menu == "📝 Controle de Matrículas (GERAL)":
     st.header("📋 Lista Geral de Alunos")
     df_raw = safe_read("GERAL")
-    
     if not df_raw.empty:
-        st.write("🔍 **Filtros de Busca**")
-        # Layout de 4 colunas para os filtros
+        st.write("🔍 **Filtros**")
         f1, f2, f3, f4 = st.columns(4)
-        with f1: f_nome = st.text_input("Nome do Aluno")
-        with f2: f_turma = st.selectbox("Turma", ["Todas"] + sorted(list(df_raw["TURMA"].dropna().unique())))
-        with f3: f_comu = st.selectbox("Comunidade", ["Todas"] + sorted(list(df_raw["COMUNIDADE"].dropna().unique())))
-        with f4: f_turno = st.selectbox("Turno", ["Todos"] + sorted(list(df_raw["TURNO"].dropna().unique())))
+        with f1: f_nome = st.text_input("Nome")
+        with f2: f_turma = st.selectbox("Turma ", ["Todas"] + sorted(list(df_raw["TURMA"].dropna().unique())))
+        with f3: f_comu = st.selectbox("Comunidade ", ["Todas"] + sorted(list(df_raw["COMUNIDADE"].dropna().unique())))
+        with f4: f_turno = st.selectbox("Turno ", ["Todos"] + sorted(list(df_raw["TURNO"].dropna().unique())))
 
         df_f = df_raw.copy()
         if f_nome: df_f = df_f[df_f["ALUNO"].str.contains(f_nome, case=False, na=False)]
@@ -139,20 +138,37 @@ elif menu == "📝 Controle de Matrículas (GERAL)":
 
         cols = ["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE"]
         df_final = df_f[cols].dropna(subset=["ALUNO"])
-        
+        # IMPORTANTE: .to_html() ou passar o styler direto
         st.dataframe(stylize_df(df_final), use_container_width=True, height=500)
 
-# --- 3. APADRINHAMENTO ---
+# --- 3. APADRINHAMENTO (FILTRO TURMA ADICIONADO) ---
 elif menu == "🤝 Controle de Apadrinhamento":
     st.header("🤝 Gestão por Salas")
-    sala_sel = st.selectbox("Selecione a Sala:", ["SALA ROSA", "SALA AMARELA", "SALA VERDE", "SALA AZUL", "CIRAND. MUNDO"])
-    df_s = safe_read(sala_sel)
+    
+    # Primeiro escolhe a aba (Planilha)
+    sala_planilha = st.selectbox("Selecione a Aba Original:", ["SALA ROSA", "SALA AMARELA", "SALA VERDE", "SALA AZUL", "CIRAND. MUNDO"])
+    df_s = safe_read(sala_planilha)
+    
     if not df_s.empty:
+        st.write("🔍 **Refinar Busca nesta Sala**")
+        sf1, sf2 = st.columns(2)
+        with sf1:
+            # Filtro de Turma dentro da aba de apadrinhamento
+            f_turma_s = st.selectbox("Filtrar Turma:", ["Todas"] + sorted(list(df_s["TURMA"].dropna().unique())))
+        with sf2:
+            f_nome_s = st.text_input("Buscar Aluno:")
+
+        df_fs = df_s.copy()
+        if f_turma_s != "Todas": df_fs = df_fs[df_fs["TURMA"] == f_turma_s]
+        if f_nome_s: df_fs = df_fs[df_fs["ALUNO"].str.contains(f_nome_s, case=False, na=False)]
+
         cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
-        df_final_s = df_s[cols].dropna(subset=["ALUNO"])
+        df_final_s = df_fs[cols].dropna(subset=["ALUNO"])
+        
+        # Exibição colorida
         st.dataframe(stylize_df(df_final_s), use_container_width=True, height=500)
 
-# --- 4 & 5 (CADASTROS LOCAIS) ---
+# --- CADASTROS LOCAIS ---
 elif menu == "👤 Cadastrar Aluno (Local)":
     st.header("📝 Novo Cadastro Local")
     with st.form("cad_l", clear_on_submit=True):

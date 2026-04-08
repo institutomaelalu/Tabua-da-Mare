@@ -108,28 +108,29 @@ if not st.session_state.logado:
             user_input = st.text_input("Seu nome (como está na planilha)").strip().upper()
             senha_input = st.text_input("Chave de Acesso", type="password")
             
-            if st.form_submit_button("Entrar"):
-                # Lógica ADMIN estática
-                if user_input == "ADMIN" and senha_input == "123":
+if st.form_submit_button("Entrar"):
+                u_clean = user_input.strip().upper()
+                
+                # 1. Login ADMIN
+                if u_clean == "ADMIN" and senha_input == "123":
                     st.session_state.logado = True
                     st.session_state.perfil = "admin"
                     st.session_state.nome_usuario = "Coordenação"
                     st.rerun()
                 
-                # Lógica PADRINHO dinâmica: busca em todas as abas
+                # 2. Login PADRINHO (Busca em todas as abas)
                 else:
                     df_geral = safe_read("GERAL")
-                    padrinhos_validos = df_geral["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper().unique()
+                    # Pega a coluna de padrinhos, remove nulos e limpa espaços
+                    lista_padrinhos = df_geral["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper().unique()
                     
-                    if user_input in padrinhos_validos and senha_input == "lalu2026": # Chave temporária para todos os padrinhos
+                    if u_clean in lista_padrinhos and senha_input == "lalu2026":
                         st.session_state.logado = True
                         st.session_state.perfil = "padrinho"
-                        st.session_state.nome_usuario = user_input
+                        st.session_state.nome_usuario = u_clean
                         st.rerun()
                     else:
-                        st.error("Nome não localizado ou chave incorreta.")
-    st.stop()
-
+                        st.error(f"Acesso negado. O nome '{u_clean}' não foi encontrado na lista de padrinhos da planilha.")
 # --- CONTEÚDO PÓS-LOGIN ---
 st.markdown(f"""
     <div class="main-header">

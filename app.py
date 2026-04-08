@@ -108,7 +108,7 @@ if not st.session_state.logado:
             user_input = st.text_input("Seu nome (como está na planilha)").strip().upper()
             senha_input = st.text_input("Chave de Acesso", type="password")
             
-if st.form_submit_button("Entrar"):
+        if st.form_submit_button("Entrar"):
                 u_clean = user_input.strip().upper()
                 
                 # 1. Login ADMIN

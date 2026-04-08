@@ -75,11 +75,19 @@ def stylize_df(df):
             'SALA AZUL': 'background-color: #ADD8E6; color: #00008B; font-weight: bold;',
             'CIRAND. MUNDO': 'background-color: #191970; color: #FFFFFF; font-weight: bold;',
         }
-        style = colors.get(turma, 'background-color: white; color: black;')
+        # Cor padrão para linhas sem turma definida (ex: "B")
+        style = colors.get(turma, 'background-color: #f8f9fa; color: black;')
         return [style] * len(row)
     
-    # Retorna o Styler do Pandas
-    return df.style.apply(apply_room_color, axis=1)
+    # Aplica o estilo linha por linha (axis=1) e define propriedades da tabela
+    return df.style.apply(apply_room_color, axis=1).set_properties(**{
+        'border': '1px solid #dee2e6',
+        'padding': '8px',
+        'text-align': 'left'
+    }).set_table_styles([{
+        'selector': 'th',
+        'props': [('background-color', '#f8f9fa'), ('color', '#495057'), ('font-weight', 'bold')]
+    }])
 
 # 4. Navegação Lateral
 menu = st.sidebar.radio("Menu de Navegação", [
@@ -138,14 +146,16 @@ elif menu == "📝 Controle de Matrículas (GERAL)":
 
         cols = ["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE"]
         df_final = df_f[cols].dropna(subset=["ALUNO"])
-        # IMPORTANTE: .to_html() ou passar o styler direto
-        st.dataframe(stylize_df(df_final), use_container_width=True, height=500)
+        
+        # TÉCNICA DE FORÇAMENTO DE CORES: Converter o Styler para HTML e exibir com st.markdown
+        # Isso remove a interatividade (não dá para ordenar colunas), mas garante o visual.
+        colored_html = stylize_df(df_final).to_html(index=False)
+        st.markdown(colored_html, unsafe_allow_html=True)
 
-# --- 3. APADRINHAMENTO (FILTRO TURMA ADICIONADO) ---
+# --- 3. APADRINHAMENTO ---
 elif menu == "🤝 Controle de Apadrinhamento":
     st.header("🤝 Gestão por Salas")
     
-    # Primeiro escolhe a aba (Planilha)
     sala_planilha = st.selectbox("Selecione a Aba Original:", ["SALA ROSA", "SALA AMARELA", "SALA VERDE", "SALA AZUL", "CIRAND. MUNDO"])
     df_s = safe_read(sala_planilha)
     
@@ -153,7 +163,6 @@ elif menu == "🤝 Controle de Apadrinhamento":
         st.write("🔍 **Refinar Busca nesta Sala**")
         sf1, sf2 = st.columns(2)
         with sf1:
-            # Filtro de Turma dentro da aba de apadrinhamento
             f_turma_s = st.selectbox("Filtrar Turma:", ["Todas"] + sorted(list(df_s["TURMA"].dropna().unique())))
         with sf2:
             f_nome_s = st.text_input("Buscar Aluno:")
@@ -165,8 +174,9 @@ elif menu == "🤝 Controle de Apadrinhamento":
         cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
         df_final_s = df_fs[cols].dropna(subset=["ALUNO"])
         
-        # Exibição colorida
-        st.dataframe(stylize_df(df_final_s), use_container_width=True, height=500)
+        # TÉCNICA DE FORÇAMENTO DE CORES: Converter para HTML
+        colored_html_s = stylize_df(df_final_s).to_html(index=False)
+        st.markdown(colored_html_s, unsafe_allow_html=True)
 
 # --- CADASTROS LOCAIS ---
 elif menu == "👤 Cadastrar Aluno (Local)":

@@ -202,13 +202,38 @@ elif menu == "📊 Controle Interno":
     st.markdown(f"<h3 style='color:{C_VERDE}'>📊 Evolução Geral (Controle Interno)</h3>", unsafe_allow_html=True)
     if os.path.exists(AVAL_FILE):
         df_av = pd.read_csv(AVAL_FILE)
-        al_s = st.selectbox("Escolha qualquer aluno da rede:", sorted(df_av["Aluno"].unique()))
-        df_al = df_av[df_av["Aluno"] == al_s]
-        tri_s = st.selectbox("Selecione o Trimestre", df_al["Trimestre"].unique(), key="int_tri")
-        row = df_al[df_al["Trimestre"] == tri_s].iloc[0]
-        fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], mode='lines+markers+text', fill='tozeroy', line=dict(color=C_VERDE, width=4, shape='spline')))
-        fig.update_layout(yaxis=dict(range=[0, 5.5]), height=400)
-        st.plotly_chart(fig, use_container_width=True)
+        
+        if not df_av.empty:
+            al_s = st.selectbox("Escolha qualquer aluno da rede:", sorted(df_av["Aluno"].unique()))
+            df_al = df_av[df_av["Aluno"] == al_s]
+            
+            if not df_al.empty:
+                tri_s = st.selectbox("Selecione o Trimestre", df_al["Trimestre"].unique(), key="int_tri")
+                
+                # A trava de segurança: só tenta pegar a linha se o filtro não for vazio
+                df_filtrado = df_al[df_al["Trimestre"] == tri_s]
+                
+                if not df_filtrado.empty:
+                    row = df_filtrado.iloc[0]
+                    y_vals = [float(row[c]) for c in CATEGORIAS]
+                    
+                    fig = go.Figure(go.Scatter(
+                        x=CATEGORIAS, 
+                        y=y_vals, 
+                        mode='lines+markers+text', 
+                        text=[str(int(v)) for v in y_vals],
+                        textposition="top center",
+                        fill='tozeroy', 
+                        line=dict(color=C_VERDE, width=4, shape='spline')
+                    ))
+                    fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("Nenhum dado encontrado para este trimestre.")
+            else:
+                st.warning("Este aluno ainda não possui avaliações lançadas.")
+        else:
+            st.info("O arquivo de avaliações está vazio.")
     else:
         st.info("Nenhuma avaliação cadastrada no banco de dados.")
 

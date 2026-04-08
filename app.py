@@ -130,6 +130,7 @@ if st.session_state.perfil == "admin":
     menu = st.sidebar.radio("Navegação", ["👤 Cadastro", "📝 Matrículas", "🤝 Apadrinhamento", "📊 Lançar Avaliação", "🌊 Evolução (Padrinhos)", "📊 Controle Interno"])
 else:
     menu = "🌊 Evolução (Padrinhos)
+
 # 6. Navegação e Regras de Visibilidade
 def set_mat(t): st.session_state.f_mat = t
 def set_pad(t): st.session_state.f_pad = t

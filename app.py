@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import numpy as np
 import os
 
-# 1. Configuração de Estilo e Identidade Visual
+# 1. Configuração e Identidade Visual
 st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 
 C_ROSA, C_VERDE, C_AZUL, C_AMARELO = "#ff81ba", "#a8cf45", "#5cc6d0", "#ffc713"
@@ -14,43 +14,45 @@ st.markdown(f"""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     .stApp {{ background-color: #ffffff; font-family: 'Inter', sans-serif; }}
     
-    /* TÍTULO CENTRALIZADO */
-    .main-title {{ text-align: center; padding: 10px 0; margin-bottom: 0; }}
-    .main-title h1 {{ font-size: 32px; margin: 0; }}
+    /* Cabeçalho */
+    .main-title {{ text-align: center; padding: 10px 0; }}
+    .main-title h1 {{ font-size: 32px; margin: 0; font-weight: 800; }}
     
-    /* COMPACTAÇÃO DE ESPAÇO */
-    .block-container {{ padding: 1.5rem 3rem !important; }}
-    [data-testid="stVerticalBlock"] {{ gap: 0.2rem !important; }}
-    [data-testid="stHorizontalBlock"] {{ gap: 0.4rem !important; margin-bottom: -15px !important; }}
-    
-    /* TABELAS */
+    /* Tabelas Compactas */
     .custom-table {{
         width: 100%; border-collapse: separate; border-spacing: 0;
         border: 1px solid #f2f2f2; border-radius: 10px;
-        overflow: hidden; font-size: 13px; margin-top: 5px;
+        font-size: 13px; margin-top: 5px;
     }}
-    .custom-table thead th {{ background-color: #fafafa; color: #888; padding: 10px; text-align: left; border-bottom: 2px solid #eee; }}
+    .custom-table thead th {{ background-color: #fafafa; color: #888; padding: 10px; text-align: left; }}
     .custom-table tbody td {{ padding: 8px 10px; border-bottom: 1px solid #f8f8f8; }}
     
-    /* FONTES COLORIDAS */
+    /* Cores das Fontes */
     .txt-rosa {{ color: {C_ROSA} !important; font-weight: 600; }}
     .txt-verde {{ color: {C_VERDE} !important; font-weight: 600; }}
     .txt-azul {{ color: {C_AZUL} !important; font-weight: 600; }}
     .txt-amarelo {{ color: {C_AMARELO} !important; font-weight: 600; }}
 
-    /* BOTÕES */
+    /* CORREÇÃO DOS BOTÕES (Horizontal e sem escada) */
+    div[data-testid="stHorizontalBlock"] {{
+        align-items: flex-start !important;
+        gap: 0.5rem !important;
+        margin-bottom: 5px !important;
+    }}
     div.stButton > button {{
         width: 100%; border-radius: 8px !important; border: 1px solid #eee !important;
-        font-weight: 700 !important; height: 42px; font-size: 12px !important; transition: 0.2s;
+        font-weight: 700 !important; height: 40px; font-size: 11px !important;
     }}
     
-    /* SLIDERS ULTRA FINOS E COLORIDOS */
-    .stSlider [data-baseweb="slider"] {{ height: 4px !important; }}
+    /* CORREÇÃO DOS SLIDERS (Removendo o bloco azul grosseiro) */
+    .stSlider {{ padding-bottom: 20px !important; }}
+    .stSlider [data-baseweb="slider"] {{ height: 6px !important; background: #eee !important; border-radius: 3px; }}
     .stSlider [data-baseweb="slider"] [role="slider"] {{
         background-color: {C_ROSA} !important; border: 2px solid white !important; 
-        width: 18px !important; height: 18px !important; box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
+        width: 18px !important; height: 18px !important;
     }}
-    .stSlider [data-baseweb="slider"] div:first-child {{ background-color: {C_AZUL} !important; }}
+    /* Cor da trilha preenchida */
+    .stSlider [data-baseweb="slider"] > div > div {{ background-color: {C_AZUL} !important; }}
     
     hr {{ margin: 0.5rem 0 !important; border: 0; height: 2px; background: linear-gradient(to right, {C_ROSA}, {C_VERDE}, {C_AZUL}, {C_AMARELO}); }}
     </style>
@@ -65,13 +67,7 @@ st.markdown(f"""
     <hr>
     """, unsafe_allow_html=True)
 
-# 2. Lógica de Banco de Dados e Estados
-def set_mat(t): st.session_state.f_mat = t
-def set_pad(t): st.session_state.f_pad = t
-
-if 'f_mat' not in st.session_state: st.session_state.f_mat = "Todas"
-if 'f_pad' not in st.session_state: st.session_state.f_pad = "SALA ROSA"
-
+# 2. Inicialização de Dados
 CATEGORIAS = ["Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]
 ALUNOS_FILE, AVAL_FILE, PADRINHOS_FILE = "alunos.csv", "avaliacoes.csv", "padrinhos_local.csv"
 
@@ -80,6 +76,11 @@ def init_db():
     if not os.path.exists(AVAL_FILE): pd.DataFrame(columns=["Aluno", "Trimestre"] + CATEGORIAS).to_csv(AVAL_FILE, index=False)
     if not os.path.exists(PADRINHOS_FILE): pd.DataFrame(columns=["ALUNO", "PADRINHO_EDITADO"]).to_csv(PADRINHOS_FILE, index=False)
 init_db()
+
+def set_mat(t): st.session_state.f_mat = t
+def set_pad(t): st.session_state.f_pad = t
+if 'f_mat' not in st.session_state: st.session_state.f_mat = "Todas"
+if 'f_pad' not in st.session_state: st.session_state.f_pad = "SALA ROSA"
 
 TURMAS_CONFIG = {
     "SALA ROSA": {"cor": C_ROSA, "key": "sala_rosa", "txt": "#ffffff"},
@@ -93,7 +94,7 @@ def safe_read(worksheet_name):
     df = pd.DataFrame(columns=["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"])
     try:
         sheet_key = "geral" if worksheet_name == "GERAL" else TURMAS_CONFIG.get(worksheet_name, {}).get("key")
-        if sheet_key in st.secrets["connections"]["gsheets"]:
+        if sheet_key in st.secrets.get("connections", {}).get("gsheets", {}):
             url = st.secrets["connections"]["gsheets"][sheet_key]
             url_csv = url.split("/edit")[0] + "/export?format=csv"
             if "gid=" in url: url_csv += f"&gid={url.split('gid=')[1]}"
@@ -114,7 +115,7 @@ def safe_read(worksheet_name):
     except: return df.fillna("")
 
 def render_styled_table(df):
-    if df.empty: return st.warning("Sem dados cadastrados.")
+    if df.empty: return st.info("Nenhum aluno encontrado nesta seleção.")
     font_colors = ["txt-rosa", "txt-verde", "txt-azul", "txt-amarelo"]
     cols = [c for c in df.columns if "UNNAMED" not in c.upper()]
     html = '<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in cols]) + '</tr></thead><tbody>'
@@ -123,10 +124,21 @@ def render_styled_table(df):
         html += f'<tr>' + "".join([f'<td class="{c_class}">{row[v]}</td>' for v in cols]) + '</tr>'
     st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 
-# 4. Navegação
-menu = st.sidebar.radio("Navegação", ["📝 Matrículas", "🤝 Apadrinhamento", "📊 Lançar Avaliação", "🌊 Evolução Individual", "👤 Novo Cadastro"])
+# 3. Navegação (ORAL: NOVO CADASTRO É O PRIMEIRO)
+menu = st.sidebar.radio("Navegação", ["👤 Novo Cadastro", "📝 Matrículas", "🤝 Apadrinhamento", "📊 Lançar Avaliação", "🌊 Evolução Individual"])
 
-if menu == "📝 Matrículas":
+if menu == "👤 Novo Cadastro":
+    st.markdown(f"<h3 style='color:{C_ROSA};'>👤 Matricular Novo Aluno</h3>", unsafe_allow_html=True)
+    with st.form("cad_form", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        with c1: n, i, comu = st.text_input("Nome Completo"), st.text_input("Idade"), st.text_input("Comunidade")
+        with c2: t, tn = st.selectbox("Turma", list(TURMAS_CONFIG.keys())), st.selectbox("Turno", ["MATUTINO", "VESPERTINO"])
+        if st.form_submit_button("Concluir Matrícula"):
+            df_l = pd.read_csv(ALUNOS_FILE)
+            pd.concat([df_l, pd.DataFrame([[n.upper(), t, tn, i, comu]], columns=df_l.columns)], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
+            st.success("Matrícula realizada com sucesso!")
+
+elif menu == "📝 Matrículas":
     st.markdown(f"<h3 style='color:{C_VERDE};'>📋 Quadro de Matrículas</h3>", unsafe_allow_html=True)
     cols_t = st.columns(6)
     cols_t[0].button("Todas", on_click=set_mat, args=("Todas",))
@@ -160,10 +172,10 @@ elif menu == "🤝 Apadrinhamento":
     render_styled_table(df_f[["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]])
     
     with st.expander("📝 Editar Padrinho/Madrinha"):
-        with st.form("edit_pad_form"):
+        with st.form("edit_pad"):
             al_e = st.selectbox("Selecione o Aluno", sorted([str(x) for x in df["ALUNO"].unique() if x]))
             novo_p = st.text_input("Novo Nome do Padrinho/Madrinha")
-            if st.form_submit_button("Salvar Alteração"):
+            if st.form_submit_button("Salvar"):
                 df_p = pd.read_csv(PADRINHOS_FILE)
                 df_p = pd.concat([df_p[df_p["ALUNO"] != al_e], pd.DataFrame([[al_e, novo_p]], columns=["ALUNO", "PADRINHO_EDITADO"])], ignore_index=True)
                 df_p.to_csv(PADRINHOS_FILE, index=False); st.rerun()
@@ -183,16 +195,16 @@ elif menu == "📊 Lançar Avaliação":
                 df_av = pd.read_csv(AVAL_FILE)
                 df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Trimestre'] == tr))]
                 pd.concat([df_av, pd.DataFrame([[al, tr] + [float(v) for v in notas.values()]], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
-                st.success(f"Avaliação de {al} salva!")
+                st.success(f"Notas de {al} gravadas!")
 
 elif menu == "🌊 Evolução Individual":
     st.markdown(f"<h3 style='color:{C_AZUL};'>🌊 Acompanhamento de Evolução</h3>", unsafe_allow_html=True)
-    try:
-        if os.path.exists(AVAL_FILE):
-            df_av = pd.read_csv(AVAL_FILE)
-            if not df_av.empty:
-                al_s = st.selectbox("Escolha o Aluno", sorted(df_av["Aluno"].unique()))
-                df_al = df_av[df_av["Aluno"] == al_s]
+    if os.path.exists(AVAL_FILE):
+        df_av = pd.read_csv(AVAL_FILE)
+        if not df_av.empty:
+            al_s = st.selectbox("Escolha o Aluno", sorted(df_av["Aluno"].unique()))
+            df_al = df_av[df_av["Aluno"] == al_s]
+            if not df_al.empty:
                 tri_s = st.selectbox("Escolha o Trimestre", df_al["Trimestre"].unique())
                 row = df_al[df_al["Trimestre"] == tri_s].iloc[0]
                 y_vals = [float(row[cat]) for cat in CATEGORIAS]
@@ -200,16 +212,4 @@ elif menu == "🌊 Evolução Individual":
                 fig = go.Figure(go.Scatter(x=CATEGORIAS, y=y_vals, mode='lines+markers+text', text=[str(v) for v in y_vals], textposition="top center", fill='tozeroy', line=dict(color=C_AZUL, width=4, shape='spline')))
                 fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=400, margin=dict(t=30, b=0), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig, use_container_width=True)
-            else: st.info("Nenhuma nota lançada ainda. Vá na aba 'Lançar Avaliação'.")
-        else: st.error("Arquivo de avaliações não encontrado.")
-    except Exception as e: st.error(f"Erro ao carregar gráfico: {e}")
-
-elif menu == "👤 Novo Cadastro":
-    st.markdown(f"<h3 style='color:{C_ROSA};'>👤 Matricular Novo Aluno</h3>", unsafe_allow_html=True)
-    with st.form("cad_form", clear_on_submit=True):
-        n, i, comu = st.text_input("Nome Completo"), st.text_input("Idade"), st.text_input("Comunidade")
-        t, tn = st.selectbox("Turma", list(TURMAS_CONFIG.keys())), st.selectbox("Turno", ["MATUTINO", "VESPERTINO"])
-        if st.form_submit_button("Concluir Matrícula"):
-            df_l = pd.read_csv(ALUNOS_FILE)
-            pd.concat([df_l, pd.DataFrame([[n.upper(), t, tn, i, comu]], columns=df_l.columns)], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
-            st.success("Matrícula realizada!")
+        else: st.info("Sem dados de avaliação disponíveis.")

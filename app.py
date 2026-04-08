@@ -46,18 +46,21 @@ MAPA_LINKS = {
 
 def safe_read(worksheet_name):
     try:
-        # Busca a chave correspondente no Secrets
         secret_key = MAPA_LINKS.get(worksheet_name)
         if secret_key:
+            # Puxa a URL do Secrets do Streamlit Cloud
             url_original = st.secrets["connections"]["gsheets"][secret_key]
-            # Converte o link de edição para link de exportação direta de CSV
-            url_export = url_original.replace("/edit#gid=", "/export?format=csv&gid=")
-            # Se não houver o marcador de gid no replace, tenta o formato padrão
-            if "/export" not in url_export:
-                url_export = url_original.split("/edit")[0] + "/export?format=csv"
             
+            # Converte link de edição para link de exportação CSV para evitar erros de conexão
+            if "/edit" in url_original:
+                url_export = url_original.split("/edit")[0] + "/export?format=csv"
+                if "gid=" in url_original:
+                    gid = url_original.split("gid=")[1]
+                    url_export += f"&gid={gid}"
+            else:
+                url_export = url_original
+
             df = pd.read_csv(url_export)
-            # Limpa espaços em branco dos nomes das colunas
             df.columns = [str(c).strip() for c in df.columns]
             return df
         return pd.DataFrame()
@@ -103,5 +106,78 @@ if menu == "🌊 Painel de Evolução":
             
             x = np.arange(len(CATEGORIAS))
             x_new = np.linspace(0, len(CATEGORIAS) - 1, 300) 
+            
+            # Interpolação para curva suave
             spl = make_interp_spline(x, notas, k=3)
-            y_smooth = np.clip(spl(x_
+            y_smooth = np.clip(spl(x_new), 1, 5)
+
+            st.subheader(f"Evolução: {aluno_sel}")
+            
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=x_new, y=y_smooth, mode='lines', 
+                                     line=dict(width=6, color=COR_AZUL), 
+                                     fill='tozeroy', fillcolor="rgba(92, 198, 208, 0.2)"))
+            fig.add_trace(go.Scatter(x=x, y=notas, mode='markers', 
+                                     marker=dict(size=12, color=COR_VERDE)))
+            fig.update_layout(xaxis=dict(tickmode='array', tickvals=list(range(len(CATEGORIAS))), ticktext=CATEGORIAS),
+                              yaxis=dict(range=[0, 5.5]), plot_bgcolor='white', height=400, showlegend=False)
+            st.plotly_chart(fig, use_container_width=True)
+
+# --- 2. CONTROLE DE MATRÍCULAS (Aba GERAL) ---
+elif menu == "📝 Controle de Matrículas (GERAL)":
+    st.header("📋 Lista Geral de Alunos")
+    df_geral = safe_read("GERAL")
+    if not df_geral.empty:
+        cols_geral = ["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
+        cols_validas = [c for c in cols_geral if c in df_geral.columns]
+        st.dataframe(df_geral[cols_validas].dropna(subset=["ALUNO"]), use_container_width=True)
+
+# --- 3. CONTROLE DE APADRINHAMENTO (Abas de Salas) ---
+elif menu == "🤝 Controle de Apadrinhamento":
+    st.header("🤝 Gestão por Salas")
+    lista_salas = ["SALA ROSA", "SALA AMARELA", "SALA VERDE", "SALA AZUL", "CIRAND. MUNDO"]
+    sala_sel = st.selectbox("Selecione a Sala:", lista_salas)
+    
+    df_sala = safe_read(sala_sel)
+    if not df_sala.empty:
+        cols_sala = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
+        cols_v = [c for c in cols_sala if c in df_sala.columns]
+        st.dataframe(df_sala[cols_v].dropna(subset=["ALUNO"]), use_container_width=True)
+
+# --- 4. CADASTRAR ALUNO (Local) ---
+elif menu == "👤 Cadastrar Aluno (Local)":
+    st.header("📝 Novo Cadastro Local")
+    with st.form("cad_local", clear_on_submit=True):
+        nome = st.text_input("Nome Completo")
+        idade = st.number_input("Idade", 0, 100, 7)
+        turno = st.selectbox("Turno", ["Matutino", "Vespertino"])
+        if st.form_submit_button("Salvar Registro"):
+            if nome:
+                df = pd.read_csv(ALUNOS_FILE)
+                novo = pd.DataFrame([[nome.strip(), idade, turno]], columns=["Nome", "Idade", "Turno"])
+                pd.concat([df, novo], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
+                st.success(f"Aluno {nome} cadastrado com sucesso!")
+
+# --- 5. LANÇAR AVALIAÇÃO (Local) ---
+elif menu == "📊 Lançar Avaliação (Local)":
+    st.header("📊 Registro de Notas")
+    df_alunos = pd.read_csv(ALUNOS_FILE)
+    if df_alunos.empty:
+        st.warning("Cadastre um aluno localmente antes de avaliar.")
+    else:
+        with st.form("notas_local", clear_on_submit=True):
+            aluno = st.selectbox("Aluno", sorted(df_alunos["Nome"].unique()))
+            trim = st.selectbox("Trimestre", ["1º Trimestre", "2º Trimestre", "3º Trimestre"])
+            
+            c1, c2 = st.columns(2)
+            scores = {}
+            for i, cat in enumerate(CATEGORIAS):
+                with c1 if i < 4 else c2:
+                    scores[cat] = st.slider(cat, 1, 5, 3)
+            
+            if st.form_submit_button("Confirmar Avaliação"):
+                df_av = pd.read_csv(AVAL_FILE)
+                df_av = df_av[~((df_av['Aluno'] == aluno) & (df_av['Trimestre'] == trim))]
+                nova_linha = pd.DataFrame([[aluno, trim] + list(scores.values())], columns=["Aluno", "Trimestre"] + CATEGORIAS)
+                pd.concat([df_av, nova_linha], ignore_index=True).to_csv(AVAL_FILE, index=False)
+                st.success("Avaliação salva com sucesso!")

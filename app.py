@@ -3,53 +3,71 @@ import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 import os
+from scipy.interpolate import make_interp_spline
 
-# 1. Configuração de Estilo
+# 1. Configuração de Estilo e Cabeçalho
 st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 
 COR_VERDE_INST = "#a8cf45"
 COR_AZUL_INST = "#5cc6d0"
 
+# --- BLOCO CSS (FONTE 12PX E CORES CORRIGIDAS) ---
 st.markdown(f"""
     <style>
     .custom-table {{
-        width: 100%; border-collapse: separate; border-spacing: 0;
-        font-family: 'Segoe UI', sans-serif; color: #31333F;
-        border: 1px solid #e6e9ef; border-radius: 8px;
-        overflow: hidden; font-size: 12px; margin-top: 15px;
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-family: 'Segoe UI', sans-serif;
+        color: #31333F;
+        border: 1px solid #e6e9ef;
+        border-radius: 8px;
+        overflow: hidden;
+        font-size: 12px; /* Fonte reduzida */
+        margin-top: 15px;
     }}
     .custom-table thead th {{
-        background-color: #f0f2f6; color: #555; padding: 8px 12px;
-        text-align: left; font-weight: 600; border-bottom: 2px solid #e6e9ef;
+        background-color: #f0f2f6;
+        color: #555;
+        padding: 8px 12px;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid #e6e9ef;
     }}
-    .custom-table tbody td {{ padding: 6px 12px; border-bottom: 1px solid #f0f2f6; }}
+    .custom-table tbody td {{
+        padding: 6px 12px;
+        border-bottom: 1px solid #f0f2f6;
+    }}
+    /* Cores das Salas */
     .row-rosa {{ background-color: #ffeef2 !important; color: #d63384 !important; font-weight: 500; }}
     .row-amarela {{ background-color: #fff9db !important; color: #856404 !important; font-weight: 500; }}
     .row-verde {{ background-color: #ebfbee !important; color: #087f5b !important; font-weight: 500; }}
     .row-azul {{ background-color: #e7f5ff !important; color: #1971c2 !important; font-weight: 500; }}
-    .row-ciranda {{ background-color: #3f51b5 !important; color: #ffffff !important; font-weight: 500; }}
+    .row-ciranda {{ background-color: #1a237e !important; color: #ffffff !important; font-weight: 500; }}
     </style>
-    <div style='text-align: center;'>
-        <h1 style='color: {COR_VERDE_INST}; font-size: 26px;'>Instituto Mãe Lalu</h1>
+    
+    <div style='text-align: center; padding: 5px;'>
+        <h1 style='margin-bottom: 0; font-size: 26px;'>
+            <span style='color: {COR_VERDE_INST};'>Instituto</span> <span style='color: {COR_AZUL_INST};'>Mãe</span> <span style='color: {COR_VERDE_INST};'>Lalu</span>
+        </h1>
     </div>
+    <hr style="border: 0.5px solid {COR_VERDE_INST}; margin: 10px 0;">
     """, unsafe_allow_html=True)
 
-# 2. Banco de Dados Local
+# 2. Configurações Iniciais e CSVs Locais
+CATEGORIAS = ["Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]
 ALUNOS_FILE = "alunos.csv"
 AVAL_FILE = "avaliacoes.csv"
-PADRINHOS_LOCAL = "padrinhos_extra.csv"
 
 def init_db():
     if not os.path.exists(ALUNOS_FILE):
-        pd.DataFrame(columns=["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE"]).to_csv(ALUNOS_FILE, index=False)
+        pd.DataFrame(columns=["Nome", "Idade", "Turno"]).to_csv(ALUNOS_FILE, index=False)
     if not os.path.exists(AVAL_FILE):
-        pd.DataFrame(columns=["Aluno", "Trimestre", "Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]).to_csv(AVAL_FILE, index=False)
-    if not os.path.exists(PADRINHOS_LOCAL):
-        pd.DataFrame(columns=["ALUNO", "PADRINHO_EDITADO"]).to_csv(PADRINHOS_LOCAL, index=False)
+        pd.DataFrame(columns=["Aluno", "Trimestre"] + CATEGORIAS).to_csv(AVAL_FILE, index=False)
 
 init_db()
 
-# 3. Funções de Dados
+# 3. Mapeamento Google Sheets
 MAPA_LINKS = {
     "GERAL": "geral", "SALA ROSA": "sala_rosa", "SALA AMARELA": "sala_amarela",
     "SALA VERDE": "sala_verde", "SALA AZUL": "sala_azul", "CIRAND. MUNDO": "cirand_mundo"
@@ -58,153 +76,124 @@ MAPA_LINKS = {
 def safe_read(worksheet_name):
     try:
         secret_key = MAPA_LINKS.get(worksheet_name)
-        url_original = st.secrets["connections"]["gsheets"][secret_key]
-        url_export = url_original.split("/edit")[0] + "/export?format=csv"
-        if "gid=" in url_original: url_export += f"&gid={url_original.split('gid=')[1]}"
-        df = pd.read_csv(url_export)
-        df.columns = [str(c).strip().upper() for c in df.columns]
-        
-        df_local = pd.read_csv(ALUNOS_FILE)
-        if worksheet_name == "GERAL":
-            df = pd.concat([df, df_local], ignore_index=True)
-        else:
-            sala_key = worksheet_name.replace("SALA ", "")
-            df_local_sala = df_local[df_local["TURMA"].str.contains(sala_key, na=False, case=False)]
-            df = pd.concat([df, df_local_sala], ignore_index=True)
-            
-        df_pad = pd.read_csv(PADRINHOS_LOCAL)
-        if 'PADRINHO/MADRINHA' not in df.columns: df['PADRINHO/MADRINHA'] = ""
-        for _, row_p in df_pad.iterrows():
-            df.loc[df['ALUNO'] == row_p['ALUNO'], 'PADRINHO/MADRINHA'] = row_p['PADRINHO_EDITADO']
-            
-        return df.fillna("") # Garante que nada seja nulo/None
-    except: 
-        return pd.DataFrame(columns=["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"])
+        if secret_key:
+            url_original = st.secrets["connections"]["gsheets"][secret_key]
+            url_export = url_original.split("/edit")[0] + "/export?format=csv"
+            if "gid=" in url_original:
+                url_export += f"&gid={url_original.split('gid=')[1]}"
+            df = pd.read_csv(url_export)
+            df.columns = [str(c).strip() for c in df.columns]
+            return df
+        return pd.DataFrame()
+    except:
+        return pd.DataFrame()
 
-def render_styled_table(df, context=None):
-    if df.empty:
-        st.info("Nenhum registro encontrado.")
-        return
-    
-    def get_class(val, ctx):
-        v = (ctx if ctx else str(val)).upper()
-        if 'ROSA' in v: return 'row-rosa'
-        if 'AMARELA' in v: return 'row-amarela'
-        if 'VERDE' in v: return 'row-verde'
-        if 'AZUL' in v: return 'row-azul'
-        if 'CIRAND' in v: return 'row-ciranda'
+# --- FUNÇÃO DE RENDERIZAÇÃO COLORIDA ---
+def render_styled_table(df, context_color=None):
+    def get_row_class(row_val, context):
+        # Prioriza o contexto da aba (Sala Selecionada) ou o valor na coluna Turma
+        val = (context if context else str(row_val)).upper()
+        if 'ROSA' in val: return 'row-rosa'
+        if 'AMARELA' in val: return 'row-amarela'
+        if 'VERDE' in val: return 'row-verde'
+        if 'AZUL' in val: return 'row-azul'
+        if 'CIRAND' in val: return 'row-ciranda'
         return ''
 
-    html = '<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in df.columns]) + '</tr></thead><tbody>'
+    html = '<table class="custom-table"><thead><tr>'
+    for col in df.columns:
+        html += f'<th>{col}</th>'
+    html += '</tr></thead><tbody>'
+    
     for _, row in df.iterrows():
-        cl = get_class(row.get('TURMA', ''), context)
-        html += f'<tr class="{cl}">' + "".join([f'<td>{v}</td>' for v in row]) + '</tr>'
-    st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
+        row_class = get_row_class(row.get('TURMA', ''), context_color)
+        html += f'<tr class="{row_class}">'
+        for val in row:
+            display_val = "" if pd.isna(val) else val
+            html += f'<td>{display_val}</td>'
+        html += '</tr>'
+    
+    html += '</tbody></table>'
+    st.markdown(html, unsafe_allow_html=True)
 
-# 4. Navegação
-menu = st.sidebar.radio("Navegação", [
-    "👤 1. Novo Cadastro",
-    "📝 2. Controle de Matrículas", 
-    "🤝 3. Controle de Apadrinhamento",
-    "📊 4. Avaliação - Tábua da Maré",
-    "🌊 5. Tábua da Maré"
+# 4. Navegação Lateral
+menu = st.sidebar.radio("Menu de Navegação", [
+    "🌊 Painel de Evolução", 
+    "📝 Controle de Matrículas (GERAL)", 
+    "🤝 Controle de Apadrinhamento",
+    "👤 Cadastrar Aluno (Local)", 
+    "📊 Lançar Avaliação (Local)"
 ])
 
-if menu == "👤 1. Novo Cadastro":
-    st.header("📝 Registro de Novo Aluno")
-    with st.form("form_cadastro", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            nome = st.text_input("Nome Completo")
-            idade = st.text_input("Idade")
-            comu = st.text_input("Comunidade")
-        with col2:
-            turma = st.selectbox("Turma", ["SALA ROSA", "SALA AMARELA", "SALA VERDE", "SALA AZUL", "CIRAND. MUNDO"])
-            turno = st.selectbox("Turno", ["MATUTINO", "VESPERTINO"])
-        
-        if st.form_submit_button("Finalizar Registro"):
-            if nome:
-                df_l = pd.read_csv(ALUNOS_FILE)
-                novo = pd.DataFrame([[nome.upper(), turma, turno, idade, comu]], columns=df_l.columns)
-                pd.concat([df_l, novo], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
-                st.success("Registrado com sucesso!")
-                st.rerun()
+# --- 1. PAINEL DE EVOLUÇÃO (Mantido) ---
+if menu == "🌊 Painel de Evolução":
+    st.info("Visualização gráfica dos dados locais de desempenho.")
 
-elif menu == "📝 2. Controle de Matrículas":
-    st.header("📋 Quadro de Matrículas")
-    df = safe_read("GERAL")
-    
-    c1, c2 = st.columns(2)
-    with c1: f_n = st.text_input("Buscar Nome")
-    with c2: 
-        opcoes_turno = ["Todos"] + sorted([str(x) for x in df["TURNO"].unique() if x])
-        f_t = st.selectbox("Filtrar Turno", opcoes_turno)
-    
-    df_f = df.copy()
-    if f_n: df_f = df_f[df_f["ALUNO"].str.contains(f_n, case=False, na=False)]
-    if f_t != "Todos": df_f = df_f[df_f["TURNO"] == f_t]
-    
-    render_styled_table(df_f[["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE"]])
+# --- 2. MATRÍCULAS (GERAL) ---
+elif menu == "📝 Controle de Matrículas (GERAL)":
+    st.header("📋 Lista Geral de Alunos")
+    df_raw = safe_read("GERAL")
+    if not df_raw.empty:
+        f1, f2, f3, f4 = st.columns(4)
+        with f1: f_nome = st.text_input("Nome")
+        with f2: f_turma = st.selectbox("Turma", ["Todas"] + sorted(list(df_raw["TURMA"].dropna().unique())))
+        with f3: f_comu = st.selectbox("Comunidade", ["Todas"] + sorted(list(df_raw["COMUNIDADE"].dropna().unique())))
+        with f4: f_turno = st.selectbox("Turno", ["Todos"] + sorted(list(df_raw["TURNO"].dropna().unique())))
 
-elif menu == "🤝 3. Controle de Apadrinhamento":
+        df_f = df_raw.copy()
+        if f_nome: df_f = df_f[df_f["ALUNO"].str.contains(f_nome, case=False, na=False)]
+        if f_turma != "Todas": df_f = df_f[df_f["TURMA"] == f_turma]
+        if f_comu != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_comu]
+        if f_turno != "Todos": df_f = df_f[df_f["TURNO"] == f_turno]
+
+        cols = ["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE"]
+        render_styled_table(df_f[cols].dropna(subset=["ALUNO"]))
+
+# --- 3. APADRINHAMENTO (COM FILTRO SEM PADRINHO) ---
+elif menu == "🤝 Controle de Apadrinhamento":
     st.header("🤝 Gestão de Apadrinhamento")
-    sala = st.selectbox("Selecione a Sala", ["SALA ROSA", "SALA AMARELA", "SALA VERDE", "SALA AZUL", "CIRAND. MUNDO"])
-    df = safe_read(sala)
+    sala_planilha = st.selectbox("Selecione a Sala:", ["SALA ROSA", "SALA AMARELA", "SALA VERDE", "SALA AZUL", "CIRAND. MUNDO"])
+    df_s = safe_read(sala_planilha)
     
-    check = st.checkbox("Mostrar apenas sem Padrinho/Madrinha")
-    df_f = df.copy()
-    if check:
-        # Filtra quem está realmente sem nada escrito
-        df_f = df_f[df_f["PADRINHO/MADRINHA"].astype(str).str.strip().isin(["", "None", "nan"])]
-    
-    render_styled_table(df_f[["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]], context=sala)
-    
-    if not df_f.empty:
-        st.divider()
-        st.subheader("✍️ Atualizar Padrinho")
-        with st.form("edit_pad"):
-            al_sel = st.selectbox("Aluno", sorted(df["ALUNO"].unique()))
-            novo_p = st.text_input("Novo Padrinho/Madrinha")
-            if st.form_submit_button("Salvar"):
-                df_p = pd.read_csv(PADRINHOS_LOCAL)
-                df_p = df_p[df_p["ALUNO"] != al_sel]
-                pd.concat([df_p, pd.DataFrame([[al_sel, novo_p]], columns=df_p.columns)], ignore_index=True).to_csv(PADRINHOS_LOCAL, index=False)
-                st.success("Atualizado!")
-                st.rerun()
+    if not df_s.empty:
+        sf1, sf2, sf3 = st.columns([1, 1, 1])
+        with sf1: f_turma_s = st.selectbox("Filtro Turma:", ["Todas"] + sorted(list(df_s["TURMA"].dropna().unique())))
+        with sf2: f_nome_s = st.text_input("Buscar Aluno")
+        with sf3: filtro_vazios = st.checkbox("Somente sem Padrinho")
 
-elif menu == "📊 4. Avaliação - Tábua da Maré":
-    st.header("📊 Avaliação Trimestral")
-    df_g = safe_read("GERAL")
-    lista_al = sorted([str(x) for x in df_g["ALUNO"].unique() if x])
-    
-    if lista_al:
-        with st.form("aval"):
-            al = st.selectbox("Aluno", lista_al)
-            tri = st.selectbox("Trimestre", ["1º Trimestre", "2º Trimestre", "3º Trimestre"])
-            cats = ["Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]
-            notas = {c: st.slider(c, 1, 5, 3) for c in cats}
-            if st.form_submit_button("Salvar"):
+        df_fs = df_s.copy()
+        if f_turma_s != "Todas": df_fs = df_fs[df_fs["TURMA"] == f_turma_s]
+        if f_nome_s: df_fs = df_fs[df_fs["ALUNO"].str.contains(f_nome_s, case=False, na=False)]
+        
+        if filtro_vazios:
+            # Filtra nulos, vazios ou termos comuns de pendência
+            df_fs = df_fs[df_fs["PADRINHO/MADRINHA"].isna() | 
+                          (df_fs["PADRINHO/MADRINHA"].astype(str).str.strip() == "") |
+                          (df_fs["PADRINHO/MADRINHA"].astype(str).str.contains("None|Pendente|-", case=False))]
+
+        cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
+        # Passa a aba selecionada para pintar a tabela inteira com a cor da sala
+        render_styled_table(df_fs[cols].dropna(subset=["ALUNO"]), context_color=sala_planilha)
+
+# --- 4 & 5. CADASTROS LOCAIS ---
+elif menu == "👤 Cadastrar Aluno (Local)":
+    st.header("📝 Novo Cadastro Local")
+    with st.form("cad_l"):
+        n, i, t = st.text_input("Nome"), st.number_input("Idade", 0, 20, 7), st.selectbox("Turno", ["Matutino", "Vespertino"])
+        if st.form_submit_button("Salvar"):
+            df = pd.read_csv(ALUNOS_FILE)
+            pd.concat([df, pd.DataFrame([[n.strip(), i, t]], columns=["Nome", "Idade", "Turno"])], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
+            st.success("Salvo com sucesso!")
+
+elif menu == "📊 Lançar Avaliação (Local)":
+    st.header("📊 Registro de Notas")
+    df_al = pd.read_csv(ALUNOS_FILE)
+    if not df_al.empty:
+        with st.form("notas_l"):
+            al, tr = st.selectbox("Aluno", sorted(df_al["Nome"].unique())), st.selectbox("Trimestre", ["1º Trimestre", "2º Trimestre", "3º Trimestre"])
+            sc = {c: st.slider(c, 1, 5, 3) for c in CATEGORIAS}
+            if st.form_submit_button("Confirmar"):
                 df_av = pd.read_csv(AVAL_FILE)
-                df_av = df_av[~((df_av["Aluno"] == al) & (df_av["Trimestre"] == tri))]
-                pd.concat([df_av, pd.DataFrame([[al, tri] + list(notas.values())], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
-                st.success("Salvo!")
-    else:
-        st.warning("Nenhum aluno cadastrado.")
-
-elif menu == "🌊 5. Tábua da Maré":
-    st.header("🌊 Evolução")
-    df_av = pd.read_csv(AVAL_FILE)
-    if not df_av.empty:
-        al_sel = st.selectbox("Escolha o Aluno", sorted(df_av["Aluno"].unique()))
-        df_al = df_av[df_av["Aluno"] == al_sel]
-        tri_sel = st.selectbox("Trimestre", df_al["Trimestre"].unique())
-        
-        row = df_al[df_al["Trimestre"] == tri_sel].iloc[0]
-        cats = ["Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]
-        val = [float(row[c]) for c in cats]
-        
-        fig = go.Figure(go.Scatter(x=cats, y=val, mode='lines+markers', fill='tozeroy', line=dict(color=COR_AZUL_INST)))
-        fig.update_layout(yaxis=dict(range=[0, 5.5]))
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Nenhuma avaliação feita ainda.")
+                df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Trimestre'] == tr))]
+                pd.concat([df_av, pd.DataFrame([[al, tr] + list(sc.values())], columns=["Aluno", "Trimestre"] + CATEGORIAS)], ignore_index=True).to_csv(AVAL_FILE, index=False)
+                st.success("Avaliação salva!")

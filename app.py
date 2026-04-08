@@ -160,7 +160,7 @@ st.markdown(f"""
 st.sidebar.write(f"👤 **{st.session_state.nome_usuario}**")
 if st.sidebar.button("Sair"):
     st.session_state.logado = False
-    st.return()
+    st.rerun()
     
 # 5. Navegação e Regras de Visibilidade
 def set_mat(t): st.session_state.f_mat = t

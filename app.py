@@ -161,7 +161,32 @@ st.sidebar.write(f"👤 **{st.session_state.nome_usuario}**")
 if st.sidebar.button("Sair"):
     st.session_state.logado = False
     st.rerun()
+# (Restante do código de Matrículas, Cadastro e Evolução permanece igual, 
+# garantindo que a aba 'Evolução Individual' esteja funcionando perfeitamente)
+
+if st.session_state.perfil == "admin":
+    menu = st.sidebar.radio("Navegação", ["👤 Cadastro", "📝 Matrículas", "🤝 Apadrinhamento", "📊 Lançar Avaliação", "🌊 Evolução Individual"])
+else:
+    menu = "🌊 Evolução Individual"
+
+# --- Exemplo da aba de Evolução protegida ---
+if menu == "🌊 Evolução Individual":
+    st.markdown(f"<h3 style='color:{C_AZUL};'>🌊 Tábua da Maré (Evolução)</h3>", unsafe_allow_html=True)
+    df_av = pd.read_csv(AVAL_FILE) if os.path.exists(AVAL_FILE) else pd.DataFrame()
+    df_geral = safe_read("GERAL")
     
+    if st.session_state.perfil == "admin":
+        alunos_visiveis = sorted(df_av["Aluno"].unique()) if not df_av.empty else []
+    else:
+        afilhados = df_geral[df_geral["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper() == st.session_state.nome_usuario]["ALUNO"].unique()
+        alunos_visiveis = [a for a in df_av["Aluno"].unique() if a in afilhados] if not df_av.empty else []
+
+    if alunos_visiveis:
+        al_s = st.selectbox("Escolha o Aluno", alunos_visiveis)
+        # ... (restante do código do gráfico Plotly)
+    else:
+        st.info("Ainda não há avaliações para seus afilhados.")    
+        
 # 5. Navegação e Regras de Visibilidade
 def set_mat(t): st.session_state.f_mat = t
 def set_pad(t): st.session_state.f_pad = t

@@ -206,16 +206,59 @@ elif menu == "📊 4. Avaliação":
                 pd.concat([df_av, nova_linha], ignore_index=True).to_csv(AVAL_FILE, index=False)
                 st.success("Salva!")
 
-elif menu == "🌊 5. Evolução":
-    st.header("🌊 Evolução Individual")
+# --- ABA 5: Tábua da Maré ---
+elif menu == "🌊 5. Tábua da Maré":
+    st.header("🌊 Tábua da Maré")
+    
     if os.path.exists(AVAL_FILE):
-        df_av = pd.read_csv(AVAL_FILE)
-        if not df_av.empty:
-            al_s = st.selectbox("Selecione o Aluno", sorted(df_av["Aluno"].unique()))
-            df_al = df_av[df_av["Aluno"] == al_s]
-            tri_s = st.selectbox("Selecione o Trimestre", df_al["Trimestre"].unique())
-            row = df_al[df_al["Trimestre"] == tri_s].iloc[0]
-            y_vals = [float(row[c]) for c in CATEGORIAS]
-            fig = go.Figure(go.Scatter(x=CATEGORIAS, y=y_vals, mode='lines+markers', fill='tozeroy', line=dict(color=COR_AZUL_INST, width=3)))
-            fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=450)
-            st.plotly_chart(fig, use_container_width=True)
+        try:
+            df_av = pd.read_csv(AVAL_FILE)
+            
+            if not df_av.empty:
+                # 1. Seleção do Aluno
+                lista_alunos_av = sorted(df_av["Aluno"].unique())
+                al_s = st.selectbox("Selecione o Aluno", lista_alunos_av)
+                
+                # 2. Filtrar dados do aluno
+                df_al = df_av[df_av["Aluno"] == al_s]
+                
+                # 3. Seleção do Trimestre
+                lista_tri = df_al["Trimestre"].unique()
+                tri_s = st.selectbox("Selecione o Trimestre", lista_tri)
+                
+                # 4. Localizar a linha e converter valores
+                row = df_al[df_al["Trimestre"] == tri_s].iloc[0]
+                
+                y_vals = []
+                for c in CATEGORIAS:
+                    try:
+                        val = float(row[c])
+                        y_vals.append(val)
+                    except:
+                        y_vals.append(0.0) # Valor de escape
+                
+                # 5. Gerar Gráfico
+                fig = go.Figure(go.Scatter(
+                    x=CATEGORIAS, 
+                    y=y_vals, 
+                    mode='lines+markers+text',
+                    text=[str(v) for v in y_vals],
+                    textposition="top center",
+                    fill='tozeroy', 
+                    line=dict(color=COR_AZUL_INST, width=3),
+                    marker=dict(size=8)
+                ))
+                
+                fig.update_layout(
+                    yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]),
+                    height=450,
+                    margin=dict(l=20, r=20, t=20, b=20)
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Nenhuma avaliação encontrada no arquivo. Vá para a aba '4. Avaliação' e salve uma nota primeiro.")
+        except Exception as e:
+            st.error(f"Erro ao ler o histórico de avaliações: {e}")
+    else:
+        st.error("O arquivo de banco de dados de avaliações não foi encontrado.")

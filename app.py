@@ -14,15 +14,15 @@ st.markdown(f"""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     .stApp {{ background-color: #ffffff; font-family: 'Inter', sans-serif; }}
     
-    .main-header {{ text-align: center; padding-top: 30px; padding-bottom: 5px; }}
+    .main-header {{ text-align: center; padding-top: 30px; padding-bottom: 10px; }}
     .main-header h1 {{ margin: 0; font-size: 40px !important; font-weight: 800; line-height: 1.1; }}
 
-    /* Redução de Espaçamentos */
-    .block-container {{ padding-top: 0.5rem !important; }}
-    [data-testid="stVerticalBlock"] > div {{ padding-bottom: 0rem !important; margin-bottom: -15px !important; }}
-    .stSelectbox, .stCheckbox, .stSlider {{ margin-bottom: -20px !important; }}
-    [data-testid="stHorizontalBlock"] {{ gap: 0.5rem !important; margin-bottom: -10px !important; }}
-    hr {{ margin: 0.2rem 0 !important; }}
+    /* Espaçamentos equilibrados: reduzidos, mas SEM sobreposição (sem margens negativas) */
+    .block-container {{ padding-top: 1rem !important; padding-bottom: 1rem !important; }}
+    [data-testid="stVerticalBlock"] > div {{ padding-bottom: 0.3rem !important; }}
+    .stSelectbox, .stCheckbox, .stSlider {{ margin-bottom: 5px !important; }}
+    [data-testid="stHorizontalBlock"] {{ gap: 0.8rem !important; margin-bottom: 5px !important; }}
+    hr {{ margin: 0.5rem 0 !important; }}
 
     /* Tabelas */
     .custom-table {{

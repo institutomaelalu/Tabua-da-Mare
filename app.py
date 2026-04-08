@@ -24,9 +24,7 @@ st.markdown(f"""
     }}
     .custom-table thead th {{ background-color: #ffffff; padding: 10px; text-align: left; border-bottom: 2px solid #f8f8f8; color: #444; }}
     .custom-table tbody td {{ padding: 8px 10px; border-bottom: 1px solid #fafafa; color: #666 !important; font-weight: 500; }}
-    div.stButton > button {{
-        width: 100%; border-radius: 8px !important; font-weight: 600 !important; height: 38px;
-    }}
+    div.stButton > button {{ width: 100%; border-radius: 8px !important; font-weight: 600 !important; height: 38px; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -49,7 +47,7 @@ TURMAS_CONFIG = {
     "CIRAND. MUNDO": {"cor": "#6741d9", "key": "cirand_mundo"},
 }
 
-# 3. Leitura Segura
+# 3. Funções de Leitura
 def safe_read(worksheet_name):
     df = pd.DataFrame(columns=["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"])
     try:
@@ -99,7 +97,7 @@ if not st.session_state.logado:
                     else: st.error("Acesso negado.")
     st.stop()
 
-# --- NAVEGAÇÃO ---
+# --- SIDEBAR E NAVEGAÇÃO ---
 st.sidebar.write(f"👤 **{st.session_state.nome_usuario}**")
 if st.sidebar.button("Sair"):
     st.session_state.logado = False
@@ -112,60 +110,101 @@ else:
 
 # --- ABAS ---
 
-if menu == "🌊 Evolução (Padrinhos)":
-    st.markdown(f"<h3 style='color:{C_AZUL}'>🤝 Área do Padrinho: Meus Afilhados</h3>", unsafe_allow_html=True)
+if menu == "👤 Cadastro":
+    st.markdown(f"<h3 style='color:{C_ROSA}'>👤 Novo Cadastro de Aluno</h3>", unsafe_allow_html=True)
+    with st.form("cad_aluno"):
+        n, i, comu = st.text_input("Nome Completo"), st.text_input("Idade"), st.text_input("Comunidade")
+        t, tn = st.selectbox("Sala", list(TURMAS_CONFIG.keys())), st.selectbox("Turma", ["A", "B"])
+        if st.form_submit_button("Cadastrar"):
+            df_l = pd.read_csv(ALUNOS_FILE)
+            pd.concat([df_l, pd.DataFrame([[n.upper(), t, tn, i, comu]], columns=df_l.columns)], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
+            st.success("Aluno cadastrado com sucesso!")
+
+elif menu == "📝 Matrículas":
+    st.markdown(f"<h3 style='color:{C_VERDE}'>📋 Quadro de Matrículas</h3>", unsafe_allow_html=True)
+    df = safe_read("GERAL")
+    f1, f2 = st.columns(2)
+    f_tn = f1.selectbox("Filtrar Turno", ["Todos", "A", "B"])
+    f_cm = f2.selectbox("Filtrar Comunidade", ["Todas"] + sorted(df["COMUNIDADE"].unique()))
+    df_f = df.copy()
+    if f_tn != "Todos": df_f = df_f[df_f["TURNO"] == f_tn]
+    if f_cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_cm]
+    view_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE"]
+    html = '<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in view_cols]) + '</tr></thead><tbody>'
+    for _, r in df_f.iterrows(): html += '<tr>' + "".join([f'<td>{r[c]}</td>' for c in view_cols]) + '</tr>'
+    st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
+
+elif menu == "🤝 Apadrinhamento":
+    st.markdown(f"<h3 style='color:{C_AZUL}'>🤝 Gestão de Padrinhos</h3>", unsafe_allow_html=True)
+    df = safe_read("GERAL")
+    sem_p = st.checkbox("Mostrar apenas alunos sem padrinho")
+    df_p = df.copy()
+    if sem_p: df_p = df_p[df_p["PADRINHO/MADRINHA"].isin(["", "0", "nan"])]
+    
+    view_cols = ["ALUNO", "TURMA", "PADRINHO/MADRINHA"]
+    html = '<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in view_cols]) + '</tr></thead><tbody>'
+    for _, r in df_p.iterrows(): html += '<tr>' + "".join([f'<td>{r[c]}</td>' for c in view_cols]) + '</tr>'
+    st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
+
+    with st.expander("📝 Editar/Vincular Padrinho"):
+        with st.form("edit_p"):
+            al_sel = st.selectbox("Aluno", sorted(df["ALUNO"].unique()))
+            novo_p = st.text_input("Nome do Padrinho")
+            if st.form_submit_button("Salvar Alteração"):
+                hist_p = pd.read_csv(PADRINHOS_FILE)
+                hist_p = hist_p[hist_p["ALUNO"] != al_sel]
+                pd.concat([hist_p, pd.DataFrame([[al_sel, novo_p]], columns=["ALUNO", "PADRINHO_EDITADO"])], ignore_index=True).to_csv(PADRINHOS_FILE, index=False)
+                st.success("Padrinho atualizado!")
+                st.rerun()
+
+elif menu == "📊 Lançar Avaliação":
+    st.markdown(f"<h3 style='color:{C_AMARELO}'>📊 Registro de Notas</h3>", unsafe_allow_html=True)
+    df_g = safe_read("GERAL")
+    with st.form("f_aval"):
+        al = st.selectbox("Aluno", sorted(df_g["ALUNO"].unique()))
+        tri = st.selectbox("Trimestre", ["1º Trimestre", "2º Trimestre", "3º Trimestre"])
+        notas = {cat: st.slider(cat, 1, 5, 3) for cat in CATEGORIAS}
+        if st.form_submit_button("Salvar Avaliação"):
+            df_av = pd.read_csv(AVAL_FILE)
+            df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Trimestre'] == tri))]
+            new_row = pd.DataFrame([[al, tri] + [float(v) for v in notas.values()]], columns=df_av.columns)
+            pd.concat([df_av, new_row], ignore_index=True).to_csv(AVAL_FILE, index=False)
+            st.success("Nota registrada com sucesso!")
+
+elif menu == "🌊 Evolução (Padrinhos)":
+    st.markdown(f"<h3 style='color:{C_AZUL}'>🌊 Área do Padrinho</h3>", unsafe_allow_html=True)
     df_geral = safe_read("GERAL")
     df_av = pd.read_csv(AVAL_FILE) if os.path.exists(AVAL_FILE) else pd.DataFrame()
-    
-    padrinho_alvo = st.session_state.nome_usuario if st.session_state.perfil != "admin" else st.selectbox("Simular Padrinho:", sorted(df_geral["PADRINHO/MADRINHA"].unique()))
+    p_alvo = st.session_state.nome_usuario if st.session_state.perfil != "admin" else st.selectbox("Simular Padrinho:", sorted(df_geral["PADRINHO/MADRINHA"].unique()))
 
-    afilhados_df = df_geral[df_geral["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper() == padrinho_alvo.strip().upper()]
-    
-    if not afilhados_df.empty:
-        # Saudação Restaurada
-        st.write(f"Olá **{padrinho_alvo}**, aqui estão as crianças que você apadrinha:")
-        
-        # Tabela de Afilhados
-        view = afilhados_df[["ALUNO", "TURMA", "IDADE"]].copy()
-        html = '<table class="custom-table"><thead><tr><th>AFILHADO</th><th>TURMA</th><th>IDADE</th></tr></thead><tbody>'
-        for _, r in view.iterrows(): html += f'<tr><td>{r["ALUNO"]}</td><td>{r["TURMA"]}</td><td>{r["IDADE"]}</td></tr>'
-        st.markdown(html + '</tbody></table><br>', unsafe_allow_html=True)
-        
-        # Lógica de Evolução (Filtro e Gráfico)
-        al_visiveis = [a for a in afilhados_df["ALUNO"].unique() if not df_av.empty and a in df_av["Aluno"].unique()]
+    afilhados = df_geral[df_geral["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper() == p_alvo.strip().upper()]
+    if not afilhados.empty:
+        st.write(f"Olá **{padrinho_alvo}**, aqui estão seus afilhados:")
+        al_visiveis = [a for a in afilhados["ALUNO"].unique() if not df_av.empty and a in df_av["Aluno"].unique()]
         if al_visiveis:
-            al_s = st.selectbox("Ver evolução detalhada de:", al_visiveis)
+            al_s = st.selectbox("Escolha o afilhado para ver o gráfico:", al_visiveis)
             df_al = df_av[df_av["Aluno"] == al_s]
             tri_s = st.selectbox("Trimestre", df_al["Trimestre"].unique())
-            
-            df_filtrado = df_al[df_al["Trimestre"] == tri_s]
-            if not df_filtrado.empty:
-                row = df_filtrado.iloc[0]
-                y_vals = [float(row[c]) for c in CATEGORIAS]
-                fig = go.Figure(go.Scatter(x=CATEGORIAS, y=y_vals, mode='lines+markers+text', text=[str(int(v)) for v in y_vals], textposition="top center", fill='tozeroy', line=dict(color=C_AZUL, width=4, shape='spline')))
-                fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=350, margin=dict(t=20, b=0))
-                st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("As avaliações desses afilhados ainda não foram lançadas no sistema.")
-    else:
-        st.warning("Não encontramos afilhados vinculados ao seu nome.")
+            row = df_al[df_al["Trimestre"] == tri_s].iloc[0]
+            fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], mode='lines+markers+text', text=[str(int(row[c])) for c in CATEGORIAS], textposition="top center", fill='tozeroy', line=dict(color=C_AZUL, width=4, shape='spline')))
+            fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=350)
+            st.plotly_chart(fig, use_container_width=True)
+        else: st.info("Ainda não há avaliações lançadas para seus afilhados.")
+    else: st.error("Nenhum afilhado encontrado para este usuário.")
 
 elif menu == "🛡️ Controle Interno":
-    st.markdown(f"<h3 style='color:{C_VERDE}'>🛡️ Controle Interno</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color:{C_VERDE}'>🛡️ Controle Interno (Rede Completa)</h3>", unsafe_allow_html=True)
     if os.path.exists(AVAL_FILE):
         df_av = pd.read_csv(AVAL_FILE)
         if not df_av.empty:
-            al_s = st.selectbox("Escolha qualquer aluno da rede:", sorted(df_av["Aluno"].unique()))
+            al_s = st.selectbox("Selecione qualquer aluno:", sorted(df_av["Aluno"].unique()))
             df_al = df_av[df_av["Aluno"] == al_s]
             if not df_al.empty:
-                tri_s = st.selectbox("Trimestre", df_al["Trimestre"].unique(), key="int_tri")
+                tri_s = st.selectbox("Trimestre:", df_al["Trimestre"].unique(), key="int_tri")
                 df_filtrado = df_al[df_al["Trimestre"] == tri_s]
                 if not df_filtrado.empty:
                     row = df_filtrado.iloc[0]
-                    y_vals = [float(row[c]) for c in CATEGORIAS]
-                    fig = go.Figure(go.Scatter(x=CATEGORIAS, y=y_vals, mode='lines+markers+text', text=[str(int(v)) for v in y_vals], textposition="top center", fill='tozeroy', line=dict(color=C_VERDE, width=4, shape='spline')))
+                    fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], mode='lines+markers+text', text=[str(int(row[c])) for c in CATEGORIAS], textposition="top center", fill='tozeroy', line=dict(color=C_VERDE, width=4, shape='spline')))
                     fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=400)
                     st.plotly_chart(fig, use_container_width=True)
-        else: st.info("O banco de dados de avaliações está vazio.")
-
-# Outras abas (Cadastro, Matrículas, Apadrinhamento, Lançar Avaliação) seguem conforme sua versão funcional.
+        else: st.warning("O banco de dados de avaliações está vazio.")

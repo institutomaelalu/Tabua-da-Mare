@@ -6,140 +6,95 @@ import os
 from scipy.interpolate import make_interp_spline
 from streamlit_gsheets import GSheetsConnection
 
-# 1. Configuração de Estilo
+# 1. Configuração e Estilo
 st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
+COR_VERDE, COR_AZUL = "#a8cf45", "#5cc6d0"
 
-COR_VERDE = "#a8cf45"
-COR_AZUL = "#5cc6d0"
+st.markdown(f"<div style='text-align: center; padding: 10px;'><h1 style='margin-bottom: 0;'><span style='color: {COR_VERDE};'>Instituto</span> <span style='color: {COR_AZUL};'>Mãe</span> <span style='color: {COR_VERDE};'>Lalu</span></h1><h3 style='color: {COR_AZUL}; font-weight: 300; margin-top: 0;'>🌊 Painel de Controle Integrado</h3></div><hr style='border: 1px solid {COR_VERDE};'>", unsafe_allow_html=True)
 
-st.markdown(f"""
-    <div style='text-align: center; padding: 10px;'>
-        <h1 style='margin-bottom: 0;'>
-            <span style='color: {COR_VERDE};'>Instituto</span> <span style='color: {COR_AZUL};'>Mãe</span> <span style='color: {COR_VERDE};'>Lalu</span>
-        </h1>
-        <h3 style='color: {COR_AZUL}; font-weight: 300; margin-top: 0;'>🌊 Painel de Controle Integrado</h3>
-    </div>
-    <hr style="border: 1px solid {COR_VERDE};">
-    """, unsafe_allow_html=True)
-
-# 2. Configurações e Banco de Dados Local (Original da Tábua da Maré)
+# 2. Configurações Tábua da Maré (Original Local)
 CATEGORIAS = ["Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]
-ALUNOS_FILE = "alunos.csv"
-AVAL_FILE = "avaliacoes.csv"
+ALUNOS_FILE, AVAL_FILE = "alunos.csv", "avaliacoes.csv"
 
 def init_db():
-    if not os.path.exists(ALUNOS_FILE):
-        pd.DataFrame(columns=["Nome", "Idade", "Turno"]).to_csv(ALUNOS_FILE, index=False)
-    if not os.path.exists(AVAL_FILE):
-        pd.DataFrame(columns=["Aluno", "Trimestre"] + CATEGORIAS).to_csv(AVAL_FILE, index=False)
+    if not os.path.exists(ALUNOS_FILE): pd.DataFrame(columns=["Nome", "Idade", "Turno"]).to_csv(ALUNOS_FILE, index=False)
+    if not os.path.exists(AVAL_FILE): pd.DataFrame(columns=["Aluno", "Trimestre"] + CATEGORIAS).to_csv(AVAL_FILE, index=False)
 
 init_db()
-
-# Conexão com Google Sheets (Para Matrícula e Apadrinhamento)
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 3. Navegação Lateral
-menu = st.sidebar.radio("Menu", [
-    "🌊 Painel de Evolução", 
-    "📝 Controle de Matrículas (GERAL)", 
-    "🤝 Controle de Apadrinhamento",
-    "👤 Cadastrar Aluno (Local)", 
-    "📊 Lançar Avaliação (Local)"
-])
+# 3. Navegação
+menu = st.sidebar.radio("Menu", ["🌊 Painel de Evolução", "📝 Controle de Matrículas (GERAL)", "🤝 Controle de Apadrinhamento", "👤 Cadastrar Aluno (Local)", "📊 Lançar Avaliação (Local)"])
 
-# --- 1. PAINEL DE EVOLUÇÃO (Tábua da Maré - Código Original) ---
+# --- FUNÇÃO AUXILIAR DE LEITURA (Evita HTTPError) ---
+def safe_read(worksheet_name):
+    try:
+        df = conn.read(worksheet=worksheet_name, ttl=0)
+        if df is not None:
+            df.columns = [str(c).strip() for c in df.columns]
+        return df
+    except Exception as e:
+        st.error(f"Erro ao acessar a aba '{worksheet_name}'. Verifique o link no Secrets e se a aba existe.")
+        return pd.DataFrame()
+
+# --- 1. PAINEL DE EVOLUÇÃO (Tábua da Maré) ---
 if menu == "🌊 Painel de Evolução":
-    df_alunos = pd.read_csv(ALUNOS_FILE)
-    df_av = pd.read_csv(AVAL_FILE)
-    
-    if df_av.empty:
-        st.info("Aguardando registros e avaliações.")
+    df_alunos, df_av = pd.read_csv(ALUNOS_FILE), pd.read_csv(AVAL_FILE)
+    if df_av.empty: st.info("Sem avaliações.")
     else:
         c1, c2, c3 = st.columns(3)
-        with c1:
-            turno_sel = st.selectbox("1. Filtrar Turno", ["Matutino", "Vespertino"])
-        
-        alunos_turno = df_alunos[df_alunos["Turno"] == turno_sel]["Nome"].unique()
-        avaliados = df_av[df_av["Aluno"].isin(alunos_turno)]["Aluno"].unique()
-        
-        if len(avaliados) == 0:
-            st.warning("Nenhum dado neste turno.")
+        with c1: t_sel = st.selectbox("Turno", ["Matutino", "Vespertino"])
+        avaliados = df_av[df_av["Aluno"].isin(df_alunos[df_alunos["Turno"] == t_sel]["Nome"])]["Aluno"].unique()
+        if len(avaliados) == 0: st.warning("Sem dados.")
         else:
-            with c2:
-                aluno_sel = st.selectbox("2. Selecionar Aluno", sorted(avaliados))
-            with c3:
-                trims = df_av[df_av["Aluno"] == aluno_sel]["Trimestre"].unique()
-                trim_sel = st.selectbox("3. Trimestre de Avaliação", trims)
-
-            dados = df_av[(df_av["Aluno"] == aluno_sel) & (df_av["Trimestre"] == trim_sel)].iloc[0]
-            notas = [dados[c] for c in CATEGORIAS]
-            
-            x = np.arange(len(CATEGORIAS))
-            x_new = np.linspace(0, len(CATEGORIAS) - 1, 300) 
-            spl = make_interp_spline(x, notas, k=3)
-            y_smooth = np.clip(spl(x_new), 1, 5)
-
-            st.subheader(f"🌊 Tábua da Maré: {aluno_sel} ({trim_sel})")
-            
+            with c2: a_sel = st.selectbox("Aluno", sorted(avaliados))
+            with c3: trim_sel = st.selectbox("Trimestre", df_av[df_av["Aluno"] == a_sel]["Trimestre"].unique())
+            dados = df_av[(df_av["Aluno"] == a_sel) & (df_av["Trimestre"] == trim_sel)].iloc[0]
+            notas = [float(dados[c]) for c in CATEGORIAS]
+            x, x_new = np.arange(len(CATEGORIAS)), np.linspace(0, len(CATEGORIAS) - 1, 300)
+            y_smooth = np.clip(make_interp_spline(x, notas, k=3)(x_new), 1, 5)
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=x_new, y=y_smooth, mode='lines', line=dict(shape='spline', width=6, color=COR_AZUL),
-                                     fill='tozeroy', fillcolor=f"rgba(92, 198, 208, 0.2)", name="Fluxo"))
-            fig.add_trace(go.Scatter(x=x, y=notas, mode='markers', marker=dict(size=10, color=COR_VERDE), name="Nota Real"))
-            fig.update_layout(xaxis=dict(tickmode='array', tickvals=list(range(len(CATEGORIAS))), ticktext=CATEGORIAS),
-                              yaxis=dict(range=[0, 5.5], gridcolor="#f0f0f0"), plot_bgcolor='white', height=400, showlegend=False)
+            fig.add_trace(go.Scatter(x=x_new, y=y_smooth, mode='lines', line=dict(width=6, color=COR_AZUL), fill='tozeroy', fillcolor="rgba(92, 198, 208, 0.2)"))
+            fig.add_trace(go.Scatter(x=x, y=notas, mode='markers', marker=dict(size=10, color=COR_VERDE)))
+            fig.update_layout(xaxis=dict(tickmode='array', tickvals=list(range(len(CATEGORIAS))), ticktext=CATEGORIAS), yaxis=dict(range=[0, 5.5]), plot_bgcolor='white', height=400, showlegend=False)
             st.plotly_chart(fig, use_container_width=True)
 
-            st.divider()
-            fig_radar = go.Figure(go.Scatterpolar(r=notas, theta=CATEGORIAS, fill='toself', fillcolor='rgba(168, 207, 69, 0.4)', line=dict(color=COR_VERDE)))
-            fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 5])), showlegend=False)
-            st.plotly_chart(fig_radar, use_container_width=True)
-
-# --- 2. CONTROLE DE MATRÍCULAS (Aba GERAL - Google Sheets) ---
+# --- 2. MATRÍCULAS (GERAL) ---
 elif menu == "📝 Controle de Matrículas (GERAL)":
-    st.header("📋 Lista Geral de Alunos (Nuvem)")
-    df_geral = conn.read(worksheet="GERAL", ttl=0)
-    if not df_geral.empty:
-        st.dataframe(df_geral[["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]].dropna(subset=["ALUNO"]), use_container_width=True)
+    st.header("📋 Lista Geral (Nuvem)")
+    df = safe_read("GERAL")
+    if not df.empty:
+        cols = [c for c in ["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"] if c in df.columns]
+        st.dataframe(df[cols].dropna(subset=["ALUNO"]), use_container_width=True)
 
-# --- 3. CONTROLE DE APADRINHAMENTO (Abas de Salas - Google Sheets) ---
+# --- 3. APADRINHAMENTO ---
 elif menu == "🤝 Controle de Apadrinhamento":
     st.header("🤝 Gestão por Salas")
-    sala_sel = st.selectbox("Selecione a Sala:", ["SALA ROSA", "SALA AMARELA", "SALA VERDE", "SALA AZUL", "CIRAND. MUNDO"])
-    try:
-        df_sala = conn.read(worksheet=sala_sel, ttl=0)
-        cols_presentes = [c for c in ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"] if c in df_sala.columns]
-        st.dataframe(df_sala[cols_presentes].dropna(subset=["ALUNO"]), use_container_width=True)
-    except:
-        st.error(f"Aba '{sala_sel}' não encontrada.")
+    sala = st.selectbox("Sala:", ["SALA ROSA", "SALA AMARELA", "SALA VERDE", "SALA AZUL", "CIRAND. MUNDO"])
+    df_s = safe_read(sala)
+    if not df_s.empty:
+        cols = [c for c in ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"] if c in df_s.columns]
+        st.dataframe(df_s[cols].dropna(subset=["ALUNO"]), use_container_width=True)
 
-# --- 4. CADASTRAR ALUNO (Original Local) ---
+# --- 4 & 5 (CADASTRO E LANÇAMENTO LOCAL MANTIDOS) ---
 elif menu == "👤 Cadastrar Aluno (Local)":
-    st.header("📝 Novo Registro Local")
-    with st.form("cadastro", clear_on_submit=True):
-        nome = st.text_input("Nome do Aluno")
-        idade = st.number_input("Idade", 4, 15, 7)
-        turno = st.selectbox("Turno", ["Matutino", "Vespertino"])
+    with st.form("cad"):
+        n = st.text_input("Nome")
+        i = st.number_input("Idade", 4, 15, 7)
+        t = st.selectbox("Turno", ["Matutino", "Vespertino"])
         if st.form_submit_button("Salvar"):
-            if nome:
-                df = pd.read_csv(ALUNOS_FILE)
-                novo = pd.DataFrame([[nome.strip(), idade, turno]], columns=["Nome", "Idade", "Turno"])
-                pd.concat([df, novo], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
-                st.success(f"Aluno {nome} registrado localmente!")
+            df = pd.read_csv(ALUNOS_FILE)
+            pd.concat([df, pd.DataFrame([[n.strip(), i, t]], columns=["Nome", "Idade", "Turno"])], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
+            st.success("Salvo!")
 
-# --- 5. LANÇAR AVALIAÇÃO (Original Local) ---
 elif menu == "📊 Lançar Avaliação (Local)":
-    st.header("📊 Lançar Notas")
-    df_alunos = pd.read_csv(ALUNOS_FILE)
-    if df_alunos.empty:
-        st.info("Cadastre um aluno no menu local primeiro.")
-    else:
-        with st.form("notas", clear_on_submit=True):
-            aluno = st.selectbox("Selecione o Aluno", df_alunos["Nome"].unique())
-            trim = st.selectbox("Trimestre", ["1º Trimestre", "2º Trimestre", "3º Trimestre"])
-            scores = {c: st.slider(c, 1, 5, 3) for c in CATEGORIAS}
-            if st.form_submit_button("Salvar Avaliação"):
-                df_av = pd.read_csv(AVAL_FILE)
-                df_av = df_av[~((df_av['Aluno'] == aluno) & (df_av['Trimestre'] == trim))]
-                nova_av = pd.DataFrame([[aluno, trim] + list(scores.values())], columns=["Aluno", "Trimestre"] + CATEGORIAS)
-                pd.concat([df_av, nova_av], ignore_index=True).to_csv(AVAL_FILE, index=False)
-                st.success("Avaliação salva localmente!")
+    df_al = pd.read_csv(ALUNOS_FILE)
+    with st.form("notas"):
+        al = st.selectbox("Aluno", df_al["Nome"].unique())
+        tr = st.selectbox("Trimestre", ["1º Trimestre", "2º Trimestre", "3º Trimestre"])
+        sc = {c: st.slider(c, 1, 5, 3) for c in CATEGORIAS}
+        if st.form_submit_button("Salvar"):
+            df_v = pd.read_csv(AVAL_FILE)
+            df_v = df_v[~((df_v['Aluno'] == al) & (df_v['Trimestre'] == tr))]
+            pd.concat([df_v, pd.DataFrame([[al, tr] + list(sc.values())], columns=["Aluno", "Trimestre"] + CATEGORIAS)], ignore_index=True).to_csv(AVAL_FILE, index=False)
+            st.success("Avaliação salva!")

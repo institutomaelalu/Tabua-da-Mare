@@ -14,19 +14,20 @@ st.markdown(f"""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     .stApp {{ background-color: #ffffff; font-family: 'Inter', sans-serif; }}
     
-    /* Título: Mais baixo e fonte maior */
+    /* Título: Ajuste de posição (mais baixo) e tamanho maior para não cortar o acento */
     .main-header {{ 
         text-align: center; 
-        padding-top: 40px; 
-        padding-bottom: 5px;
+        padding-top: 50px; 
+        padding-bottom: 10px;
     }}
     .main-header h1 {{ 
         margin: 0; 
-        font-size: 38px !important; 
+        font-size: 42px !important; 
         font-weight: 800;
+        line-height: 1.2;
     }}
 
-    /* Tabelas e Redução de Espaçamentos */
+    /* Tabelas e Redução Drástica de Espaçamentos */
     .custom-table {{
         width: 100%; border-collapse: separate; border-spacing: 0;
         border: 1px solid #f0f0f0; border-radius: 10px;
@@ -46,18 +47,18 @@ st.markdown(f"""
         font-weight: 500; 
     }}
     
-    /* Redução de espaços entre widgets */
-    .stSelectbox, .stCheckbox, div[data-testid="stForm"] {{ margin-bottom: -15px !important; }}
+    /* Redução de espaços entre botões, filtros e tabela */
+    .stSelectbox, .stCheckbox, div[data-testid="stForm"] {{ margin-bottom: -20px !important; }}
     [data-testid="stVerticalBlock"] > div {{ padding-bottom: 0rem !important; }}
     
     div.stButton > button {{
         width: 100%; border-radius: 8px !important; border: 1px solid #eee !important;
         font-weight: 600 !important; height: 40px; font-size: 12px !important;
     }}
-    [data-testid="stHorizontalBlock"] {{ gap: 0.5rem !important; margin-bottom: -10px !important; }}
+    [data-testid="stHorizontalBlock"] {{ gap: 0.5rem !important; margin-bottom: -15px !important; }}
     
-    .block-container {{ padding-top: 1rem !important; }}
-    hr {{ margin: 0.3rem 0 !important; }}
+    .block-container {{ padding-top: 0.5rem !important; }}
+    hr {{ margin: 0.2rem 0 !important; }}
     </style>
     
     <div class="main-header">
@@ -93,7 +94,6 @@ TURMAS_CONFIG = {
     "CIRAND. MUNDO": {"cor": "#6741d9", "key": "cirand_mundo", "txt": "#ffffff"},
 }
 
-# 3. Funções de leitura e renderização
 def safe_read(worksheet_name):
     df = pd.DataFrame(columns=["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"])
     try:
@@ -111,7 +111,7 @@ def safe_read(worksheet_name):
         if worksheet_name == "GERAL": full = pd.concat([df, df_l], ignore_index=True)
         else:
             sala_f = worksheet_name.replace("SALA ", "")
-            full = pd.concat([df, df_l[df_l["TURMA"].str.contains(sala_f, na=False, case=False)]], ignore_index=True)
+            full = pd.concat([df, df_l[df_l["TURMA"].astype(str).str.contains(sala_f, na=False, case=False)]], ignore_index=True)
         full["ALUNO"] = full["ALUNO"].astype(str).str.strip().str.upper()
         for _, r in df_p.iterrows():
             full.loc[full["ALUNO"] == str(r["ALUNO"]).strip().upper(), "PADRINHO/MADRINHA"] = r["PADRINHO_EDITADO"]
@@ -146,14 +146,18 @@ if menu == "📝 Matrículas":
     
     df = safe_read(st.session_state.f_mat if st.session_state.f_mat != "Todas" else "GERAL")
     f1, f2 = st.columns(2)
-    # Filtro fixado com opções A e B
+    # FILTRO: Relação com a coluna TURNO
     with f1: f_tn = st.selectbox("Turma (A/B)", ["Todos", "A", "B"])
     with f2: f_cm = st.selectbox("Comunidade", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]))
     
     df_f = df.copy()
-    if f_tn != "Todos": df_f = df_f[df_f["TURNO"].astype(str).str.upper() == f_tn]
-    if f_cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_cm]
-    render_styled_table(df_f[["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE"]])
+    if f_tn != "Todos": 
+        df_f = df_f[df_f["TURNO"].astype(str).str.strip().str.upper() == f_tn]
+    if f_cm != "Todas": 
+        df_f = df_f[df_f["COMUNIDADE"] == f_cm]
+    
+    # REMOVIDA COLUNA TURNO DA EXIBIÇÃO
+    render_styled_table(df_f[["ALUNO", "TURMA", "IDADE", "COMUNIDADE"]])
 
 elif menu == "🤝 Apadrinhamento":
     st.markdown(f"<h3 style='color:{C_AZUL}; margin-bottom:5px;'>🤝 Apadrinhamento</h3>", unsafe_allow_html=True)
@@ -165,16 +169,21 @@ elif menu == "🤝 Apadrinhamento":
     
     df = safe_read(st.session_state.f_pad)
     f1, f2, f3 = st.columns([1, 1, 1])
-    # Filtro fixado com opções A e B
+    # FILTRO: Relação com a coluna TURMA
     with f1: f_tn_p = st.selectbox("Turma (A/B) ", ["Todos", "A", "B"])
     with f2: f_cm_p = st.selectbox("Comunidade ", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]))
     with f3: check = st.checkbox("Sem padrinho/madrinha")
     
     df_f = df.copy()
-    if f_tn_p != "Todos": df_f = df_f[df_f["TURNO"].astype(str).str.upper() == f_tn_p]
-    if f_cm_p != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_cm_p]
-    if check: df_f = df_f[df_f["PADRINHO/MADRINHA"].astype(str).str.strip().isin(["", "nan", "None", "0"])]
-    render_styled_table(df_f[["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]])
+    if f_tn_p != "Todos": 
+        df_f = df_f[df_f["TURMA"].astype(str).str.strip().str.upper() == f_tn_p]
+    if f_cm_p != "Todas": 
+        df_f = df_f[df_f["COMUNIDADE"] == f_cm_p]
+    if check: 
+        df_f = df_f[df_f["PADRINHO/MADRINHA"].astype(str).str.strip().isin(["", "nan", "None", "0"])]
+    
+    # REMOVIDA COLUNA TURNO DA EXIBIÇÃO
+    render_styled_table(df_f[["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]])
 
     st.write("---")
     with st.expander("📝 Gerenciar Padrinho/Madrinha"):

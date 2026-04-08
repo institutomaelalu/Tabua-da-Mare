@@ -64,24 +64,21 @@ def safe_read(worksheet_name):
         st.error(f"Erro ao acessar {worksheet_name}.")
         return pd.DataFrame()
 
-# --- FUNÇÃO DE ESTILIZAÇÃO POR TURMA ---
+# --- FUNÇÃO DE ESTILIZAÇÃO ---
 def stylize_df(df):
     def apply_room_color(row):
         turma = str(row.get('TURMA', '')).strip().upper()
         colors = {
-            'SALA ROSA': 'background-color: #ffd1dc; color: #a020f0',
-            'SALA AMARELA': 'background-color: #fff9c4; color: #856404',
-            'SALA VERDE': 'background-color: #c8e6c9; color: #1b5e20',
-            'SALA AZUL': 'background-color: #e3f2fd; color: #0d47a1',
+            'SALA ROSA': 'background-color: #ffd1dc; color: #000000',
+            'SALA AMARELA': 'background-color: #fff9c4; color: #000000',
+            'SALA VERDE': 'background-color: #c8e6c9; color: #000000',
+            'SALA AZUL': 'background-color: #e3f2fd; color: #000000',
             'CIRAND. MUNDO': 'background-color: #1a237e; color: #ffffff',
         }
         style = colors.get(turma, '')
         return [style] * len(row)
     
-    return df.style.apply(apply_room_color, axis=1).set_properties(**{
-        'border': '1px solid #f0f2f6',
-        'font-size': '14px'
-    })
+    return df.style.apply(apply_room_color, axis=1)
 
 # 4. Navegação Lateral
 menu = st.sidebar.radio("Menu de Navegação", [
@@ -120,83 +117,60 @@ if menu == "🌊 Painel de Evolução":
             fig.update_layout(xaxis=dict(tickmode='array', tickvals=list(range(len(CATEGORIAS))), ticktext=CATEGORIAS), yaxis=dict(range=[0, 5.5]), plot_bgcolor='white', height=400, showlegend=False)
             st.plotly_chart(fig, use_container_width=True)
 
-# --- 2. MATRÍCULAS (FILTROS ADICIONADOS) ---
+# --- 2. MATRÍCULAS (GERAL) - FILTROS ATUALIZADOS ---
 elif menu == "📝 Controle de Matrículas (GERAL)":
     st.header("📋 Lista Geral de Alunos")
-    df_geral = safe_read("GERAL")
+    df_raw = safe_read("GERAL")
     
-    if not df_geral.empty:
-        # Filtros no topo
-        st.write("🔍 **Filtros Rápidos**")
-        f1, f2, f3 = st.columns(3)
-        
-        with f1:
-            filtro_nome = st.text_input("Buscar por Nome")
-        with f2:
-            opcoes_turma = ["Todas"] + list(df_geral["TURMA"].dropna().unique())
-            filtro_turma = st.selectbox("Filtrar por Turma", opcoes_turma)
-        with f3:
-            opcoes_comu = ["Todas"] + list(df_geral["COMUNIDADE"].dropna().unique())
-            filtro_comu = st.selectbox("Filtrar por Comunidade", opcoes_comu)
+    if not df_raw.empty:
+        st.write("🔍 **Filtros de Busca**")
+        # Layout de 4 colunas para os filtros
+        f1, f2, f3, f4 = st.columns(4)
+        with f1: f_nome = st.text_input("Nome do Aluno")
+        with f2: f_turma = st.selectbox("Turma", ["Todas"] + sorted(list(df_raw["TURMA"].dropna().unique())))
+        with f3: f_comu = st.selectbox("Comunidade", ["Todas"] + sorted(list(df_raw["COMUNIDADE"].dropna().unique())))
+        with f4: f_turno = st.selectbox("Turno", ["Todos"] + sorted(list(df_raw["TURNO"].dropna().unique())))
 
-        # Aplicando a lógica de filtragem
-        df_filtrado = df_geral.copy()
-        if filtro_nome:
-            df_filtrado = df_filtrado[df_filtrado["ALUNO"].str.contains(filtro_nome, case=False, na=False)]
-        if filtro_turma != "Todas":
-            df_filtrado = df_filtrado[df_filtrado["TURMA"] == filtro_turma]
-        if filtro_comu != "Todas":
-            df_filtrado = df_filtrado[df_filtrado["COMUNIDADE"] == filtro_comu]
+        df_f = df_raw.copy()
+        if f_nome: df_f = df_f[df_f["ALUNO"].str.contains(f_nome, case=False, na=False)]
+        if f_turma != "Todas": df_f = df_f[df_f["TURMA"] == f_turma]
+        if f_comu != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_comu]
+        if f_turno != "Todos": df_f = df_f[df_f["TURNO"] == f_turno]
 
-        # Removendo a coluna Padrinho/Madrinha conforme solicitado
-        cols_geral = ["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE"]
-        cols_v = [c for c in cols_geral if c in df_filtrado.columns]
+        cols = ["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE"]
+        df_final = df_f[cols].dropna(subset=["ALUNO"])
         
-        df_display = df_filtrado[cols_v].dropna(subset=["ALUNO"])
-        st.dataframe(stylize_df(df_display), use_container_width=True)
+        st.dataframe(stylize_df(df_final), use_container_width=True, height=500)
 
 # --- 3. APADRINHAMENTO ---
 elif menu == "🤝 Controle de Apadrinhamento":
     st.header("🤝 Gestão por Salas")
     sala_sel = st.selectbox("Selecione a Sala:", ["SALA ROSA", "SALA AMARELA", "SALA VERDE", "SALA AZUL", "CIRAND. MUNDO"])
-    df_sala = safe_read(sala_sel)
-    if not df_sala.empty:
-        # Mantém a coluna Padrinho/Madrinha apenas aqui
-        cols_sala = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
-        cols_v = [c for c in cols_sala if c in df_sala.columns]
-        df_display = df_sala[cols_v].dropna(subset=["ALUNO"])
-        st.dataframe(stylize_df(df_display), use_container_width=True)
+    df_s = safe_read(sala_sel)
+    if not df_s.empty:
+        cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
+        df_final_s = df_s[cols].dropna(subset=["ALUNO"])
+        st.dataframe(stylize_df(df_final_s), use_container_width=True, height=500)
 
-# --- 4. CADASTRAR ALUNO ---
+# --- 4 & 5 (CADASTROS LOCAIS) ---
 elif menu == "👤 Cadastrar Aluno (Local)":
     st.header("📝 Novo Cadastro Local")
-    with st.form("cad_local", clear_on_submit=True):
-        nome = st.text_input("Nome Completo")
-        idade = st.number_input("Idade", 0, 100, 7)
-        turno = st.selectbox("Turno", ["Matutino", "Vespertino"])
-        if st.form_submit_button("Salvar Registro"):
-            if nome:
-                df = pd.read_csv(ALUNOS_FILE)
-                novo = pd.DataFrame([[nome.strip(), idade, turno]], columns=["Nome", "Idade", "Turno"])
-                pd.concat([df, novo], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
-                st.success(f"Aluno {nome} cadastrado!")
+    with st.form("cad_l", clear_on_submit=True):
+        n, i, t = st.text_input("Nome"), st.number_input("Idade", 0, 20, 7), st.selectbox("Turno", ["Matutino", "Vespertino"])
+        if st.form_submit_button("Salvar"):
+            df = pd.read_csv(ALUNOS_FILE)
+            pd.concat([df, pd.DataFrame([[n.strip(), i, t]], columns=["Nome", "Idade", "Turno"])], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
+            st.success("Cadastrado!")
 
-# --- 5. LANÇAR AVALIAÇÃO ---
 elif menu == "📊 Lançar Avaliação (Local)":
     st.header("📊 Registro de Notas")
-    df_alunos = pd.read_csv(ALUNOS_FILE)
-    if df_alunos.empty:
-        st.warning("Cadastre um aluno primeiro.")
-    else:
-        with st.form("notas_local", clear_on_submit=True):
-            aluno = st.selectbox("Aluno", sorted(df_alunos["Nome"].unique()))
-            trim = st.selectbox("Trimestre", ["1º Trimestre", "2º Trimestre", "3º Trimestre"])
-            c1, c2 = st.columns(2)
-            scores = {}
-            for i, cat in enumerate(CATEGORIAS):
-                with c1 if i < 4 else c2: scores[cat] = st.slider(cat, 1, 5, 3)
-            if st.form_submit_button("Confirmar Avaliação"):
+    df_al = pd.read_csv(ALUNOS_FILE)
+    if not df_al.empty:
+        with st.form("notas_l", clear_on_submit=True):
+            al, tr = st.selectbox("Aluno", sorted(df_al["Nome"].unique())), st.selectbox("Trimestre", ["1º Trimestre", "2º Trimestre", "3º Trimestre"])
+            sc = {c: st.slider(c, 1, 5, 3) for c in CATEGORIAS}
+            if st.form_submit_button("Confirmar"):
                 df_av = pd.read_csv(AVAL_FILE)
-                df_av = df_av[~((df_av['Aluno'] == aluno) & (df_av['Trimestre'] == trim))]
-                pd.concat([df_av, pd.DataFrame([[aluno, trim] + list(scores.values())], columns=["Aluno", "Trimestre"] + CATEGORIAS)], ignore_index=True).to_csv(AVAL_FILE, index=False)
-                st.success("Avaliação salva!")
+                df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Trimestre'] == tr))]
+                pd.concat([df_av, pd.DataFrame([[al, tr] + list(sc.values())], columns=["Aluno", "Trimestre"] + CATEGORIAS)], ignore_index=True).to_csv(AVAL_FILE, index=False)
+                st.success("Salvo!")

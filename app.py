@@ -14,21 +14,31 @@ st.markdown(f"""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     .stApp {{ background-color: #ffffff; font-family: 'Inter', sans-serif; }}
     
-    /* Tabelas e Espaçamento */
+    /* Título: Mais baixo e fonte maior */
+    .main-header {{ 
+        text-align: center; 
+        padding-top: 40px; 
+        padding-bottom: 5px;
+    }}
+    .main-header h1 {{ 
+        margin: 0; 
+        font-size: 38px !important; 
+        font-weight: 800;
+    }}
+
+    /* Tabelas e Redução de Espaçamentos */
     .custom-table {{
         width: 100%; border-collapse: separate; border-spacing: 0;
         border: 1px solid #f0f0f0; border-radius: 10px;
-        overflow: hidden; font-size: 13px; margin-top: 5px;
+        overflow: hidden; font-size: 13px; margin-top: 0px;
     }}
-    
-    /* Ajuste de Cores: Cabeçalhos Coloridos */
     .custom-table thead th {{ background-color: #ffffff; padding: 10px; text-align: left; border-bottom: 2px solid #f8f8f8; }}
+    
     .th-rosa {{ color: {C_ROSA} !important; font-weight: 700; }}
     .th-verde {{ color: {C_VERDE} !important; font-weight: 700; }}
     .th-azul {{ color: {C_AZUL} !important; font-weight: 700; }}
     .th-amarelo {{ color: {C_AMARELO} !important; font-weight: 700; }}
 
-    /* Linhas da Tabela em Cinza (Cor anterior dos títulos) */
     .custom-table tbody td {{ 
         padding: 8px 10px; 
         border-bottom: 1px solid #fafafa; 
@@ -36,19 +46,22 @@ st.markdown(f"""
         font-weight: 500; 
     }}
     
-    /* Botões de Filtro */
+    /* Redução de espaços entre widgets */
+    .stSelectbox, .stCheckbox, div[data-testid="stForm"] {{ margin-bottom: -15px !important; }}
+    [data-testid="stVerticalBlock"] > div {{ padding-bottom: 0rem !important; }}
+    
     div.stButton > button {{
         width: 100%; border-radius: 8px !important; border: 1px solid #eee !important;
         font-weight: 600 !important; height: 40px; font-size: 12px !important;
     }}
-    [data-testid="stHorizontalBlock"] {{ gap: 0.5rem !important; }}
+    [data-testid="stHorizontalBlock"] {{ gap: 0.5rem !important; margin-bottom: -10px !important; }}
     
-    .block-container {{ padding-top: 2rem !important; }}
-    hr {{ margin: 0.5rem 0 !important; }}
+    .block-container {{ padding-top: 1rem !important; }}
+    hr {{ margin: 0.3rem 0 !important; }}
     </style>
     
-    <div style='text-align: center;'>
-        <h1 style='margin: 0; font-size: 28px;'>
+    <div class="main-header">
+        <h1>
             <span style='color: {C_VERDE};'>Instituto</span> <span style='color: {C_AZUL};'>Mãe</span> <span style='color: {C_VERDE};'>Lalu</span>
         </h1>
     </div>
@@ -109,15 +122,11 @@ def render_styled_table(df):
     if df.empty: return st.warning("Sem dados.")
     header_classes = ["th-rosa", "th-verde", "th-azul", "th-amarelo"]
     cols = [c for c in df.columns if "UNNAMED" not in c.upper()]
-    
-    # Gerando cabeçalho com cores alternadas
     html = '<table class="custom-table"><thead><tr>'
     for i, c in enumerate(cols):
         h_class = header_classes[i % len(header_classes)]
         html += f'<th class="{h_class}">{c}</th>'
     html += '</tr></thead><tbody>'
-    
-    # Gerando corpo com cor cinza fixa
     for _, row in df.iterrows():
         html += '<tr>' + "".join([f'<td>{row[v]}</td>' for v in cols]) + '</tr>'
     st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
@@ -137,9 +146,12 @@ if menu == "📝 Matrículas":
     
     df = safe_read(st.session_state.f_mat if st.session_state.f_mat != "Todas" else "GERAL")
     f1, f2 = st.columns(2)
-    with f1: f_tn = st.selectbox("Turma (A/B)", ["Todos"] + sorted([str(x) for x in df["TURNO"].unique() if x]))
+    # Filtro fixado com opções A e B
+    with f1: f_tn = st.selectbox("Turma (A/B)", ["Todos", "A", "B"])
     with f2: f_cm = st.selectbox("Comunidade", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]))
-    df_f = df[df["TURNO"] == f_tn] if f_tn != "Todos" else df
+    
+    df_f = df.copy()
+    if f_tn != "Todos": df_f = df_f[df_f["TURNO"].astype(str).str.upper() == f_tn]
     if f_cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_cm]
     render_styled_table(df_f[["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE"]])
 
@@ -153,12 +165,13 @@ elif menu == "🤝 Apadrinhamento":
     
     df = safe_read(st.session_state.f_pad)
     f1, f2, f3 = st.columns([1, 1, 1])
-    with f1: f_tn_p = st.selectbox("Turma (A/B) ", ["Todos"] + sorted([str(x) for x in df["TURNO"].unique() if x]))
+    # Filtro fixado com opções A e B
+    with f1: f_tn_p = st.selectbox("Turma (A/B) ", ["Todos", "A", "B"])
     with f2: f_cm_p = st.selectbox("Comunidade ", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]))
     with f3: check = st.checkbox("Sem padrinho/madrinha")
     
     df_f = df.copy()
-    if f_tn_p != "Todos": df_f = df_f[df_f["TURNO"] == f_tn_p]
+    if f_tn_p != "Todos": df_f = df_f[df_f["TURNO"].astype(str).str.upper() == f_tn_p]
     if f_cm_p != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_cm_p]
     if check: df_f = df_f[df_f["PADRINHO/MADRINHA"].astype(str).str.strip().isin(["", "nan", "None", "0"])]
     render_styled_table(df_f[["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]])
@@ -166,7 +179,7 @@ elif menu == "🤝 Apadrinhamento":
     st.write("---")
     with st.expander("📝 Gerenciar Padrinho/Madrinha"):
         with st.form("form_pad"):
-            al_sel = st.selectbox("Selecione o Aluno", sorted(df_f["ALUNO"].unique()))
+            al_sel = st.selectbox("Selecione o Aluno", sorted(df["ALUNO"].unique()))
             novo_p = st.text_input("Nome do Padrinho/Madrinha")
             if st.form_submit_button("Atualizar Padrinho"):
                 df_p = pd.read_csv(PADRINHOS_FILE)
@@ -203,7 +216,6 @@ elif menu == "🌊 Evolução":
             fig = go.Figure(go.Scatter(x=CATEGORIAS, y=y_vals, mode='lines+markers+text', text=[str(v) for v in y_vals], textposition="top center", fill='tozeroy', line=dict(color=C_AZUL, width=4, shape='spline')))
             fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=400, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(t=30, b=0))
             st.plotly_chart(fig, use_container_width=True)
-        else: st.info("Sem dados.")
 
 elif menu == "👤 Cadastro":
     st.markdown(f"<h3 style='color:{C_ROSA};'>👤 Novo Cadastro</h3>", unsafe_allow_html=True)

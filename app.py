@@ -18,7 +18,7 @@ st.markdown(f"""
     .main-title {{ text-align: center; padding: 10px 0; }}
     .main-title h1 {{ font-size: 32px; margin: 0; font-weight: 800; }}
     
-    /* Tabelas Compactas */
+    /* Tabelas */
     .custom-table {{
         width: 100%; border-collapse: separate; border-spacing: 0;
         border: 1px solid #f2f2f2; border-radius: 10px;
@@ -33,26 +33,39 @@ st.markdown(f"""
     .txt-azul {{ color: {C_AZUL} !important; font-weight: 600; }}
     .txt-amarelo {{ color: {C_AMARELO} !important; font-weight: 600; }}
 
-    /* CORREÇÃO DOS BOTÕES (Horizontal e sem escada) */
+    /* Botões de Sala - Alinhamento Horizontal Real */
     div[data-testid="stHorizontalBlock"] {{
-        align-items: flex-start !important;
-        gap: 0.5rem !important;
-        margin-bottom: 5px !important;
+        align-items: center !important;
+        gap: 0.3rem !important;
     }}
     div.stButton > button {{
         width: 100%; border-radius: 8px !important; border: 1px solid #eee !important;
-        font-weight: 700 !important; height: 40px; font-size: 11px !important;
+        font-weight: 700 !important; height: 38px; font-size: 10px !important;
+        text-transform: uppercase;
     }}
     
-    /* CORREÇÃO DOS SLIDERS (Removendo o bloco azul grosseiro) */
-    .stSlider {{ padding-bottom: 20px !important; }}
-    .stSlider [data-baseweb="slider"] {{ height: 6px !important; background: #eee !important; border-radius: 3px; }}
-    .stSlider [data-baseweb="slider"] [role="slider"] {{
-        background-color: {C_ROSA} !important; border: 2px solid white !important; 
-        width: 18px !important; height: 18px !important;
+    /* SLIDERS: GROSSOS PORÉM SUAVES */
+    /* Barra de fundo (vazia) */
+    .stSlider [data-baseweb="slider"] {{ 
+        height: 12px !important; 
+        background: #f0f2f6 !important; 
+        border-radius: 10px !important; 
     }}
-    /* Cor da trilha preenchida */
-    .stSlider [data-baseweb="slider"] > div > div {{ background-color: {C_AZUL} !important; }}
+    /* Barra de preenchimento (progresso) */
+    .stSlider [data-baseweb="slider"] > div > div {{ 
+        background: {C_AZUL} !important; 
+        height: 12px !important;
+        border-radius: 10px 0 0 10px !important;
+    }}
+    /* Bolinha de arraste */
+    .stSlider [data-baseweb="slider"] [role="slider"] {{
+        background-color: {C_ROSA} !important; 
+        border: 3px solid white !important; 
+        width: 24px !important; 
+        height: 24px !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
+        margin-top: -6px !important; /* Centraliza na barra grossa */
+    }}
     
     hr {{ margin: 0.5rem 0 !important; border: 0; height: 2px; background: linear-gradient(to right, {C_ROSA}, {C_VERDE}, {C_AZUL}, {C_AMARELO}); }}
     </style>
@@ -67,7 +80,7 @@ st.markdown(f"""
     <hr>
     """, unsafe_allow_html=True)
 
-# 2. Inicialização de Dados
+# 2. Inicialização de Dados e Funções
 CATEGORIAS = ["Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]
 ALUNOS_FILE, AVAL_FILE, PADRINHOS_FILE = "alunos.csv", "avaliacoes.csv", "padrinhos_local.csv"
 
@@ -115,7 +128,7 @@ def safe_read(worksheet_name):
     except: return df.fillna("")
 
 def render_styled_table(df):
-    if df.empty: return st.info("Nenhum aluno encontrado nesta seleção.")
+    if df.empty: return st.info("Nenhum dado encontrado.")
     font_colors = ["txt-rosa", "txt-verde", "txt-azul", "txt-amarelo"]
     cols = [c for c in df.columns if "UNNAMED" not in c.upper()]
     html = '<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in cols]) + '</tr></thead><tbody>'
@@ -124,7 +137,7 @@ def render_styled_table(df):
         html += f'<tr>' + "".join([f'<td class="{c_class}">{row[v]}</td>' for v in cols]) + '</tr>'
     st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 
-# 3. Navegação (ORAL: NOVO CADASTRO É O PRIMEIRO)
+# 3. Navegação (Novo Cadastro como Primeiro)
 menu = st.sidebar.radio("Navegação", ["👤 Novo Cadastro", "📝 Matrículas", "🤝 Apadrinhamento", "📊 Lançar Avaliação", "🌊 Evolução Individual"])
 
 if menu == "👤 Novo Cadastro":
@@ -212,4 +225,4 @@ elif menu == "🌊 Evolução Individual":
                 fig = go.Figure(go.Scatter(x=CATEGORIAS, y=y_vals, mode='lines+markers+text', text=[str(v) for v in y_vals], textposition="top center", fill='tozeroy', line=dict(color=C_AZUL, width=4, shape='spline')))
                 fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=400, margin=dict(t=30, b=0), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig, use_container_width=True)
-        else: st.info("Sem dados de avaliação disponíveis.")
+        else: st.info("Ainda não há dados de avaliações para gerar o gráfico.")

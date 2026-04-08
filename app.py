@@ -94,57 +94,43 @@ def safe_read(worksheet_name):
         return full.fillna("")
     except: return df.fillna("")
 
-# 4. SISTEMA DE LOGIN INTEGRADO AO GSHEETS
+# 4. LOGIN
 if "logado" not in st.session_state:
-    st.session_state.logado = False
-    st.session_state.perfil = None
-    st.session_state.nome_usuario = ""
+    st.session_state.logado, st.session_state.perfil, st.session_state.nome_usuario = False, None, ""
 
 if not st.session_state.logado:
     st.markdown("<div class='main-header'><h1>Acesso ao Sistema</h1></div><hr>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1.5, 1])
-    with col2:
-        with st.form("login_form"):
-            user_input = st.text_input("Seu nome (como está na planilha)").strip().upper()
-            senha_input = st.text_input("Chave de Acesso", type="password")
-            
+    c1, c2, c3 = st.columns([1, 1.5, 1])
+    with c2:
+        with st.form("login"):
+            u = st.text_input("Seu nome (como na planilha)").strip().upper()
+            s = st.text_input("Chave de Acesso", type="password")
             if st.form_submit_button("Entrar"):
-                # Lógica ADMIN estática
-                if user_input == "ADMIN" and senha_input == "123":
-                    st.session_state.logado = True
-                    st.session_state.perfil = "admin"
-                    st.session_state.nome_usuario = "Coordenação"
+                if u == "ADMIN" and s == "123":
+                    st.session_state.logado, st.session_state.perfil, st.session_state.nome_usuario = True, "admin", "Coordenação"
                     st.rerun()
-                
-                # Lógica PADRINHO dinâmica: busca em todas as abas
                 else:
-                    df_geral = safe_read("GERAL")
-                    padrinhos_validos = df_geral["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper().unique()
-                    
-                    if user_input in padrinhos_validos and senha_input == "lalu2026": # Chave temporária para todos os padrinhos
-                        st.session_state.logado = True
-                        st.session_state.perfil = "padrinho"
-                        st.session_state.nome_usuario = user_input
+                    validos = safe_read("GERAL")["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper().unique()
+                    if u in validos and s == "lalu2026":
+                        st.session_state.logado, st.session_state.perfil, st.session_state.nome_usuario = True, "padrinho", u
                         st.rerun()
-                    else:
-                        st.error("Nome não localizado ou chave incorreta.")
+                    else: st.error("Acesso negado.")
     st.stop()
 
-# --- CONTEÚDO PÓS-LOGIN ---
-st.markdown(f"""
-    <div class="main-header">
-        <h1><span style='color: {C_VERDE};'>Instituto</span> <span style='color: {C_AZUL};'>Mãe</span> <span style='color: {C_VERDE};'>Lalu</span></h1>
-    </div>
-    <hr style="border: 0; height: 2px; background-image: linear-gradient(to right, {C_ROSA}, {C_VERDE}, {C_AZUL}, {C_AMARELO});">
-    """, unsafe_allow_html=True)
+# --- HEADER ---
+st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Instituto</span> <span style='color:{C_AZUL}'>Mãe</span> <span style='color:{C_VERDE}'>Lalu</span></h1></div><hr>", unsafe_allow_html=True)
 
-# Sidebar
 st.sidebar.write(f"👤 **{st.session_state.nome_usuario}**")
 if st.sidebar.button("Sair"):
     st.session_state.logado = False
     st.rerun()
 
-# 5. Navegação e Regras de Visibilidade
+# 5. NAVEGAÇÃO DUPLICADA
+if st.session_state.perfil == "admin":
+    menu = st.sidebar.radio("Navegação", ["👤 Cadastro", "📝 Matrículas", "🤝 Apadrinhamento", "📊 Lançar Avaliação", "🌊 Evolução (Padrinhos)", "📊 Controle Interno"])
+else:
+    menu = "🌊 Evolução (Padrinhos)
+# 6. Navegação e Regras de Visibilidade
 def set_mat(t): st.session_state.f_mat = t
 def set_pad(t): st.session_state.f_pad = t
 

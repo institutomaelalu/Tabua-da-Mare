@@ -20,27 +20,29 @@ st.markdown(f"""
         border: 1px solid #f0f0f0; border-radius: 10px;
         overflow: hidden; font-size: 13px; margin-top: 5px;
     }}
-    .custom-table thead th {{ background-color: #ffffff; color: #999; padding: 10px; text-align: left; border-bottom: 2px solid #f8f8f8; }}
-    .custom-table tbody td {{ padding: 8px 10px; border-bottom: 1px solid #fafafa; }}
     
-    /* Fontes Coloridas */
-    .txt-rosa {{ color: {C_ROSA} !important; font-weight: 600; }}
-    .txt-verde {{ color: {C_VERDE} !important; font-weight: 600; }}
-    .txt-azul {{ color: {C_AZUL} !important; font-weight: 600; }}
-    .txt-amarelo {{ color: {C_AMARELO} !important; font-weight: 600; }}
+    /* Ajuste de Cores: Cabeçalhos Coloridos */
+    .custom-table thead th {{ background-color: #ffffff; padding: 10px; text-align: left; border-bottom: 2px solid #f8f8f8; }}
+    .th-rosa {{ color: {C_ROSA} !important; font-weight: 700; }}
+    .th-verde {{ color: {C_VERDE} !important; font-weight: 700; }}
+    .th-azul {{ color: {C_AZUL} !important; font-weight: 700; }}
+    .th-amarelo {{ color: {C_AMARELO} !important; font-weight: 700; }}
 
-    /* Botões de Filtro - Mais Próximos */
+    /* Linhas da Tabela em Cinza (Cor anterior dos títulos) */
+    .custom-table tbody td {{ 
+        padding: 8px 10px; 
+        border-bottom: 1px solid #fafafa; 
+        color: #999 !important; 
+        font-weight: 500; 
+    }}
+    
+    /* Botões de Filtro */
     div.stButton > button {{
         width: 100%; border-radius: 8px !important; border: 1px solid #eee !important;
         font-weight: 600 !important; height: 40px; font-size: 12px !important;
     }}
     [data-testid="stHorizontalBlock"] {{ gap: 0.5rem !important; }}
     
-    /* Ajuste de Sliders para Identidade Visual */
-    .stSlider [data-baseweb="slider"] [role="slider"] {{ background-color: {C_AZUL}; border: 2px solid {C_ROSA}; }}
-    .stSlider [data-baseweb="slider"] [data-testid="stTickBar"] {{ background-color: {C_VERDE}; }}
-    
-    /* Redução de espaços entre elementos */
     .block-container {{ padding-top: 2rem !important; }}
     hr {{ margin: 0.5rem 0 !important; }}
     </style>
@@ -105,12 +107,19 @@ def safe_read(worksheet_name):
 
 def render_styled_table(df):
     if df.empty: return st.warning("Sem dados.")
-    font_colors = ["txt-rosa", "txt-verde", "txt-azul", "txt-amarelo"]
+    header_classes = ["th-rosa", "th-verde", "th-azul", "th-amarelo"]
     cols = [c for c in df.columns if "UNNAMED" not in c.upper()]
-    html = '<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in cols]) + '</tr></thead><tbody>'
-    for i, row in df.iterrows():
-        c_class = font_colors[i % len(font_colors)]
-        html += f'<tr>' + "".join([f'<td class="{c_class}">{row[v]}</td>' for v in cols]) + '</tr>'
+    
+    # Gerando cabeçalho com cores alternadas
+    html = '<table class="custom-table"><thead><tr>'
+    for i, c in enumerate(cols):
+        h_class = header_classes[i % len(header_classes)]
+        html += f'<th class="{h_class}">{c}</th>'
+    html += '</tr></thead><tbody>'
+    
+    # Gerando corpo com cor cinza fixa
+    for _, row in df.iterrows():
+        html += '<tr>' + "".join([f'<td>{row[v]}</td>' for v in cols]) + '</tr>'
     st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 
 # 4. Interface e Navegação
@@ -128,7 +137,7 @@ if menu == "📝 Matrículas":
     
     df = safe_read(st.session_state.f_mat if st.session_state.f_mat != "Todas" else "GERAL")
     f1, f2 = st.columns(2)
-    with f1: f_tn = st.selectbox("Turno", ["Todos"] + sorted([str(x) for x in df["TURNO"].unique() if x]))
+    with f1: f_tn = st.selectbox("Turma (A/B)", ["Todos"] + sorted([str(x) for x in df["TURNO"].unique() if x]))
     with f2: f_cm = st.selectbox("Comunidade", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]))
     df_f = df[df["TURNO"] == f_tn] if f_tn != "Todos" else df
     if f_cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_cm]
@@ -143,15 +152,28 @@ elif menu == "🤝 Apadrinhamento":
         st.markdown(f"<style>div[data-testid='stHorizontalBlock'] > div:nth-child({i+1}) button {{ background-color: {conf['cor'] if is_sel else '#eee'} !important; color: {conf['txt'] if is_sel else '#888'} !important; }}</style>", unsafe_allow_html=True)
     
     df = safe_read(st.session_state.f_pad)
-    # RESTAURAÇÃO DOS FILTROS
-    f1, f2 = st.columns(2)
-    with f1: f_cm_p = st.selectbox("Comunidade ", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]))
-    with f2: check = st.checkbox("Sem padrinho/madrinha")
+    f1, f2, f3 = st.columns([1, 1, 1])
+    with f1: f_tn_p = st.selectbox("Turma (A/B) ", ["Todos"] + sorted([str(x) for x in df["TURNO"].unique() if x]))
+    with f2: f_cm_p = st.selectbox("Comunidade ", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]))
+    with f3: check = st.checkbox("Sem padrinho/madrinha")
     
     df_f = df.copy()
+    if f_tn_p != "Todos": df_f = df_f[df_f["TURNO"] == f_tn_p]
     if f_cm_p != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_cm_p]
     if check: df_f = df_f[df_f["PADRINHO/MADRINHA"].astype(str).str.strip().isin(["", "nan", "None", "0"])]
-    render_styled_table(df_f[["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]])
+    render_styled_table(df_f[["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]])
+
+    st.write("---")
+    with st.expander("📝 Gerenciar Padrinho/Madrinha"):
+        with st.form("form_pad"):
+            al_sel = st.selectbox("Selecione o Aluno", sorted(df_f["ALUNO"].unique()))
+            novo_p = st.text_input("Nome do Padrinho/Madrinha")
+            if st.form_submit_button("Atualizar Padrinho"):
+                df_p = pd.read_csv(PADRINHOS_FILE)
+                df_p = df_p[df_p["ALUNO"] != al_sel]
+                pd.concat([df_p, pd.DataFrame([[al_sel, novo_p]], columns=["ALUNO", "PADRINHO_EDITADO"])], ignore_index=True).to_csv(PADRINHOS_FILE, index=False)
+                st.success(f"Padrinho de {al_sel} atualizado!")
+                st.rerun()
 
 elif menu == "📊 Avaliação":
     st.markdown(f"<h3 style='color:{C_AMARELO};'>📊 Lançar Notas</h3>", unsafe_allow_html=True)
@@ -187,7 +209,7 @@ elif menu == "👤 Cadastro":
     st.markdown(f"<h3 style='color:{C_ROSA};'>👤 Novo Cadastro</h3>", unsafe_allow_html=True)
     with st.form("cad"):
         n, i, comu = st.text_input("Nome"), st.text_input("Idade"), st.text_input("Comunidade")
-        t, tn = st.selectbox("Turma", list(TURMAS_CONFIG.keys())), st.selectbox("Turno", ["MATUTINO", "VESPERTINO"])
+        t, tn = st.selectbox("Sala", list(TURMAS_CONFIG.keys())), st.selectbox("Turma", ["A", "B"])
         if st.form_submit_button("Cadastrar"):
             df_l = pd.read_csv(ALUNOS_FILE)
             pd.concat([df_l, pd.DataFrame([[n.upper(), t, tn, i, comu]], columns=df_l.columns)], ignore_index=True).to_csv(ALUNOS_FILE, index=False)

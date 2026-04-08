@@ -10,7 +10,6 @@ st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 COR_VERDE_INST = "#a8cf45"
 COR_AZUL_INST = "#5cc6d0"
 
-# CSS para Tabelas e Ajuste Geral
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #ffffff; }}
@@ -31,13 +30,9 @@ st.markdown(f"""
     .row-azul {{ background-color: #e7f5ff !important; color: #1971c2 !important; }}
     .row-ciranda {{ background-color: #1a237e !important; color: #ffffff !important; }}
     
-    /* Ajuste para botões ficarem centralizados e retangulares */
     div.stButton > button {{
-        width: 100%;
-        border-radius: 8px !important;
-        border: 1px solid #ddd !important;
-        font-weight: 600 !important;
-        height: 45px;
+        width: 100%; border-radius: 8px !important;
+        border: 1px solid #ddd !important; font-weight: 600 !important; height: 45px;
     }}
     </style>
     
@@ -68,23 +63,45 @@ TURMAS_CORES = {
 }
 
 def safe_read(worksheet_name):
+    # Tenta ler do Google Sheets
     try:
-        url = st.secrets["connections"]["gsheets"]["geral" if worksheet_name == "GERAL" else st.secrets["connections"]["gsheets"][worksheet_name.lower().replace(" ", "_").replace(".", "")]]
+        sheet_key = worksheet_name.lower().replace(" ", "_").replace(".", "")
+        if worksheet_name == "GERAL": sheet_key = "geral"
+        
+        url = st.secrets["connections"]["gsheets"][sheet_key]
         url_csv = url.split("/edit")[0] + "/export?format=csv"
         if "gid=" in url: url_csv += f"&gid={url.split('gid=')[1]}"
+        
         df = pd.read_csv(url_csv)
         df.columns = [str(c).strip().upper() for c in df.columns]
+    except Exception as e:
+        # Se falhar o Google, cria um DF vazio com colunas padrão para não travar os filtros
+        df = pd.DataFrame(columns=["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"])
+    
+    # Sempre tenta unir com os dados locais salvos no Streamlit Cloud
+    try:
         df_local = pd.read_csv(ALUNOS_FILE)
         df_pad = pd.read_csv(PADRINHOS_FILE)
-        full = pd.concat([df, df_local], ignore_index=True) if worksheet_name == "GERAL" else \
-               pd.concat([df, df_local[df_local["TURMA"].str.contains(worksheet_name.replace("SALA ", ""), na=False, case=False)]], ignore_index=True)
+        
+        if worksheet_name == "GERAL":
+            full = pd.concat([df, df_local], ignore_index=True)
+        else:
+            sala_filtro = worksheet_name.replace("SALA ", "")
+            df_local_sala = df_local[df_local["TURMA"].str.contains(sala_filtro, na=False, case=False)]
+            full = pd.concat([df, df_local_sala], ignore_index=True)
+            
+        # Aplica edições de padrinhos
         if "ALUNO" in full.columns:
-            for _, r in df_pad.iterrows(): full.loc[full["ALUNO"] == r["ALUNO"], "PADRINHO/MADRINHA"] = r["PADRINHO_EDITADO"]
+            full["ALUNO"] = full["ALUNO"].astype(str).str.strip().str.upper()
+            for _, r in df_pad.iterrows():
+                al_nome = str(r["ALUNO"]).strip().upper()
+                full.loc[full["ALUNO"] == al_nome, "PADRINHO/MADRINHA"] = r["PADRINHO_EDITADO"]
         return full.fillna("")
-    except: return pd.DataFrame(columns=["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"])
+    except:
+        return df.fillna("")
 
 def render_styled_table(df, context_color=None):
-    if df.empty: return st.info("Sem dados.")
+    if df.empty: return st.warning("Nenhum dado encontrado.")
     def get_row_class(row_val, context):
         val = (context if context else str(row_val)).upper()
         if 'ROSA' in val: return 'row-rosa'
@@ -93,42 +110,46 @@ def render_styled_table(df, context_color=None):
         if 'AZUL' in val: return 'row-azul'
         if 'CIRAND' in val: return 'row-ciranda'
         return ''
-    html = '<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in df.columns]) + '</tr></thead><tbody>'
+    
+    cols_to_show = [c for c in df.columns if "UNNAMED" not in c.upper()]
+    html = '<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in cols_to_show]) + '</tr></thead><tbody>'
     for _, row in df.iterrows():
         r_c = get_row_class(row.get('TURMA', ''), context_color)
-        html += f'<tr class="{r_c}">' + "".join([f'<td>{v}</td>' for v in row]) + '</tr>'
+        html += f'<tr class="{r_c}">' + "".join([f'<td>{row[v]}</td>' for v in cols_to_show]) + '</tr>'
     st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 
-# 4. Interface
+# 4. Interface Principal
 menu = st.sidebar.radio("Navegação", ["👤 1. Novo Cadastro", "📝 2. Matrículas", "🤝 3. Apadrinhamento", "📊 4. Avaliação", "🌊 5. Evolução"])
 
 if menu == "👤 1. Novo Cadastro":
     st.header("📝 Registro de Novo Aluno")
-    with st.form("cad"):
+    with st.form("cad_form"):
         c1, c2 = st.columns(2)
         with c1: n, i, comu = st.text_input("Nome"), st.text_input("Idade"), st.text_input("Comunidade")
         with c2: t, tn = st.selectbox("Turma", list(TURMAS_CORES.keys())), st.selectbox("Turno", ["MATUTINO", "VESPERTINO"])
         if st.form_submit_button("Salvar"):
             df_l = pd.read_csv(ALUNOS_FILE)
             pd.concat([df_l, pd.DataFrame([[n.upper(), t, tn, i, comu]], columns=df_l.columns)], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
-            st.success("Salvo!")
+            st.success("Salvo com sucesso!")
 
 elif menu == "📝 2. Matrículas":
     st.header("📋 Quadro de Matrículas")
     if 'f_mat' not in st.session_state: st.session_state.f_mat = "Todas"
     
-    cols = st.columns(6)
-    if cols[0].button("Todas", type="primary" if st.session_state.f_mat == "Todas" else "secondary"): st.session_state.f_mat = "Todas"
+    # Botões de Turma Lado a Lado
+    cols_t = st.columns(6)
+    if cols_t[0].button("Todas", key="btn_todas", type="primary" if st.session_state.f_mat == "Todas" else "secondary"):
+        st.session_state.f_mat = "Todas"
     
     for i, (sala, cores) in enumerate(TURMAS_CORES.items(), 1):
         is_sel = st.session_state.f_mat == sala
-        if cols[i].button(sala): st.session_state.f_mat = sala
+        if cols_t[i].button(sala, key=f"mat_{sala}"): st.session_state.f_mat = sala
         st.markdown(f"<style>div[data-testid='stHorizontalBlock'] > div:nth-child({i+1}) button {{ background-color: {cores['bg_on'] if is_sel else cores['bg_off']} !important; color: {cores['txt_on'] if is_sel else cores['txt_off']} !important; }}</style>", unsafe_allow_html=True)
 
     df = safe_read("GERAL")
     f1, f2 = st.columns(2)
-    with f1: f_tn = st.selectbox("Turno", ["Todos"] + sorted(list(df["TURNO"].unique())))
-    with f2: f_cm = st.selectbox("Comunidade", ["Todas"] + sorted(list(df["COMUNIDADE"].unique())))
+    with f1: f_tn = st.selectbox("Turno", ["Todos"] + sorted([str(x) for x in df["TURNO"].unique() if x]))
+    with f2: f_cm = st.selectbox("Comunidade", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]))
     
     df_f = df.copy()
     if st.session_state.f_mat != "Todas": df_f = df_f[df_f["TURMA"] == st.session_state.f_mat]
@@ -140,54 +161,64 @@ elif menu == "🤝 3. Apadrinhamento":
     st.header("🤝 Gestão de Apadrinhamento")
     if 'f_pad' not in st.session_state: st.session_state.f_pad = "SALA ROSA"
     
-    cols = st.columns(5)
+    cols_p = st.columns(5)
     for i, (sala, cores) in enumerate(TURMAS_CORES.items()):
         is_sel = st.session_state.f_pad == sala
-        if cols[i].button(sala, key=f"btn_p_{sala}"): st.session_state.f_pad = sala
+        if cols_p[i].button(sala, key=f"pad_btn_{sala}"): st.session_state.f_pad = sala
         st.markdown(f"<style>div[data-testid='stHorizontalBlock'] > div:nth-child({i+1}) button {{ background-color: {cores['bg_on'] if is_sel else cores['bg_off']} !important; color: {cores['txt_on'] if is_sel else cores['txt_off']} !important; }}</style>", unsafe_allow_html=True)
 
     df = safe_read(st.session_state.f_pad)
     f1, f2 = st.columns(2)
-    with f1: f_cm = st.selectbox("Comunidade", ["Todas"] + sorted(list(df["COMUNIDADE"].unique())))
+    with f1: f_cm = st.selectbox("Comunidade ", ["Todas"] + sorted([str(x) for x in df["COMUNIDADE"].unique() if x]))
     with f2: check = st.checkbox("Sem Padrinho")
     
     df_f = df.copy()
     if f_cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_cm]
-    if check: df_f = df_f[df_f["PADRINHO/MADRINHA"].astype(str).str.strip().isin(["", "nan", "None"])]
+    if check: 
+        if "PADRINHO/MADRINHA" in df_f.columns:
+            df_f = df_f[df_f["PADRINHO/MADRINHA"].astype(str).str.strip().isin(["", "nan", "None", "0"])]
     
     render_styled_table(df_f[["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]], context_color=st.session_state.f_pad)
     
-    with st.expander("📝 Editar Padrinho"):
-        with st.form("ed_p"):
-            al = st.selectbox("Aluno", sorted(df["ALUNO"].unique()))
-            npad = st.text_input("Novo Padrinho")
-            if st.form_submit_button("Atualizar"):
+    with st.expander("📝 Editar Padrinho/Madrinha"):
+        with st.form("edit_pad_form"):
+            al_edit = st.selectbox("Aluno", sorted([str(x) for x in df["ALUNO"].unique() if x]))
+            novo_p = st.text_input("Nome do Padrinho")
+            if st.form_submit_button("Salvar"):
                 df_p = pd.read_csv(PADRINHOS_FILE)
-                df_p = pd.concat([df_p[df_p["ALUNO"] != al], pd.DataFrame([[al, npad]], columns=df_p.columns)], ignore_index=True)
+                df_p = pd.concat([df_p[df_p["ALUNO"] != al_edit], pd.DataFrame([[al_edit, novo_p]], columns=["ALUNO", "PADRINHO_EDITADO"])], ignore_index=True)
                 df_p.to_csv(PADRINHOS_FILE, index=False)
-                st.success("Ok!"); st.rerun()
+                st.success("Atualizado!"); st.rerun()
 
 elif menu == "📊 4. Avaliação":
-    st.header("📊 Registro de Notas")
+    st.header("📊 Lançar Notas")
     df_g = safe_read("GERAL")
     if not df_g.empty:
-        with st.form("av"):
-            al = st.selectbox("Aluno", sorted(df_g["ALUNO"].unique()))
+        with st.form("aval_form"):
+            al = st.selectbox("Aluno", sorted([str(x) for x in df_g["ALUNO"].unique() if x]))
             tr = st.selectbox("Trimestre", ["1º Trimestre", "2º Trimestre", "3º Trimestre"])
             notas = {c: st.slider(c, 1, 5, 3) for c in CATEGORIAS}
-            if st.form_submit_button("Salvar"):
+            if st.form_submit_button("Gravar Avaliação"):
                 df_av = pd.read_csv(AVAL_FILE)
-                df_av = pd.concat([df_av[~((df_av['Aluno']==al)&(df_av['Trimestre']==tr))], pd.DataFrame([[al, tr]+list(notas.values())], columns=df_av.columns)], ignore_index=True)
-                df_av.to_csv(AVAL_FILE, index=False); st.success("Salvo!")
+                # Remove duplicata antes de salvar
+                df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Trimestre'] == tr))]
+                nova_linha = pd.DataFrame([[al, tr] + [float(v) for v in notas.values()]], columns=df_av.columns)
+                pd.concat([df_av, nova_linha], ignore_index=True).to_csv(AVAL_FILE, index=False)
+                st.success("Avaliação salva!")
 
 elif menu == "🌊 5. Evolução":
     st.header("🌊 Evolução Individual")
-    df_av = pd.read_csv(AVAL_FILE)
-    if not df_av.empty:
-        al = st.selectbox("Aluno", sorted(df_av["Aluno"].unique()))
-        df_al = df_av[df_av["Aluno"] == al]
-        tri = st.selectbox("Trimestre", df_al["Trimestre"].unique())
-        row = df_al[df_al["Trimestre"] == tri].iloc[0]
-        fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], mode='lines+markers', fill='tozeroy', line=dict(color=COR_AZUL_INST)))
-        fig.update_layout(yaxis=dict(range=[0, 5.5]))
-        st.plotly_chart(fig, use_container_width=True)
+    if os.path.exists(AVAL_FILE):
+        df_av = pd.read_csv(AVAL_FILE)
+        if not df_av.empty:
+            al_s = st.selectbox("Selecione o Aluno", sorted(df_av["Aluno"].unique()))
+            df_al = df_av[df_av["Aluno"] == al_s]
+            tri_s = st.selectbox("Selecione o Trimestre", df_al["Trimestre"].unique())
+            row = df_al[df_al["Trimestre"] == tri_s].iloc[0]
+            
+            y_vals = [float(row[c]) for c in CATEGORIAS]
+            fig = go.Figure(go.Scatter(x=CATEGORIAS, y=y_vals, mode='lines+markers', fill='tozeroy', line=dict(color=COR_AZUL_INST, width=3)))
+            fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=450)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Nenhuma avaliação registrada no sistema.")

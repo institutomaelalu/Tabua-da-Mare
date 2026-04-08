@@ -13,12 +13,9 @@ st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     .stApp {{ background-color: #ffffff; font-family: 'Inter', sans-serif; }}
-    
-    /* Header Principal */
     .main-header {{ text-align: center; padding: 20px 0; }}
     .main-header h1 {{ font-size: 42px !important; font-weight: 800; }}
 
-    /* Tabelas Customizadas */
     .custom-table {{
         width: 100%; border-collapse: separate; border-spacing: 0;
         border: 1px solid #f0f0f0; border-radius: 10px;
@@ -27,14 +24,12 @@ st.markdown(f"""
     .custom-table thead th {{ padding: 12px 10px; text-align: left; color: white !important; font-weight: 700; border: none; }}
     .custom-table tbody td {{ padding: 8px 10px; border-bottom: 1px solid #fafafa; color: #444 !important; font-weight: 500; }}
     
-    /* Botões de Sala */
     div.stButton > button {{
         width: 100%; border-radius: 8px !important; font-weight: 700 !important; 
         height: 42px; font-size: 11px !important; border: none !important;
         transition: all 0.3s;
     }}
 
-    /* Estilização do Login (Card) */
     .login-card {{
         background: linear-gradient(135deg, {C_AZUL}22, {C_ROSA}22);
         padding: 30px; border-radius: 20px; border: 2px solid #f0f0f0;
@@ -43,7 +38,7 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Banco de Dados e Configurações
+# 2. Banco de Dados
 CATEGORIAS = ["Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]
 ALUNOS_FILE, AVAL_FILE, PADRINHOS_FILE = "alunos.csv", "avaliacoes.csv", "padrinhos_local.csv"
 
@@ -97,7 +92,7 @@ def safe_read(worksheet_name):
         return full.fillna("")
     except: return df.fillna("")
 
-# 3. Autenticação e Sessão
+# 3. Autenticação
 if "logado" not in st.session_state: st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
 if 'sel_mat' not in st.session_state: st.session_state.sel_mat = "SALA ROSA"
 if 'sel_pad' not in st.session_state: st.session_state.sel_pad = "SALA ROSA"
@@ -106,15 +101,10 @@ if not st.session_state.logado:
     st.markdown("<br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1.2, 1])
     with c2:
-        st.markdown(f"""
-            <div class="login-card">
-                <h2 style='text-align: center; color: {C_AZUL}; margin-top: 0;'>Bem-vindo!</h2>
-                <p style='text-align: center; color: #666; font-size: 14px;'>Acesse o sistema do Instituto Mãe Lalu</p>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div class="login-card"><h2 style="text-align: center; color: {C_AZUL}; margin:0;">Bem-vindo!</h2></div>', unsafe_allow_html=True)
         with st.form("login"):
             u = st.text_input("👤 Usuário").strip().upper()
-            s = st.text_input("🔑 Chave de Acesso", type="password")
+            s = st.text_input("🔑 Chave", type="password")
             if st.form_submit_button("ENTRAR NO SISTEMA"):
                 if u == "ADMIN" and s == "123":
                     st.session_state.update({"logado": True, "perfil": "admin", "nome_usuario": "Coordenação"})
@@ -127,13 +117,18 @@ if not st.session_state.logado:
                     else: st.error("Acesso negado.")
     st.stop()
 
-# --- INTERFACE PRINCIPAL ---
-st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Instituto</span> <span style='color:{C_AZUL}'>Mãe</span> <span style='color:{C_VERDE}'>Lalu</span></h1></div><hr>", unsafe_allow_html=True)
+# --- SIDEBAR & SAIR ---
+st.sidebar.write(f"👤 **{st.session_state.nome_usuario}**")
+if st.sidebar.button("🚪 Sair"):
+    st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
+    st.rerun()
 
 if st.session_state.perfil == "admin":
     menu = st.sidebar.radio("Navegação", ["👤 Cadastro", "📝 Matrículas", "🤝 Apadrinhamento", "📊 Lançar Avaliação", "🌊 Evolução (Padrinhos)", "🌊 Tábua da Maré - Interno"])
 else:
     menu = "🌊 Evolução (Padrinhos)"
+
+st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Instituto</span> <span style='color:{C_AZUL}'>Mãe</span> <span style='color:{C_VERDE}'>Lalu</span></h1></div><hr>", unsafe_allow_html=True)
 
 # --- FUNCIONALIDADES ---
 
@@ -193,47 +188,52 @@ elif menu == "📊 Lançar Avaliação":
         if st.form_submit_button("Salvar Avaliação"):
             df_av = pd.read_csv(AVAL_FILE)
             df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Trimestre'] == tr))]
-            novo = pd.DataFrame([[al, tr] + [float(v) for v in notas.values()]], columns=df_av.columns)
-            pd.concat([df_av, novo], ignore_index=True).to_csv(AVAL_FILE, index=False)
-            st.success(f"Avaliação de {al} salva!")
+            pd.concat([df_av, pd.DataFrame([[al, tr] + [float(v) for v in notas.values()]], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
+            st.success("Salvo!")
 
 elif menu == "🌊 Evolução (Padrinhos)":
-    st.markdown(f"<h3 style='color:{C_AZUL}'>🤝 Área do Padrinho</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color:{C_AZUL}'>🤝 Área do Padrinho: Meus Afilhados</h3>", unsafe_allow_html=True)
     df_g = safe_read("GERAL")
-    df_av = pd.read_csv(AVAL_FILE)
-    padrinho = st.session_state.nome_usuario
-    afilhas = df_g[df_g["PADRINHO/MADRINHA"].astype(str).str.upper() == padrinho.upper()]
+    df_av = pd.read_csv(AVAL_FILE) if os.path.exists(AVAL_FILE) else pd.DataFrame()
+    
+    if st.session_state.perfil == "admin":
+        lista_p = sorted(df_g["PADRINHO/MADRINHA"].unique())
+        padrinho_alvo = st.selectbox("Simular visão do Padrinho:", [p for p in lista_p if p and p != "0"])
+    else: padrinho_alvo = st.session_state.nome_usuario
+
+    afilhas = df_g[df_g["PADRINHO/MADRINHA"].astype(str).str.upper() == padrinho_alvo.upper()]
     if not afilhas.empty:
-        al_s = st.selectbox("Selecione seu afilhado:", afilhas["ALUNO"].unique())
+        st.write(f"Olá **{padrinho_alvo}**, aqui está a evolução das crianças que você apadrinha:")
+        al_s = st.selectbox("Selecione o afilhado:", afilhas["ALUNO"].unique())
         df_al = df_av[df_av["Aluno"] == al_s]
         if not df_al.empty:
             tri = st.selectbox("Trimestre", df_al["Trimestre"].unique())
             row = df_al[df_al["Trimestre"] == tri].iloc[0]
             fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], fill='tozeroy', line=dict(color=C_AZUL, width=4, shape='spline')))
-            fig.update_layout(yaxis=dict(range=[0, 5.5]))
+            fig.update_layout(yaxis=dict(range=[0, 5.5]), height=350)
             st.plotly_chart(fig, use_container_width=True)
-        else: st.info("Avaliações ainda não disponíveis.")
-    else: st.warning("Nenhum afilhado vinculado.")
+        else: st.info("Avaliações não lançadas para este aluno.")
+    else: st.warning("Nenhum afilhado encontrado.")
 
 elif menu == "🌊 Tábua da Maré - Interno":
     st.markdown(f"<h3 style='color:{C_VERDE}'>🌊 Tábua da Maré - Interno</h3>", unsafe_allow_html=True)
-    df_av = pd.read_csv(AVAL_FILE)
-    if not df_av.empty:
-        al_s = st.selectbox("Pesquisar Aluno:", sorted(df_av["Aluno"].unique()))
-        df_al = df_av[df_av["Aluno"] == al_s]
-        tri = st.selectbox("Ver Período:", df_al["Trimestre"].unique(), key="tri_int")
-        row = df_al[df_al["Trimestre"] == tri].iloc[0]
-        fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], mode='lines+markers+text', text=[str(int(row[c])) for c in CATEGORIAS], textposition="top center", fill='tozeroy', line=dict(color=C_VERDE, width=4, shape='spline')))
-        fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=450)
-        st.plotly_chart(fig, use_container_width=True)
+    if os.path.exists(AVAL_FILE):
+        df_av = pd.read_csv(AVAL_FILE)
+        if not df_av.empty:
+            al_s = st.selectbox("Pesquisar Aluno:", sorted(df_av["Aluno"].unique()))
+            df_al = df_av[df_av["Aluno"] == al_s]
+            tri = st.selectbox("Trimestre", df_al["Trimestre"].unique())
+            row = df_al[df_al["Trimestre"] == tri].iloc[0]
+            fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], mode='lines+markers+text', text=[str(int(row[c])) for c in CATEGORIAS], textposition="top center", fill='tozeroy', line=dict(color=C_VERDE, width=4, shape='spline')))
+            fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=400)
+            st.plotly_chart(fig, use_container_width=True)
 
 elif menu == "👤 Cadastro":
     st.markdown(f"<h3 style='color:{C_ROSA}'>👤 Novo Cadastro</h3>", unsafe_allow_html=True)
     with st.form("cad"):
-        n, i, comu = st.text_input("Nome Completo"), st.text_input("Idade"), st.text_input("Comunidade")
+        n, i, comu = st.text_input("Nome"), st.text_input("Idade"), st.text_input("Comunidade")
         t, tn = st.selectbox("Sala", list(TURMAS_CONFIG.keys())), st.selectbox("Turno", ["A", "B"])
-        if st.form_submit_button("Finalizar Cadastro"):
+        if st.form_submit_button("Cadastrar"):
             df_l = pd.read_csv(ALUNOS_FILE)
-            novo = pd.DataFrame([[n.upper(), t, tn, i, comu]], columns=df_l.columns)
-            pd.concat([df_l, novo], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
-            st.success(f"O aluno {n.upper()} foi cadastrado!")
+            pd.concat([df_l, pd.DataFrame([[n.upper(), t, tn, i, comu]], columns=df_l.columns)], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
+            st.success("Cadastrado!")

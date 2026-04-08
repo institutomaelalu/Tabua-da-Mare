@@ -94,7 +94,7 @@ def safe_read(worksheet_name):
         return full.fillna("")
     except: return df.fillna("")
 
-# 4. SISTEMA DE LOGIN INTEGRADO AO GSHEETS
+# 4. SISTEMA DE LOGIN COM DIAGNÓSTICO
 if "logado" not in st.session_state:
     st.session_state.logado = False
     st.session_state.perfil = None
@@ -103,34 +103,53 @@ if "logado" not in st.session_state:
 if not st.session_state.logado:
     st.markdown("<div class='main-header'><h1>Acesso ao Sistema</h1></div><hr>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1.5, 1])
+    
     with col2:
         with st.form("login_form"):
-            user_input = st.text_input("Seu nome (como está na planilha)").strip().upper()
+            user_input = st.text_input("Seu nome (conforme planilha)").strip().upper()
             senha_input = st.text_input("Chave de Acesso", type="password")
+            btn_login = st.form_submit_button("Entrar")
             
-            if st.form_submit_button("Entrar"):
-                # Lógica ADMIN estática
+            if btn_login:
                 if user_input == "ADMIN" and senha_input == "123":
                     st.session_state.logado = True
                     st.session_state.perfil = "admin"
                     st.session_state.nome_usuario = "Coordenação"
                     st.rerun()
-                
-                # Lógica PADRINHO dinâmica: busca em todas as abas
                 else:
-                    df_geral = safe_read("GERAL")
-                    padrinhos_validos = df_geral["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper().unique()
-                    
-                    if user_input in padrinhos_validos and senha_input == "lalu2026": # Chave temporária para todos os padrinhos
-                        st.session_state.logado = True
-                        st.session_state.perfil = "padrinho"
-                        st.session_state.nome_usuario = user_input
-                        st.rerun()
+                    df_check = safe_read("GERAL")
+                    if "PADRINHO/MADRINHA" in df_check.columns:
+                        padrinhos_validos = df_check["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper().unique()
+                        padrinhos_validos = [p for p in padrinhos_validos if p not in ["", "NAN", "0", "NONE"]]
+                        
+                        if user_input in padrinhos_validos and senha_input == "lalu2026":
+                            st.session_state.logado = True
+                            st.session_state.perfil = "padrinho"
+                            st.session_state.nome_usuario = user_input
+                            st.rerun()
+                        else:
+                            st.error("Nome ou chave incorretos.")
                     else:
-                        st.error("Nome não localizado ou chave incorreta.")
+                        st.error("Erro técnico: Coluna de padrinhos não encontrada nas planilhas.")
+
+        # FERRAMENTA DE DIAGNÓSTICO
+        with st.expander("🔍 Não consegue acessar? Verifique os nomes cadastrados"):
+            if st.button("Carregar lista de nomes da planilha"):
+                df_diag = safe_read("GERAL")
+                if "PADRINHO/MADRINHA" in df_diag.columns:
+                    nomes = df_diag["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper().unique()
+                    nomes = [n for n in nomes if n not in ["", "NAN", "0", "NONE"]]
+                    if nomes:
+                        st.write("O sistema encontrou estes nomes de padrinhos nas planilhas:")
+                        st.info(", ".join(nomes))
+                        st.warning("O nome digitado no login deve ser EXATAMENTE igual a um destes acima.")
+                    else:
+                        st.error("A coluna 'Padrinho' foi encontrada, mas parece estar vazia em todas as abas.")
+                else:
+                    st.error("O sistema não conseguiu encontrar nenhuma coluna com o nome 'Padrinho' ou 'Madrinha' nas suas planilhas.")
     st.stop()
 
-# --- CONTEÚDO PÓS-LOGIN ---
+# --- CÓDIGO DO SISTEMA (APÓS LOGIN) ---
 st.markdown(f"""
     <div class="main-header">
         <h1><span style='color: {C_VERDE};'>Instituto</span> <span style='color: {C_AZUL};'>Mãe</span> <span style='color: {C_VERDE};'>Lalu</span></h1>
@@ -138,12 +157,11 @@ st.markdown(f"""
     <hr style="border: 0; height: 2px; background-image: linear-gradient(to right, {C_ROSA}, {C_VERDE}, {C_AZUL}, {C_AMARELO});">
     """, unsafe_allow_html=True)
 
-# Sidebar
 st.sidebar.write(f"👤 **{st.session_state.nome_usuario}**")
 if st.sidebar.button("Sair"):
     st.session_state.logado = False
-    st.rerun()
-
+    st.return()
+    
 # 5. Navegação e Regras de Visibilidade
 def set_mat(t): st.session_state.f_mat = t
 def set_pad(t): st.session_state.f_pad = t

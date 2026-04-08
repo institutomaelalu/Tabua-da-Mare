@@ -13,18 +13,16 @@ st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     .stApp {{ background-color: #ffffff; font-family: 'Inter', sans-serif; }}
-    
-    .main-header {{ text-align: center; padding-top: 30px; padding-bottom: 10px; }}
-    .main-header h1 {{ margin: 0; font-size: 40px !important; font-weight: 800; line-height: 1.1; }}
+    .main-header {{ text-align: center; padding-top: 25px; padding-bottom: 5px; }}
+    .main-header h1 {{ margin: 0; font-size: 38px !important; font-weight: 800; line-height: 1.1; }}
 
-    /* Espaçamentos equilibrados: reduzidos, mas SEM sobreposição (sem margens negativas) */
+    /* Espaçamentos equilibrados e scannability */
     .block-container {{ padding-top: 1rem !important; padding-bottom: 1rem !important; }}
-    [data-testid="stVerticalBlock"] > div {{ padding-bottom: 0.3rem !important; }}
-    .stSelectbox, .stCheckbox, .stSlider {{ margin-bottom: 5px !important; }}
+    [data-testid="stVerticalBlock"] > div {{ padding-bottom: 0.4rem !important; }}
+    .stSelectbox, .stCheckbox, .stSlider {{ margin-bottom: 8px !important; }}
     [data-testid="stHorizontalBlock"] {{ gap: 0.8rem !important; margin-bottom: 5px !important; }}
     hr {{ margin: 0.5rem 0 !important; }}
 
-    /* Tabelas */
     .custom-table {{
         width: 100%; border-collapse: separate; border-spacing: 0;
         border: 1px solid #f0f0f0; border-radius: 10px;
@@ -35,29 +33,16 @@ st.markdown(f"""
     .th-verde {{ color: {C_VERDE} !important; font-weight: 700; }}
     .th-azul {{ color: {C_AZUL} !important; font-weight: 700; }}
     .th-amarelo {{ color: {C_AMARELO} !important; font-weight: 700; }}
-    .custom-table tbody td {{ padding: 8px 10px; border-bottom: 1px solid #fafafa; color: #777 !important; font-weight: 500; }}
+    .custom-table tbody td {{ padding: 8px 10px; border-bottom: 1px solid #fafafa; color: #666 !important; font-weight: 500; }}
     
     div.stButton > button {{
         width: 100%; border-radius: 8px !important; border: 1px solid #eee !important;
         font-weight: 600 !important; height: 38px; font-size: 12px !important;
     }}
     </style>
-    
-    <div class="main-header">
-        <h1>
-            <span style='color: {C_VERDE};'>Instituto</span> <span style='color: {C_AZUL};'>Mãe</span> <span style='color: {C_VERDE};'>Lalu</span>
-        </h1>
-    </div>
-    <hr style="border: 0; height: 2px; background-image: linear-gradient(to right, {C_ROSA}, {C_VERDE}, {C_AZUL}, {C_AMARELO});">
     """, unsafe_allow_html=True)
 
-# 2. Inicialização e Dados
-def set_mat(t): st.session_state.f_mat = t
-def set_pad(t): st.session_state.f_pad = t
-
-if 'f_mat' not in st.session_state: st.session_state.f_mat = "Todas"
-if 'f_pad' not in st.session_state: st.session_state.f_pad = "SALA ROSA"
-
+# 2. Inicialização de Arquivos Locais
 CATEGORIAS = ["Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]
 ALUNOS_FILE, AVAL_FILE, PADRINHOS_FILE = "alunos.csv", "avaliacoes.csv", "padrinhos_local.csv"
 
@@ -76,6 +61,7 @@ TURMAS_CONFIG = {
     "CIRAND. MUNDO": {"cor": "#6741d9", "key": "cirand_mundo", "txt": "#ffffff"},
 }
 
+# 3. Funções de Leitura
 def safe_read(worksheet_name):
     df = pd.DataFrame(columns=["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"])
     try:
@@ -86,35 +72,91 @@ def safe_read(worksheet_name):
             if "gid=" in url: url_csv += f"&gid={url.split('gid=')[1]}"
             df_sheet = pd.read_csv(url_csv)
             df_sheet.columns = [str(c).strip().upper() for c in df_sheet.columns]
-            df = df_sheet
+            # Mapeamento dinâmico para garantir que "Padrinho/Madrinha" seja encontrado
+            if "PADRINHO/MADRINHA" in df_sheet.columns:
+                df = df_sheet
+            elif "PADRINHO" in df_sheet.columns:
+                df_sheet = df_sheet.rename(columns={"PADRINHO": "PADRINHO/MADRINHA"})
+                df = df_sheet
     except: pass
+    
     try:
         df_l, df_p = pd.read_csv(ALUNOS_FILE), pd.read_csv(PADRINHOS_FILE)
         if worksheet_name == "GERAL": full = pd.concat([df, df_l], ignore_index=True)
         else:
             sala_f = worksheet_name.replace("SALA ", "")
             full = pd.concat([df, df_l[df_l["TURMA"].astype(str).str.contains(sala_f, na=False, case=False)]], ignore_index=True)
+        
         full["ALUNO"] = full["ALUNO"].astype(str).str.strip().str.upper()
+        # Sobrescreve com edições locais se existirem
         for _, r in df_p.iterrows():
             full.loc[full["ALUNO"] == str(r["ALUNO"]).strip().upper(), "PADRINHO/MADRINHA"] = r["PADRINHO_EDITADO"]
         return full.fillna("")
     except: return df.fillna("")
 
-def render_styled_table(df):
-    if df.empty: return st.warning("Sem dados.")
-    header_classes = ["th-rosa", "th-verde", "th-azul", "th-amarelo"]
-    cols = [c for c in df.columns if "UNNAMED" not in c.upper()]
-    html = '<table class="custom-table"><thead><tr>'
-    for i, c in enumerate(cols):
-        h_class = header_classes[i % len(header_classes)]
-        html += f'<th class="{h_class}">{c}</th>'
-    html += '</tr></thead><tbody>'
-    for _, row in df.iterrows():
-        html += '<tr>' + "".join([f'<td>{row[v]}</td>' for v in cols]) + '</tr>'
-    st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
+# 4. SISTEMA DE LOGIN INTEGRADO AO GSHEETS
+if "logado" not in st.session_state:
+    st.session_state.logado = False
+    st.session_state.perfil = None
+    st.session_state.nome_usuario = ""
 
-# 3. Navegação
-menu = st.sidebar.radio("Navegação", ["👤 Cadastro", "📝 Matrículas", "🤝 Apadrinhamento", "📊 Lançar Avaliação", "🌊 Evolução Individual"])
+if not st.session_state.logado:
+    st.markdown("<div class='main-header'><h1>Acesso ao Sistema</h1></div><hr>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1.5, 1])
+    with col2:
+        with st.form("login_form"):
+            user_input = st.text_input("Seu nome (como está na planilha)").strip().upper()
+            senha_input = st.text_input("Chave de Acesso", type="password")
+            
+            if st.form_submit_button("Entrar"):
+                # Lógica ADMIN estática
+                if user_input == "ADMIN" and senha_input == "123":
+                    st.session_state.logado = True
+                    st.session_state.perfil = "admin"
+                    st.session_state.nome_usuario = "Coordenação"
+                    st.rerun()
+                
+                # Lógica PADRINHO dinâmica: busca em todas as abas
+                else:
+                    df_geral = safe_read("GERAL")
+                    padrinhos_validos = df_geral["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper().unique()
+                    
+                    if user_input in padrinhos_validos and senha_input == "lalu2026": # Chave temporária para todos os padrinhos
+                        st.session_state.logado = True
+                        st.session_state.perfil = "padrinho"
+                        st.session_state.nome_usuario = user_input
+                        st.rerun()
+                    else:
+                        st.error("Nome não localizado ou chave incorreta.")
+    st.stop()
+
+# --- CONTEÚDO PÓS-LOGIN ---
+st.markdown(f"""
+    <div class="main-header">
+        <h1><span style='color: {C_VERDE};'>Instituto</span> <span style='color: {C_AZUL};'>Mãe</span> <span style='color: {C_VERDE};'>Lalu</span></h1>
+    </div>
+    <hr style="border: 0; height: 2px; background-image: linear-gradient(to right, {C_ROSA}, {C_VERDE}, {C_AZUL}, {C_AMARELO});">
+    """, unsafe_allow_html=True)
+
+# Sidebar
+st.sidebar.write(f"👤 **{st.session_state.nome_usuario}**")
+if st.sidebar.button("Sair"):
+    st.session_state.logado = False
+    st.rerun()
+
+# 5. Navegação e Regras de Visibilidade
+def set_mat(t): st.session_state.f_mat = t
+def set_pad(t): st.session_state.f_pad = t
+
+if 'f_mat' not in st.session_state: st.session_state.f_mat = "Todas"
+if 'f_pad' not in st.session_state: st.session_state.f_pad = "SALA ROSA"
+
+if st.session_state.perfil == "admin":
+    menu = st.sidebar.radio("Navegação", ["👤 Cadastro", "📝 Matrículas", "🤝 Apadrinhamento", "📊 Lançar Avaliação", "🌊 Evolução Individual"])
+else:
+    menu = "🌊 Evolução Individual" # Padrinho entra direto aqui
+
+# --- ABAS ESPECÍFICAS (Somente Admin vê as primeiras 4) ---
 
 if menu == "📝 Matrículas":
     st.markdown(f"<h3 style='color:{C_VERDE}; margin-bottom:5px;'>📋 Quadro de Matrículas</h3>", unsafe_allow_html=True)
@@ -134,7 +176,14 @@ if menu == "📝 Matrículas":
     df_f = df.copy()
     if f_tn != "Todos": df_f = df_f[df_f["TURNO"].astype(str).str.strip().str.upper() == f_tn]
     if f_cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_cm]
-    render_styled_table(df_f[["ALUNO", "TURMA", "IDADE", "COMUNIDADE"]])
+    
+    # Render Table
+    header_classes = ["th-rosa", "th-verde", "th-azul", "th-amarelo"]
+    view_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE"]
+    html = '<table class="custom-table"><thead><tr>' + "".join([f'<th class="{header_classes[idx%4]}">{c}</th>' for idx, c in enumerate(view_cols)]) + '</tr></thead><tbody>'
+    for _, r in df_f.iterrows():
+        html += '<tr>' + "".join([f'<td>{r[c]}</td>' for c in view_cols]) + '</tr>'
+    st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 
 elif menu == "🤝 Apadrinhamento":
     st.markdown(f"<h3 style='color:{C_AZUL}; margin-bottom:5px;'>🤝 Apadrinhamento</h3>", unsafe_allow_html=True)
@@ -155,7 +204,11 @@ elif menu == "🤝 Apadrinhamento":
     if f_cm_p != "Todas": df_f = df_f[df_f["COMUNIDADE"] == f_cm_p]
     if check: df_f = df_f[df_f["PADRINHO/MADRINHA"].astype(str).str.strip().isin(["", "nan", "None", "0"])]
     
-    render_styled_table(df_f[["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]])
+    view_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
+    html = '<table class="custom-table"><thead><tr>' + "".join([f'<th class="th-azul">{c}</th>' for c in view_cols]) + '</tr></thead><tbody>'
+    for _, r in df_f.iterrows():
+        html += '<tr>' + "".join([f'<td>{r[c]}</td>' for c in view_cols]) + '</tr>'
+    st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 
     with st.expander("📝 Gerenciar Padrinhos"):
         with st.form("form_pad"):
@@ -183,11 +236,21 @@ elif menu == "📊 Lançar Avaliação":
             st.success("Salvo!")
 
 elif menu == "🌊 Evolução Individual":
-    st.markdown(f"<h3 style='color:{C_AZUL};'>🌊 Evolução Individual</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color:{C_AZUL};'>🌊 Tábua da Maré (Evolução)</h3>", unsafe_allow_html=True)
     if os.path.exists(AVAL_FILE):
         df_av = pd.read_csv(AVAL_FILE)
-        if not df_av.empty:
-            al_s = st.selectbox("Escolha o Aluno", sorted(df_av["Aluno"].unique()))
+        df_geral = safe_read("GERAL")
+        
+        if st.session_state.perfil == "admin":
+            alunos_visiveis = sorted(df_av["Aluno"].unique())
+        else:
+            # Filtra os afilhados comparando o nome do padrinho logado com a planilha
+            nome_logado = st.session_state.nome_usuario
+            afilhados = df_geral[df_geral["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper() == nome_logado]["ALUNO"].unique()
+            alunos_visiveis = [a for a in df_av["Aluno"].unique() if a in afilhados]
+
+        if alunos_visiveis:
+            al_s = st.selectbox("Escolha o Aluno", alunos_visiveis)
             df_al = df_av[df_av["Aluno"] == al_s]
             if not df_al.empty:
                 tri_s = st.selectbox("Trimestre", df_al["Trimestre"].unique())
@@ -196,7 +259,8 @@ elif menu == "🌊 Evolução Individual":
                 fig = go.Figure(go.Scatter(x=CATEGORIAS, y=y_vals, mode='lines+markers+text', text=[str(int(v)) for v in y_vals], textposition="top center", fill='tozeroy', line=dict(color=C_AZUL, width=4, shape='spline')))
                 fig.update_layout(yaxis=dict(range=[0, 5.5], tickvals=[1,2,3,4,5]), height=400, plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=30, b=0))
                 st.plotly_chart(fig, use_container_width=True)
-        else: st.info("Sem avaliações.")
+        else:
+            st.info("Ainda não há avaliações registradas para seus afilhados.")
 
 elif menu == "👤 Cadastro":
     st.markdown(f"<h3 style='color:{C_ROSA};'>👤 Novo Cadastro</h3>", unsafe_allow_html=True)

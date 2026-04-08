@@ -28,17 +28,17 @@ st.markdown(f"""
     .row-amarela {{ background-color: #fff9db !important; color: #856404 !important; font-weight: 500; }}
     .row-verde {{ background-color: #ebfbee !important; color: #087f5b !important; font-weight: 500; }}
     .row-azul {{ background-color: #e7f5ff !important; color: #1971c2 !important; font-weight: 500; }}
-    .row-ciranda {{ background-color: #3f51b5 !important; color: #ffffff !important; font-weight: 500; }} /* Azul Suave */
+    .row-ciranda {{ background-color: #3f51b5 !important; color: #ffffff !important; font-weight: 500; }}
     </style>
     <div style='text-align: center;'>
         <h1 style='color: {COR_VERDE_INST}; font-size: 26px;'>Instituto Mãe Lalu</h1>
     </div>
     """, unsafe_allow_html=True)
 
-# 2. Banco de Dados Local (CSVs)
+# 2. Banco de Dados Local
 ALUNOS_FILE = "alunos.csv"
 AVAL_FILE = "avaliacoes.csv"
-PADRINHOS_LOCAL = "padrinhos_extra.csv" # Para salvar edições de padrinhos localmente
+PADRINHOS_LOCAL = "padrinhos_extra.csv"
 
 def init_db():
     if not os.path.exists(ALUNOS_FILE):
@@ -65,16 +65,14 @@ def safe_read(worksheet_name):
         df = pd.read_csv(url_export)
         df.columns = [str(c).strip().upper() for c in df.columns]
         
-        # Integrar alunos cadastrados localmente
         df_local = pd.read_csv(ALUNOS_FILE)
         if worksheet_name == "GERAL":
             df = pd.concat([df, df_local], ignore_index=True)
         else:
-            # Filtrar locais que pertencem à sala específica
-            df_local_sala = df_local[df_local["TURMA"].str.contains(worksheet_name.replace("SALA ", ""), na=False, case=False)]
+            sala_key = worksheet_name.replace("SALA ", "")
+            df_local_sala = df_local[df_local["TURMA"].str.contains(sala_key, na=False, case=False)]
             df = pd.concat([df, df_local_sala], ignore_index=True)
             
-        # Aplicar edições locais de padrinhos
         df_pad = pd.read_csv(PADRINHOS_LOCAL)
         for _, row_p in df_pad.iterrows():
             df.loc[df['ALUNO'] == row_p['ALUNO'], 'PADRINHO/MADRINHA'] = row_p['PADRINHO_EDITADO']
@@ -98,23 +96,22 @@ def render_styled_table(df, context=None):
         html += f'<tr class="{cl}">' + "".join([f'<td>{("" if pd.isna(v) else v)}</td>' for v in row]) + '</tr>'
     st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 
-# 4. Navegação
+# 4. Navegação (Nomes Limpos)
 menu = st.sidebar.radio("Navegação", [
-    "👤 1. Novo Cadastro (Local)",
-    "📝 2. Controle de Matrículas (Geral)", 
+    "👤 1. Novo Cadastro",
+    "📝 2. Controle de Matrículas", 
     "🤝 3. Controle de Apadrinhamento",
     "📊 4. Avaliação - Tábua da Maré",
-    "🌊 5. Tábua da Maré (Evolução)"
+    "🌊 5. Tábua da Maré"
 ])
 
-# --- ABA 1: NOVO CADASTRO ---
-if menu == "👤 1. Novo Cadastro (Local)":
+if menu == "👤 1. Novo Cadastro":
     st.header("📝 Registro de Novo Aluno")
     with st.form("form_cadastro", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
             nome = st.text_input("Nome Completo")
-            idade = st.text_input("Idade (ex: 05 ANOS)")
+            idade = st.text_input("Idade")
             comu = st.text_input("Comunidade")
         with col2:
             turma = st.selectbox("Turma", ["SALA ROSA", "SALA AMARELA", "SALA VERDE", "SALA AZUL", "CIRAND. MUNDO"])
@@ -124,11 +121,10 @@ if menu == "👤 1. Novo Cadastro (Local)":
             df_l = pd.read_csv(ALUNOS_FILE)
             novo = pd.DataFrame([[nome.upper(), turma, turno, idade, comu]], columns=df_l.columns)
             pd.concat([df_l, novo], ignore_index=True).to_csv(ALUNOS_FILE, index=False)
-            st.success(f"Aluno {nome} registrado e integrado ao sistema!")
+            st.success(f"Aluno {nome} registrado!")
 
-# --- ABA 2: MATRÍCULAS GERAL ---
-elif menu == "📝 2. Controle de Matrículas (Geral)":
-    st.header("📋 Quadro Geral de Matrículas")
+elif menu == "📝 2. Controle de Matrículas":
+    st.header("📋 Quadro de Matrículas")
     df = safe_read("GERAL")
     if not df.empty:
         c1, c2 = st.columns(2)
@@ -141,7 +137,6 @@ elif menu == "📝 2. Controle de Matrículas (Geral)":
         
         render_styled_table(df_f[["ALUNO", "TURMA", "TURNO", "IDADE", "COMUNIDADE"]].dropna(subset=["ALUNO"]))
 
-# --- ABA 3: APADRINHAMENTO ---
 elif menu == "🤝 3. Controle de Apadrinhamento":
     st.header("🤝 Gestão de Apadrinhamento")
     sala = st.selectbox("Selecione a Sala", ["SALA ROSA", "SALA AMARELA", "SALA VERDE", "SALA AZUL", "CIRAND. MUNDO"])
@@ -154,20 +149,19 @@ elif menu == "🤝 3. Controle de Apadrinhamento":
         render_styled_table(df[["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]].dropna(subset=["ALUNO"]), context=sala)
         
         st.divider()
-        st.subheader("✍️ Adicionar/Editar Padrinho")
+        st.subheader("✍️ Adicionar Padrinho")
         with st.form("edit_padrinho"):
             aluno_edit = st.selectbox("Selecione o Aluno", df["ALUNO"].unique())
             novo_pad = st.text_input("Nome do Padrinho/Madrinha")
-            if st.form_submit_button("Salvar Padrinho"):
+            if st.form_submit_button("Atualizar"):
                 df_p = pd.read_csv(PADRINHOS_LOCAL)
-                df_p = df_p[df_p["ALUNO"] != aluno_edit] # Remove se já existia
+                df_p = df_p[df_p["ALUNO"] != aluno_edit]
                 pd.concat([df_p, pd.DataFrame([[aluno_edit, novo_pad]], columns=df_p.columns)], ignore_index=True).to_csv(PADRINHOS_LOCAL, index=False)
-                st.success("Informação atualizada!")
+                st.success("Atualizado!")
                 st.rerun()
 
-# --- ABA 4: AVALIAÇÃO ---
 elif menu == "📊 4. Avaliação - Tábua da Maré":
-    st.header("📊 Lançar Avaliação Trimestral")
+    st.header("📊 Avaliação Trimestral")
     df_geral = safe_read("GERAL")
     if not df_geral.empty:
         with st.form("form_aval"):
@@ -175,28 +169,24 @@ elif menu == "📊 4. Avaliação - Tábua da Maré":
             tri = st.selectbox("Trimestre", ["1º Trimestre", "2º Trimestre", "3º Trimestre"])
             cats = ["Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]
             notas = {c: st.slider(c, 1, 5, 3) for c in cats}
-            if st.form_submit_button("Salvar Avaliação"):
+            if st.form_submit_button("Salvar"):
                 df_av = pd.read_csv(AVAL_FILE)
-                # Remove duplicata se existir
                 df_av = df_av[~((df_av["Aluno"] == aluno) & (df_av["Trimestre"] == tri))]
                 nova_av = pd.DataFrame([[aluno, tri] + list(notas.values())], columns=df_av.columns)
                 pd.concat([df_av, nova_av], ignore_index=True).to_csv(AVAL_FILE, index=False)
-                st.success("Avaliação registrada!")
+                st.success("Salvo!")
 
-# --- ABA 5: EVOLUÇÃO ---
-elif menu == "🌊 5. Tábua da Maré (Evolução)":
-    st.header("🌊 Tábua da Maré - Evolução Individual")
+elif menu == "🌊 5. Tábua da Maré":
+    st.header("🌊 Tábua da Maré - Evolução")
     df_av = pd.read_csv(AVAL_FILE)
-    if df_av.empty: st.warning("Nenhuma avaliação registrada ainda.")
+    if df_av.empty: st.warning("Sem registros.")
     else:
-        al_sel = st.selectbox("Escolha o Aluno", df_av["Aluno"].unique())
+        al_sel = st.selectbox("Aluno", df_av["Aluno"].unique())
         tri_sel = st.selectbox("Trimestre", df_av[df_av["Aluno"] == al_sel]["Trimestre"].unique())
-        
         dados = df_av[(df_av["Aluno"] == al_sel) & (df_av["Trimestre"] == tri_sel)].iloc[0]
         cats = ["Frequência", "Leitura", "Escrita", "Materiais", "Participação", "Regras", "Clareza", "Interesse"]
         notas = [float(dados[c]) for c in cats]
-        
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=cats, y=notas, mode='lines+markers', line=dict(color=COR_AZUL_INST, width=4), fill='tozeroy'))
-        fig.update_layout(yaxis=dict(range=[0, 5.5]), height=400)
+        fig.update_layout(yaxis=dict(range=[0, 5.5]))
         st.plotly_chart(fig, use_container_width=True)

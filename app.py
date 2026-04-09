@@ -133,7 +133,7 @@ def criar_grafico_mare(categorias, valores):
         xaxis=dict(showgrid=False, zeroline=False), height=400, margin=dict(l=20, r=20, t=30, b=80))
     return fig
 
-# --- LOGIN ---
+# --- LOGIN E LOGOFF ---
 if "logado" not in st.session_state: st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
 for k in ['sel_mat', 'sel_pad', 'sel_aval', 'sel_int', 'sel_alf', 'sel_ind']:
     if k not in st.session_state: st.session_state[k] = "SALA ROSA"
@@ -162,13 +162,18 @@ if not st.session_state.logado:
                     else: st.error("Acesso negado.")
     st.stop()
 
+# Botão de Sair no Sidebar
+if st.sidebar.button("🚪 Sair (Logoff)"):
+    st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
+    st.rerun()
+
 # --- NAVEGAÇÃO ---
 menu_options = ["👤 Cadastro", "📝 Matrículas", "🤝 Apadrinhamento", "📊 Lançar Avaliação", "📖 Programa Alfabetização", "📈 Indicadores Pedagógicos", "🌊 Evolução (Padrinhos)", "🌊 Tábua da Maré - Interno"] if st.session_state.perfil == "admin" else ["🌊 Evolução (Padrinhos)"]
 menu = st.sidebar.radio("Navegação", menu_options)
 
 st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Instituto</span> <span style='color:{C_AZUL}'>Mãe</span> <span style='color:{C_VERDE}'>Lalu</span></h1></div><hr>", unsafe_allow_html=True)
 
-# Mensagem de Boas-vindas para Padrinhos
+# Saudação Personalizada
 if st.session_state.perfil == "padrinho":
     primeiro_nome = st.session_state.nome_usuario.split()[0].title()
     st.markdown(f"### Bem vindo, **{primeiro_nome}**! ✨")
@@ -190,7 +195,7 @@ if menu == "👤 Cadastro":
                 sh = client.open_by_key("1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4")
                 sh.worksheet(sala).append_row([nome, sala, turno, idade, comu, ""])
                 sh.worksheet("GERAL").append_row([nome, sala, turno, idade, comu, ""])
-                st.success("Cadastrado!"); st.rerun()
+                st.success("Cadastrado com sucesso!"); st.rerun()
 
 elif menu == "📝 Matrículas":
     st.markdown(f"<h3 style='color:{C_VERDE}'>📋 Quadro de Matrículas</h3>", unsafe_allow_html=True)
@@ -221,7 +226,7 @@ elif menu == "📊 Lançar Avaliação":
     
     if not df_s.empty:
         al = st.selectbox("Selecione o Aluno", sorted(df_s[df_s["ALUNO"] != ""]["ALUNO"].unique()))
-        # Título solicitado
+        # Título solicitado restaurado
         st.markdown(f"#### ⭐ 10 motivos para avaliar!")
         
         with st.form("form_aval"):
@@ -234,7 +239,7 @@ elif menu == "📊 Lançar Avaliação":
                 df_av = pd.read_csv(AVAL_FILE)
                 df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Periodo'] == tr))]
                 pd.concat([df_av, pd.DataFrame([[al, tr] + [MARE_OPCOES[notas_letras[c]] for c in CATEGORIAS] + [obs]], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
-                st.success("Avaliação salva!"); st.rerun()
+                st.success("Avaliação salva com sucesso!"); st.rerun()
 
 elif menu == "📖 Programa Alfabetização":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Trilha de Alfabetização</h3>", unsafe_allow_html=True)
@@ -260,16 +265,16 @@ elif menu == "📖 Programa Alfabetização":
             c1, c2 = st.columns(2)
             novo_nv = c1.selectbox("Novo Nível:", NIVEIS_ALF, index=NIVEIS_ALF.index(diag["Nivel"]) if diag is not None else 0)
             tipo = c2.selectbox("Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
-            st.markdown("**Evidências:**")
+            st.markdown("**Evidências Observadas:**")
             ev_cols = st.columns(3)
             sel_ev = []
             for idx, ev in enumerate(EVIDENCIAS_PADRAO):
                 if ev_cols[idx % 3].checkbox(ev): sel_ev.append(ev)
-            obs = st.text_area("Notas Pedagógicas:")
-            if st.form_submit_button("Registrar Avanço"):
+            obs = st.text_area("Observações Pedagógicas:")
+            if st.form_submit_button("Registrar Diagnóstico"):
                 df_h = df_h[~((df_h["Aluno"] == al) & (df_h["Avaliacao"] == tipo))]
                 pd.concat([df_h, pd.DataFrame([[al, tipo, novo_nv, False, ", ".join(sel_ev), obs, st.session_state.sel_alf]], columns=df_h.columns)], ignore_index=True).to_csv(ALF_FILE, index=False)
-                st.success("Registrado!"); st.rerun()
+                st.success("Diagnóstico Salvo!"); st.rerun()
 
 elif menu == "🌊 Evolução (Padrinhos)":
     st.markdown(f"<h3 style='color:{C_AZUL}'>🌊 Evolução dos Afilhados</h3>", unsafe_allow_html=True)
@@ -282,13 +287,13 @@ elif menu == "🌊 Evolução (Padrinhos)":
         afilhados = df_total[df_total["PADRINHO/MADRINHA"].astype(str).str.upper() == pad_sel.upper()]
         al_afil = st.selectbox("Selecione o Afilhado:", sorted(afilhados["ALUNO"].unique()))
         
-        # Mensagem se não houver dados
+        # Mensagem caso não existam dados
         if al_afil not in df_av["Aluno"].unique():
-            st.warning(f"Ainda não existem avaliações registradas para o(a) aluno(a) **{al_afil}**.")
+            st.warning(f"Ainda não existem avaliações registadas para o(a) aluno(a) **{al_afil}**.")
         else:
             df_hist = df_av[df_av["Aluno"] == al_afil]
             for _, r in df_hist.iterrows():
-                st.markdown(f"**Avaliação:** {r['Periodo']}")
+                st.markdown(f"**Período:** {r['Periodo']}")
                 st.plotly_chart(criar_grafico_mare(CATEGORIAS, [float(r[c]) for c in CATEGORIAS]), use_container_width=True)
 
 elif menu == "📈 Indicadores Pedagógicos":
@@ -301,11 +306,11 @@ elif menu == "📈 Indicadores Pedagógicos":
         df_1 = df_sala[df_sala["Avaliacao"] == "1ª Avaliação"]
         df_ult = df_sala.sort_values("Avaliacao").groupby("Aluno").last().reset_index()
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Alunos", len(df_ult))
-        m2.metric("Alfabéticos+", len(df_ult[df_ult["Nivel"].str.contains("Alfabético")]))
+        m1.metric("Alunos na Trilha", len(df_ult))
+        m2.metric("Nível Alfabético+", len(df_ult[df_ult["Nivel"].str.contains("Alfabético")]))
         m3.metric("Ortográficos", len(df_ult[df_ult["Nivel"] == "7. Alfabético Ortográfico"]))
         avancou = sum(1 for _, r in df_ult.iterrows() if not df_1[df_1["Aluno"]==r["Aluno"]].empty and NIVEIS_ALF.index(r["Nivel"]) > NIVEIS_ALF.index(df_1[df_1["Aluno"]==r["Aluno"]].iloc[0]["Nivel"]))
-        m4.metric("% Avanço", f"{(avancou/len(df_ult)*100):.1f}%" if len(df_ult)>0 else "0%")
+        m4.metric("% Avanço Geral", f"{(avancou/len(df_ult)*100):.1f}%" if len(df_ult)>0 else "0%")
         st.dataframe(df_ult[["Aluno", "Avaliacao", "Nivel", "Evidencias"]], use_container_width=True)
     else: st.info("Sem dados de alfabetização para esta sala.")
 
@@ -319,6 +324,6 @@ elif menu == "🌊 Tábua da Maré - Interno":
     if alunos_lista:
         al_s = st.selectbox("Aluno:", alunos_lista)
         df_al = df_av[df_av["Aluno"] == al_s]
-        tri = st.selectbox("Período", df_al["Periodo"].unique())
+        tri = st.selectbox("Semestre", df_al["Periodo"].unique())
         row = df_al[df_al["Periodo"] == tri].iloc[0]
         st.plotly_chart(criar_grafico_mare(CATEGORIAS, [float(row[c]) for c in CATEGORIAS]), use_container_width=True)

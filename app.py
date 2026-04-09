@@ -42,7 +42,6 @@ CATEGORIAS = [
     "9. Superação de Desafios", "10. Assiduidade"
 ]
 
-# Mapeamento para exibição no gráfico
 MARE_LABELS = {
     4: "Muito bom (Maré Cheia)",
     3: "Em evolução (Maré Enchente)",
@@ -140,40 +139,33 @@ def criar_grafico_mare(categorias, valores):
         x=categorias, 
         y=valores, 
         fill='tozeroy', 
-        mode='lines+markers', 
-        line=dict(color=C_AZUL_MARE, width=4, shape='spline'),
-        marker=dict(size=12, color=C_AZUL_MARE, line=dict(width=2, color="white")),
-        text=[MARE_LABELS[v] for v in valores],
+        mode='lines', # Removidos os marcadores (pontos)
+        line=dict(color=C_AZUL_MARE, width=5, shape='spline'),
+        text=[MARE_LABELS[int(v)] for v in valores],
         hoverinfo="text+x"
     ))
     
     fig.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='white', # Fundo branco
+        paper_bgcolor='white',
+        plot_bgcolor='white',
         yaxis=dict(
             range=[0.5, 4.5],
-            tickmode='array',
-            tickvals=[1, 2, 3, 4],
-            ticktext=[MARE_LABELS[1], MARE_LABELS[2], MARE_LABELS[3], MARE_LABELS[4]],
-            showgrid=False, # Remove linhas de grade
+            visible=False, # Eixo Y totalmente oculto
+            showgrid=False,
             zeroline=False,
-            showspikes=True, # Tracejado de conexão
-            spikemode='toaxis',
-            spikedash='dot',
-            spikecolor="#e0e0e0", # Tracejado bem suave
-            spikethickness=1
         ),
         xaxis=dict(
-            showgrid=False, # Remove linhas de grade
+            showgrid=False,
             zeroline=False,
-            showspikes=True,
+            showspikes=True, # Tracejado apenas para o critério correspondente
             spikemode='toaxis',
             spikedash='dot',
-            spikecolor="#e0e0e0",
-            spikethickness=1
+            spikecolor="#d1d1d1", # Tracejado suave
+            spikethickness=1,
+            tickfont=dict(size=11, color="#666")
         ),
-        height=500,
-        margin=dict(l=50, r=50, t=30, b=30),
+        height=450,
+        margin=dict(l=20, r=20, t=30, b=80), # Margem inferior maior para os nomes dos critérios
         hovermode="x"
     )
     return fig

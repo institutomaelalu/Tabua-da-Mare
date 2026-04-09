@@ -114,8 +114,7 @@ def aplicar_filtros(df_alvo, df_geral, tn, cm):
     if tn != "Todos":
         alunos_turno = df_geral[df_geral["TURNO"].astype(str).str.contains(tn)]["ALUNO"].unique()
         df_f = df_f[df_f["ALUNO"].isin(alunos_turno)]
-    if cm != "Todas":
-        df_f = df_f[df_f["COMUNIDADE"] == cm]
+    if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
     return df_f
 
 def render_botoes_salas(key_prefix, session_key):
@@ -157,10 +156,17 @@ if menu == "🌊 Evolução (Padrinhos)":
             df_al = df_av[df_av["Aluno"] == al_s]
             tri = st.selectbox("Semestre", df_al["Periodo"].unique())
             row = df_al[df_al["Periodo"] == tri].iloc[0]
+            
             fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], fill='tozeroy', mode='lines+markers', line=dict(color=C_AZUL_MARE, width=4, shape='spline')))
             fig.update_layout(yaxis=dict(range=[0.5, 4.5], showticklabels=False, gridcolor="#f0f0f0", griddash='dot'), xaxis=dict(showgrid=True, gridcolor="#f8f8f8", griddash='dot'), height=500)
             st.plotly_chart(fig, use_container_width=True)
-            st.info(f"**Observações:** {row['Observacoes']}")
+            
+            # --- AJUSTE NA MENSAGEM DE OBSERVAÇÃO ---
+            obs_texto = str(row["Observacoes"]).strip()
+            if obs_texto in ["", "nan", "None"]:
+                st.info("Nenhuma observação feita por nossos cirandeiros!")
+            else:
+                st.info(f"**Observações:** {obs_texto}")
         else: st.warning("Ainda não há avaliações para seus afilhados!")
 
 elif menu == "📝 Matrículas":

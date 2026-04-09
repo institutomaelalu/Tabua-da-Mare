@@ -125,6 +125,41 @@ def render_botoes_salas(key_prefix, session_key):
         if cols[i].button(sala, key=f"{key_prefix}_{sala}"):
             st.session_state[session_key] = sala; st.rerun()
 
+def criar_grafico_mare(categorias, valores):
+    fig = go.Figure(go.Scatter(
+        x=categorias, 
+        y=valores, 
+        fill='tozeroy', 
+        mode='lines+markers', 
+        line=dict(color=C_AZUL_MARE, width=4, shape='spline'),
+        marker=dict(size=10)
+    ))
+    fig.update_layout(
+        yaxis=dict(
+            range=[0.5, 4.5], 
+            showticklabels=False, 
+            gridcolor="#f0f0f0", # Linha sólida no fundo
+            showspikes=True, # Liga o ponto aos eixos
+            spikemode='across',
+            spikedash='dot',
+            spikecolor="#999999",
+            spikethickness=1
+        ), 
+        xaxis=dict(
+            showgrid=True, 
+            gridcolor="#f8f8f8",
+            showspikes=True,
+            spikemode='across',
+            spikedash='dot',
+            spikecolor="#999999",
+            spikethickness=1
+        ), 
+        height=500,
+        margin=dict(l=20, r=20, t=20, b=20),
+        hovermode="x unified"
+    )
+    return fig
+
 # --- SIDEBAR ---
 menu_options = ["👤 Cadastro", "📝 Matrículas", "🤝 Apadrinhamento", "📊 Lançar Avaliação", "🌊 Evolução (Padrinhos)", "🌊 Tábua da Maré - Interno"] if st.session_state.perfil == "admin" else ["🌊 Evolução (Padrinhos)"]
 menu = st.sidebar.radio("Navegação", menu_options)
@@ -157,11 +192,9 @@ if menu == "🌊 Evolução (Padrinhos)":
             tri = st.selectbox("Semestre", df_al["Periodo"].unique())
             row = df_al[df_al["Periodo"] == tri].iloc[0]
             
-            fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], fill='tozeroy', mode='lines+markers', line=dict(color=C_AZUL_MARE, width=4, shape='spline')))
-            fig.update_layout(yaxis=dict(range=[0.5, 4.5], showticklabels=False, gridcolor="#f0f0f0", griddash='dot'), xaxis=dict(showgrid=True, gridcolor="#f8f8f8", griddash='dot'), height=500)
+            fig = criar_grafico_mare(CATEGORIAS, [float(row[c]) for c in CATEGORIAS])
             st.plotly_chart(fig, use_container_width=True)
             
-            # --- AJUSTE NA MENSAGEM DE OBSERVAÇÃO ---
             obs_texto = str(row["Observacoes"]).strip()
             if obs_texto in ["", "nan", "None"]:
                 st.info("Nenhuma observação feita por nossos cirandeiros!")
@@ -243,6 +276,5 @@ elif menu == "🌊 Tábua da Maré - Interno":
         df_al = df_av[df_av["Aluno"] == al_s]
         tri = st.selectbox("Semestre ", df_al["Periodo"].unique())
         row = df_al[df_al["Periodo"] == tri].iloc[0]
-        fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], mode='lines+markers', fill='tozeroy', line=dict(color=C_AZUL_MARE, width=4, shape='spline')))
-        fig.update_layout(yaxis=dict(range=[0.5, 4.5], showticklabels=False, gridcolor="#f0f0f0", griddash='dot'), xaxis=dict(showgrid=True, gridcolor="#f8f8f8", griddash='dot'), height=450)
+        fig = criar_grafico_mare(CATEGORIAS, [float(row[c]) for c in CATEGORIAS])
         st.plotly_chart(fig, use_container_width=True)

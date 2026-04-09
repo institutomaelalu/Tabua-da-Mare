@@ -6,7 +6,7 @@ import os
 import gspread
 from google.oauth2.service_account import Credentials
 
-# 1. Configuração e Estilo (IDENTIDADE VISUAL COMPLETA)
+# 1. Configuração e Estilo
 st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 
 C_ROSA, C_VERDE, C_AZUL, C_AMARELO, C_ROXO = "#ff81ba", "#a8cf45", "#5cc6d0", "#ffc713", "#6741d9"
@@ -108,9 +108,9 @@ st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Institu
 # --- FUNÇÃO AUXILIAR PARA FILTROS ---
 def render_filtros(df_geral):
     f1, f2 = st.columns(2)
-    tn = f1.selectbox("Turno", ["Todos", "A", "B"], key=f"tn_{menu}")
+    tn = f1.selectbox("Filtrar Turno", ["Todos", "A", "B"], key=f"tn_{menu}")
     comu_list = ["Todas"] + sorted([c for c in df_geral["COMUNIDADE"].unique() if str(c).strip()])
-    cm = f2.selectbox("Comunidade", comu_list, key=f"cm_{menu}")
+    cm = f2.selectbox("Filtrar Comunidade", comu_list, key=f"cm_{menu}")
     return tn, cm
 
 def aplicar_filtros(df_alvo, df_geral, tn, cm):
@@ -213,24 +213,34 @@ elif menu == "🌊 Evolução (Padrinhos)":
     for s in TURMAS_CONFIG.keys(): dfs.append(safe_read(s))
     df_full = pd.concat(dfs, ignore_index=True)
     lista_p = sorted([p for p in df_full["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan", "None"]])
+    
     padrinho = st.session_state.nome_usuario if st.session_state.perfil == "padrinho" else st.selectbox("Selecione o Padrinho:", [""] + lista_p)
+    
     if padrinho:
+        st.write(f"#### Olá, **{padrinho}**! ✨") # Saudação restaurada
         df_av = pd.read_csv(AVAL_FILE)
         afilhas_f = df_full[(df_full["PADRINHO/MADRINHA"].astype(str).str.upper() == padrinho.upper()) & (df_full["ALUNO"].isin(df_av["Aluno"].unique()))]
+        
         if not afilhas_f.empty:
             al_s = st.selectbox("Selecione o Afilhado:", sorted(afilhas_f["ALUNO"].unique()))
             df_al = df_av[df_av["Aluno"] == al_s]
             tri = st.selectbox("Semestre", df_al["Periodo"].unique())
             row = df_al[df_al["Periodo"] == tri].iloc[0]
+            
+            # Gráfico Azul Claro com Tracejado
             fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], fill='tozeroy', mode='lines+markers', line=dict(color=C_AZUL_MARE, width=4, shape='spline')))
-            fig.update_layout(yaxis=dict(range=[0.5, 4.5], showticklabels=False, gridcolor="#f0f0f0"), height=500)
+            fig.update_layout(
+                yaxis=dict(range=[0.5, 4.5], showticklabels=False, gridcolor="#f0f0f0", griddash='dot'), 
+                xaxis=dict(showgrid=True, gridcolor="#f8f8f8", griddash='dot'),
+                height=500
+            )
             st.plotly_chart(fig, use_container_width=True)
             st.markdown("---")
             obs_t = str(row["Observacoes"]).strip()
             st.info(obs_t if obs_t not in ["", "nan"] else "Nenhuma observação feita por nossos cirandeiros!")
         else: st.warning("Ainda não há avaliações registradas para seus afilhados!")
 
-# --- ABA: TÁBUA DA MARÉ INTERNO (RESTURADA COM FILTROS) ---
+# --- ABA: TÁBUA DA MARÉ INTERNO (AZUL E TRACEJADO) ---
 elif menu == "🌊 Tábua da Maré - Interno":
     st.markdown(f"<h3 style='color:{C_VERDE}'>🌊 Tábua da Maré</h3>", unsafe_allow_html=True)
     cols_btn = st.columns(5)
@@ -244,7 +254,6 @@ elif menu == "🌊 Tábua da Maré - Interno":
     df_f = aplicar_filtros(df_s, df_g, tn, cm)
     
     df_av = pd.read_csv(AVAL_FILE)
-    # Mostra apenas alunos da sala/filtro que possuem avaliação
     alunos_lista = sorted(df_f[df_f["ALUNO"].isin(df_av["Aluno"].unique())]["ALUNO"].unique())
     
     if alunos_lista:
@@ -252,8 +261,14 @@ elif menu == "🌊 Tábua da Maré - Interno":
         df_al = df_av[df_av["Aluno"] == al_s]
         tri = st.selectbox("Semestre ", df_al["Periodo"].unique())
         row = df_al[df_al["Periodo"] == tri].iloc[0]
-        fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], mode='lines+markers', fill='tozeroy', line=dict(color=C_VERDE, width=4, shape='spline')))
-        fig.update_layout(yaxis=dict(range=[0.5, 4.5], showticklabels=False), height=450)
+        
+        # Gráfico Corrigido para Azul Claro e com Tracejado
+        fig = go.Figure(go.Scatter(x=CATEGORIAS, y=[float(row[c]) for c in CATEGORIAS], mode='lines+markers', fill='tozeroy', line=dict(color=C_AZUL_MARE, width=4, shape='spline')))
+        fig.update_layout(
+            yaxis=dict(range=[0.5, 4.5], showticklabels=False, gridcolor="#f0f0f0", griddash='dot'),
+            xaxis=dict(showgrid=True, gridcolor="#f8f8f8", griddash='dot'),
+            height=450
+        )
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Nenhum aluno com avaliação encontrada para os filtros selecionados.")

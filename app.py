@@ -41,7 +41,17 @@ CATEGORIAS = [
     "7. Leitura e Escrita", "8. Compreensão de Comandos",
     "9. Superação de Desafios", "10. Assiduidade"
 ]
+
+# Mapeamento para exibição no gráfico
+MARE_LABELS = {
+    4: "Muito bom (Maré Cheia)",
+    3: "Em evolução (Maré Enchente)",
+    2: "Requer atenção (Maré Vazante)",
+    1: "Início (Maré Baixa)"
+}
+
 MARE_OPCOES = {"Maré Cheia": 4, "Maré Enchente": 3, "Maré Vazante": 2, "Maré Baixa": 1}
+
 AVAL_FILE = "avaliacoes.csv"
 if not os.path.exists(AVAL_FILE):
     pd.DataFrame(columns=["Aluno", "Periodo"] + CATEGORIAS + ["Observacoes"]).to_csv(AVAL_FILE, index=False)
@@ -132,31 +142,39 @@ def criar_grafico_mare(categorias, valores):
         fill='tozeroy', 
         mode='lines+markers', 
         line=dict(color=C_AZUL_MARE, width=4, shape='spline'),
-        marker=dict(size=10)
+        marker=dict(size=12, color=C_AZUL_MARE, line=dict(width=2, color="white")),
+        text=[MARE_LABELS[v] for v in valores],
+        hoverinfo="text+x"
     ))
+    
     fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='white', # Fundo branco
         yaxis=dict(
-            range=[0.5, 4.5], 
-            showticklabels=False, 
-            gridcolor="#f0f0f0", # Linha sólida no fundo
-            showspikes=True, # Liga o ponto aos eixos
-            spikemode='across',
+            range=[0.5, 4.5],
+            tickmode='array',
+            tickvals=[1, 2, 3, 4],
+            ticktext=[MARE_LABELS[1], MARE_LABELS[2], MARE_LABELS[3], MARE_LABELS[4]],
+            showgrid=False, # Remove linhas de grade
+            zeroline=False,
+            showspikes=True, # Tracejado de conexão
+            spikemode='toaxis',
             spikedash='dot',
-            spikecolor="#999999",
+            spikecolor="#e0e0e0", # Tracejado bem suave
             spikethickness=1
-        ), 
+        ),
         xaxis=dict(
-            showgrid=True, 
-            gridcolor="#f8f8f8",
+            showgrid=False, # Remove linhas de grade
+            zeroline=False,
             showspikes=True,
-            spikemode='across',
+            spikemode='toaxis',
             spikedash='dot',
-            spikecolor="#999999",
+            spikecolor="#e0e0e0",
             spikethickness=1
-        ), 
+        ),
         height=500,
-        margin=dict(l=20, r=20, t=20, b=20),
-        hovermode="x unified"
+        margin=dict(l=50, r=50, t=30, b=30),
+        hovermode="x"
     )
     return fig
 

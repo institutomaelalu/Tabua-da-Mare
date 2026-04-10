@@ -312,7 +312,7 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
-# --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO FINAL ESTÁTICA) ---
+# --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO FINAL AJUSTADA) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
     df_h = pd.read_csv(ALF_FILE)
@@ -353,13 +353,12 @@ elif menu == "📊 Dados - Turno Estendido":
                 cor = CORES_EXCLUSIVAS.get(nv, "#eee")
                 html_tab += f'<td style="background-color:{cor};"><div class="cell-diag">{nv.split(". ")[1]}</div></td>'
             else: html_tab += '<td></td>'
-        html_tab += '</tr>'
-    
+        html_tab += f'</tr>'
     st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)
 
     st.markdown("---")
     
-    # --- SEÇÃO DETALHES: TRILHA E VASILHA FIXA ---
+    # --- SEÇÃO DETALHES AJUSTADA ---
     salas_ativas = sorted(list(set(st.session_state["alunos_te_dict"].values())))
     if salas_ativas:
         if "sel_te_dados" not in st.session_state: st.session_state.sel_te_dados = salas_ativas[0]
@@ -374,7 +373,7 @@ elif menu == "📊 Dados - Turno Estendido":
                 valores = [MAPA_NIVEIS.get(n, 0) for n in dados_h['Nivel']]
                 ultimo_nv = dados_h['Nivel'].iloc[-1]
                 
-                # Definição Estática de Níveis
+                # Definição de Nível e Altura
                 status_mare, altura = "Maré Baixa", "25%"
                 if ultimo_nv == "7. Alfabético Ortográfico":
                     status_mare, altura = "Maré Cheia", "92%"
@@ -388,7 +387,7 @@ elif menu == "📊 Dados - Turno Estendido":
                 with col_card:
                     st.markdown(f"""
                     <div style="border:1px solid #ddd; padding:20px; border-radius:15px; background:#f9f9f9; color:black;">
-                        <h4 style="margin-top:0">Ficha: {al_sel}</h4>
+                        <h4 style="margin-top:0">{al_sel}</h4>
                         <p><b>Nível Atual:</b><br>
                         <span style="background:{CORES_EXCLUSIVAS.get(ultimo_nv)}; padding:6px 12px; border-radius:12px; border:1px solid #bbb; display:inline-block; margin-top:5px; font-weight:bold;">
                             {ultimo_nv}
@@ -401,23 +400,23 @@ elif menu == "📊 Dados - Turno Estendido":
                     st.markdown(f"#### 🌊 Nível da Maré: {status_mare}")
                     st.markdown(f"""
                     <style>
-                        .container-mare {{ position: relative; width: 180px; height: 120px; margin: auto; }}
+                        .container-mare {{ position: relative; width: 220px; height: 120px; margin: auto; }}
                         .vasilha-ondulada {{ 
                             width: 100%; height: 100%; background: #f0f0f0;
-                            clip-path: path('M 0 20 Q 45 0 90 20 T 180 20 L 180 100 Q 180 120 160 120 L 20 120 Q 0 120 0 100 Z');
-                            position: relative; border-bottom: 3px solid #5D6D7E;
+                            clip-path: path('M 0 20 Q 55 0 110 20 T 220 20 L 220 100 Q 220 120 200 120 L 20 120 Q 0 120 0 100 Z');
+                            position: relative;
                         }}
-                        .agua-fixa {{
-                            position: absolute; bottom: 0; width: 100%; height: {altura};
-                            background: #5DADE2; /* Azul Maré Fixo */
-                            clip-path: path('M 0 10 Q 25 0 50 10 T 100 10 T 150 10 T 180 10 L 180 150 L 0 150 Z');
+                        .agua-preenchida {{
+                            position: absolute; bottom: 0; left: 0; width: 100%; height: {altura};
+                            background: #5DADE2;
+                            clip-path: path('M 0 10 Q 30 0 60 10 T 120 10 T 180 10 T 220 10 L 220 150 L 0 150 Z');
                             opacity: 0.9;
                         }}
                         .trilha-box {{ margin-top: 15px; font-size: 13px; color: black; }}
                         .trilha-item {{ padding: 6px; border-bottom: 1px dashed #ccc; }}
                     </style>
                     <div class="container-mare">
-                        <div class="vasilha-ondulada"><div class="agua-fixa"></div></div>
+                        <div class="vasilha-ondulada"><div class="agua-preenchida"></div></div>
                     </div>
                     <div class="trilha-box">
                         <b>📍 Trilha de Evolução:</b><br>

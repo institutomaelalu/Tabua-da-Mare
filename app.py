@@ -26,7 +26,7 @@ NIVEIS_ALF = list(CORES_TRILHA.keys())
 ALF_FILE = "alfabetizacao.csv"
 AVAL_FILE = "avaliacoes.csv"
 
-# --- IMPLEMENTAÇÃO DAS EVIDÊNCIAS DINÂMICAS ---
+# --- ALTERAÇÃO: EVIDÊNCIAS DINÂMICAS ---
 EVIDENCIAS_POR_NIVEL = {
     "1. Pré-Silábico": ["Diferencia letras de desenhos", "Escreve o nome sem apoio", "Acredita que nomes grandes têm muitas letras", "Sabe que se escreve da esquerda para a direita"],
     "2. Silábico s/ Valor": ["Uma letra para cada sílaba (sem som)", "Segmenta a fala em partes", "Respeita quantidade de emissões sonoras", "Faz leitura global da palavra"],
@@ -62,10 +62,23 @@ st.markdown(f"""
     }}
     .custom-table thead th {{ padding: 12px 10px; text-align: left; color: white !important; font-weight: 700; border: none; }}
     .custom-table td {{ padding: 10px; border-bottom: 1px solid #f9f9f9; }}
-    div.stButton > button {{ width: 100%; border-radius: 8px !important; font-weight: 700 !important; height: 42px; font-size: 11px !important; border: none !important; transition: all 0.3s; }}
-    .sala-badge {{ display: inline-block; padding: 4px 12px; border-radius: 20px; color: white; font-weight: 700; font-size: 10px; margin-top: 5px; text-transform: uppercase; }}
+    
+    div.stButton > button {{
+        width: 100%; border-radius: 8px !important; font-weight: 700 !important; 
+        height: 42px; font-size: 11px !important; border: none !important;
+        transition: all 0.3s;
+    }}
+    .sala-badge {{
+        display: inline-block; padding: 4px 12px; border-radius: 20px;
+        color: white; font-weight: 700; font-size: 10px; margin-top: 5px;
+        text-transform: uppercase;
+    }}
     .trilha-container {{ display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 0; }}
-    .caixa-trilha {{ flex: 1; height: 85px; border-radius: 15px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10px; font-weight: 800; padding: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 2px solid transparent; line-height: 1.2; }}
+    .caixa-trilha {{
+        flex: 1; height: 85px; border-radius: 15px; display: flex; align-items: center; justify-content: center;
+        text-align: center; font-size: 10px; font-weight: 800; padding: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 2px solid transparent; line-height: 1.2;
+    }}
     .seta-trilha {{ padding: 0 5px; color: #ccc; font-size: 18px; font-weight: bold; }}
     </style>
     """, unsafe_allow_html=True)
@@ -128,12 +141,14 @@ def criar_grafico_mare(categorias, valores):
         marker=dict(size=10, color=C_AZUL),
         text=[MARE_LABELS[int(v)] for v in valores], hoverinfo="text+x"
     ))
-    fig.update_layout(paper_bgcolor='white', plot_bgcolor='white', yaxis=dict(range=[0.5, 4.5], visible=False), xaxis=dict(showgrid=False, zeroline=False), height=400, margin=dict(l=20, r=20, t=30, b=80))
+    fig.update_layout(paper_bgcolor='white', plot_bgcolor='white', yaxis=dict(range=[0.5, 4.5], visible=False),
+        xaxis=dict(showgrid=False, zeroline=False), height=400, margin=dict(l=20, r=20, t=30, b=80))
     return fig
 
 # --- INICIALIZAÇÃO DE SESSÃO ---
 if "logado" not in st.session_state: st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
 if "alunos_te_dict" not in st.session_state: st.session_state["alunos_te_dict"] = {}
+
 for k in ['sel_mat', 'sel_pad', 'sel_aval', 'sel_int', 'sel_alf', 'sel_ind', 'sel_te']:
     if k not in st.session_state: st.session_state[k] = "SALA ROSA"
 
@@ -142,7 +157,8 @@ if not st.session_state.logado:
     c1, c2, c3 = st.columns([1, 1.2, 1])
     with c2:
         with st.form("login"):
-            u, s = st.text_input("👤 Usuário").strip().upper(), st.text_input("🔑 Chave", type="password")
+            u = st.text_input("👤 Usuário").strip().upper()
+            s = st.text_input("🔑 Chave", type="password")
             if st.form_submit_button("ENTRAR"):
                 if u == "ADMIN" and s == "123":
                     st.session_state.update({"logado": True, "perfil": "admin", "nome_usuario": "COORDENAÇÃO"})
@@ -177,8 +193,11 @@ if menu == "👤 Matrícula":
     st.markdown(f"### 👤 Novo Cadastro")
     with st.form("form_cad"):
         c1, c2 = st.columns(2)
-        nome, idade, comu = c1.text_input("Nome Completo").strip().upper(), c2.text_input("Idade").strip(), c1.text_input("Comunidade").strip().upper()
-        sala, turno = c2.selectbox("Sala Destino", list(TURMAS_CONFIG.keys())), c1.selectbox("Turno", ["A", "B"])
+        nome = c1.text_input("Nome Completo").strip().upper()
+        idade = c2.text_input("Idade").strip()
+        comu = c1.text_input("Comunidade").strip().upper()
+        sala = c2.selectbox("Sala Destino", list(TURMAS_CONFIG.keys()))
+        turno = c1.selectbox("Turno", ["A", "B"])
         if st.form_submit_button("Finalizar Cadastro"):
             if nome and idade:
                 client = get_gspread_client()
@@ -190,6 +209,7 @@ if menu == "👤 Matrícula":
 elif menu == "📝 Alunos matriculados":
     st.markdown(f"### 📋 Quadro de Alunos Matriculados")
     render_botoes_salas("btn_mat", "sel_mat")
+    st.info("✍️📖 = Aluno já matriculado no Turno Estendido")
     df_g, df_s = safe_read("GERAL"), safe_read(st.session_state.sel_mat)
     tn, cm = render_filtros(df_g, "mat"); df_f = aplicar_filtros(df_s, df_g, tn, cm)
     cor_h = TURMAS_CONFIG[st.session_state.sel_mat]["cor"]
@@ -203,6 +223,7 @@ elif menu == "📝 Alunos matriculados":
             if c0.checkbox("", key=f"chk_{i}"): selecionados.append(n_l)
         c1.write(f"**{n_l}**"); c2.write(f"{r['IDADE']} anos"); c3.write(f"{r['COMUNIDADE']}")
     if selecionados:
+        st.markdown(f"<style>div.stButton > button[key='btn_bulk_te'] {{ background-color: {cor_h} !important; color: white !important; opacity: 1.0 !important; }}</style>", unsafe_allow_html=True)
         if st.button(f"Matricular {len(selecionados)} aluno(s) no Turno Estendido", key="btn_bulk_te"):
             for al in selecionados: st.session_state["alunos_te_dict"][al] = st.session_state.sel_mat
             st.rerun()
@@ -220,6 +241,7 @@ elif menu == "🤝 Gestão de apadrinhamento":
             n_l = str(r["ALUNO"]).replace("**", "").strip()
             html += f'<tr><td>{n_l}</td><td>{r["IDADE"]}</td><td>{r["COMUNIDADE"]}</td><td>{r["PADRINHO/MADRINHA"]}</td></tr>'
         st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
+    else: st.warning("Nenhum dado encontrado para esta sala.")
 
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação")
@@ -228,6 +250,7 @@ elif menu == "📊 Avaliação da Tábua da Maré":
     if not df_s.empty:
         n_limpos = sorted([str(n).replace("**", "").strip() for n in df_s[df_s["ALUNO"] != ""]["ALUNO"].unique()])
         al = st.selectbox("Selecione o Aluno", n_limpos)
+        st.markdown("#### ⭐ 10 motivos para avaliar!")
         with st.form("f_av"):
             tr = st.selectbox("Período", ["1º Semestre", "2º Semestre"])
             cE, cD = st.columns(2); n_l = {}
@@ -254,6 +277,8 @@ elif menu == "📖 Turno Estendido":
         render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_te)
         al_te = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te]
         al = st.selectbox("Aluno:", sorted(al_te))
+        cor_o = TURMAS_CONFIG[st.session_state.sel_te]["cor"]
+        st.markdown(f'<div class="sala-badge" style="background-color:{cor_o}">{st.session_state.sel_te}</div>', unsafe_allow_html=True)
         
         df_h = pd.read_csv(ALF_FILE)
         diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
@@ -267,28 +292,28 @@ elif menu == "📖 Turno Estendido":
         st.markdown(ht + '</div>', unsafe_allow_html=True)
 
         # --- SEÇÃO DE DIAGNÓSTICO COM EVIDÊNCIAS DINÂMICAS ---
-        # O Selectbox do nível fica fora do form para atualizar as evidências instantaneamente
-        nV = st.selectbox("Nível de Diagnóstico:", NIVEIS_ALF, index=NIVEIS_ALF.index(diag["Nivel"]) if diag is not None else 0)
+        # Selectbox fora do form para atualizar evidências ao mudar
+        nV = st.selectbox("Novo Nível:", NIVEIS_ALF, index=NIVEIS_ALF.index(diag["Nivel"]) if diag is not None else 0)
         
         with st.form("f_alf_dinamico"):
             tipo = st.selectbox("Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
             
-            # Busca as evidências específicas do nível selecionado
+            # Busca as evidências baseadas no nível selecionado acima
             evidencias_atuais = EVIDENCIAS_POR_NIVEL.get(nV, [])
-            st.write(f"**Evidências observadas para o nível {nV}:**")
+            st.write(f"**Evidências para {nV}:**")
             
-            e_cols = st.columns(2)
+            e_cols = st.columns(3)
             s_ev = []
             for i, ev in enumerate(evidencias_atuais):
-                # A chave (key) dinâmica garante que o Streamlit resete os checks ao mudar o nível
-                if e_cols[i % 2].checkbox(ev, key=f"ev_{nV}_{i}"):
+                # A key dinâmica garante que o Streamlit limpe os checks ao trocar o nível
+                if e_cols[i % 3].checkbox(ev, key=f"chk_{nV}_{i}"):
                     s_ev.append(ev)
             
-            obs = st.text_area("Observações:")
+            obs = st.text_area("Obs:")
             if st.form_submit_button("Salvar Diagnóstico"):
                 df_h = df_h[~((df_h["Aluno"] == al) & (df_h["Avaliacao"] == tipo))]
                 pd.concat([df_h, pd.DataFrame([[al, tipo, nV, False, ", ".join(s_ev), obs, "TURNO ESTENDIDO"]], columns=df_h.columns)], ignore_index=True).to_csv(ALF_FILE, index=False)
-                st.success("Diagnóstico registrado!"); st.rerun()
+                st.rerun()
     else: st.info("Sem alunos no Turno.")
 
 elif menu == "📈 Indicadores pedagógicos":
@@ -297,11 +322,14 @@ elif menu == "📈 Indicadores pedagógicos":
     df_h = pd.read_csv(ALF_FILE)
     if not df_h.empty:
         df_ult = df_h.sort_values("Avaliacao").groupby("Aluno").last().reset_index()
+        df_ult["Aluno"] = df_ult["Aluno"].str.replace("**", "", regex=False)
         st.dataframe(df_ult, use_container_width=True)
+    else: st.info("Sem dados.")
 
 elif menu == "🌊 Canal do Apadrinhamento":
     st.markdown(f"### 🌊 Canal do Apadrinhamento")
-    df_av, df_total = pd.read_csv(AVAL_FILE), pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
+    df_av = pd.read_csv(AVAL_FILE)
+    df_total = pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
     p_sel = st.session_state.nome_usuario if st.session_state.perfil == "padrinho" else st.selectbox("Simular Padrinho:", sorted([p for p in df_total["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan"]]))
     if p_sel:
         afils = df_total[df_total["PADRINHO/MADRINHA"].astype(str).str.upper() == p_sel.upper()]
@@ -311,11 +339,13 @@ elif menu == "🌊 Canal do Apadrinhamento":
                 for _, r in df_av[df_av["Aluno"] == al_af].iterrows():
                     st.write(f"**{r['Periodo']}**")
                     st.plotly_chart(criar_grafico_mare(CATEGORIAS, [float(r[c]) for c in CATEGORIAS]), use_container_width=True)
+            else: st.warning("Sem avaliações.")
 
 elif menu == "🌊 Tábua da Maré":
     st.markdown(f"### 🌊 Tábua da Maré")
     render_botoes_salas("btn_int", "sel_int")
-    df_av, df_s = pd.read_csv(AVAL_FILE), safe_read(st.session_state.sel_int)
+    df_av = pd.read_csv(AVAL_FILE)
+    df_s = safe_read(st.session_state.sel_int)
     if not df_s.empty:
         alunos_sala = [str(n).replace("**", "").strip() for n in df_s["ALUNO"].unique()]
         df_f = df_av[df_av["Aluno"].isin(alunos_sala)]
@@ -325,3 +355,5 @@ elif menu == "🌊 Tábua da Maré":
                     for _, r in df_f[df_f["Aluno"] == al].iterrows():
                         st.write(f"**{r['Periodo']}**")
                         st.plotly_chart(criar_grafico_mare(CATEGORIAS, [float(r[c]) for c in CATEGORIAS]), key=f"g_{al}_{r['Periodo']}")
+        else: st.info("Nenhuma avaliação lançada para esta sala.")
+    else: st.error("Erro ao carregar dados da sala.")

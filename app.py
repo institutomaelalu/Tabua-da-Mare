@@ -512,11 +512,10 @@ elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
 
     try:
-        # Puxa a URL diretamente do secrets usando a chave 'geral'
-        # O gsheets_connection resolve o resto sozinho
-        df_h = conn.read(worksheet="TABUA_MARE").fillna("") 
+        # Usamos a mesma chave 'geral' pois é a planilha mestre
+        df_av = conn.read(spreadsheet="geral", worksheet="TÁBUA DA MARÉ").fillna("")
     except Exception as e:
-        st.error(f"Erro ao conectar com a planilha: {e}")
+        st.error(f"Erro ao carregar dados da planilha: {e}")
         st.stop()
 
     # Renderiza os botões das salas
@@ -582,9 +581,9 @@ elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
 
     try:
-        # Puxa a URL diretamente do secrets usando a chave 'geral'
-        # O gsheets_connection resolve o resto sozinho
-        df_h = conn.read(worksheet="TURNO ESTENDIDO").fillna("") 
+        # 'geral' é o nome que está no seu secrets.toml
+        # O Streamlit vai buscar a URL associada a essa chave automaticamente
+        df_h = conn.read(spreadsheet="geral", worksheet="TURNO ESTENDIDO").fillna("")
     except Exception as e:
         st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()

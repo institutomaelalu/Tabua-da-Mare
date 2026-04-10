@@ -165,7 +165,7 @@ if not st.session_state.logado:
                     st.session_state.update({"logado": True, "perfil": "admin", "nome_usuario": "COORDENAÇÃO"})
                     st.rerun()
                 else:
- if not st.session_state.logado:
+                    if not st.session_state.logado:
     # Garante que as chaves de seleção existam antes de qualquer tentativa de renderização
     for k in ['sel_mat', 'sel_pad', 'sel_aval', 'sel_int', 'sel_alf', 'sel_ind', 'sel_te', 'sel_te_dados']:
         if k not in st.session_state:

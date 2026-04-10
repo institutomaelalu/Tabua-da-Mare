@@ -5,6 +5,7 @@ import numpy as np
 import os
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
+from urllib.parse import quote # Importação necessária
 
 # --- NOVO: CONEXÃO COM GOOGLE SHEETS ---
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -514,10 +515,13 @@ elif menu == "📊 Avaliação da Tábua da Maré":
     
     # Tentativa de leitura com tratamento de erro
     try:
-        df_av = conn.read(spreadsheet=url_planilha, worksheet="TÁBUA DA MARÉ").fillna("")
+        url_planilha = "https://docs.google.com/spreadsheets/d/1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4/edit?usp=sharing".strip()
+        # O quote() transforma "TÁBUA DA MARÉ" em algo seguro para URL
+        aba_limpa_mare = quote("TÁBUA DA MARÉ")
+        df_av = conn.read(spreadsheet=url_planilha, worksheet=aba_limpa_mare).fillna("")
     except Exception as e:
         st.error(f"Erro ao carregar dados da planilha: {e}")
-        st.stop() # Interrompe a renderização deste menu se não houver conexão
+        st.stop()
 
     # Renderiza os botões das salas
     render_botoes_salas("btn_aval", "sel_aval")
@@ -583,13 +587,14 @@ elif menu == "📖 Turno Estendido":
     # --- 1. LEITURA DE DADOS DA NUVEM (Google Sheets) ---
     url_planilha = "https://docs.google.com/spreadsheets/d/1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4/edit?usp=sharing".strip()
     
-    try:
-        # Lendo da aba correta e padronizando o nome da variável para df_h
-        df_h = conn.read(spreadsheet=url_planilha, worksheet="TURNO ESTENDIDO").fillna("")
+   try:
+        url_planilha = "https://docs.google.com/spreadsheets/d/1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4/edit?usp=sharing".strip()
+        # O quote() transforma "TURNO ESTENDIDO" em "TURNO%20ESTENDIDO"
+        aba_limpa = quote("TURNO ESTENDIDO") 
+        df_h = conn.read(spreadsheet=url_planilha, worksheet=aba_limpa).fillna("")
     except Exception as e:
         st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()
-
     # --- LÓGICA DE ANOS DINÂMICOS ---
     if "Ano" not in df_h.columns:
         df_h["Ano"] = 2026

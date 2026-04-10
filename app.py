@@ -7,6 +7,64 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
+# --- 1. DEFINIÇÕES DE DADOS (Mover para o topo para evitar NameError) ---
+NIVEIS_ALF = [
+    "1. Pré-Silábico", "2. Silábico s/ Valor", "3. Silábico c/ Valor", 
+    "4. Silábico Alfabético", "5. Alfabético Inicial", "6. Alfabético Final", 
+    "7. Alfabético Ortográfico"
+]
+MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
+
+CORES_EXCLUSIVAS = {
+    "1. Pré-Silábico": "#FF0000", "2. Silábico s/ Valor": "#FFCC00", 
+    "3. Silábico c/ Valor": "#FFFF00", "4. Silábico Alfabético": "#00B0F0", 
+    "5. Alfabético Inicial": "#00B050", "6. Alfabético Final": "#FF66CC", 
+    "7. Alfabético Ortográfico": "#B1A0C7"
+}
+
+# --- 2. FUNÇÕES DE SUPORTE ---
+
+def render_vasilha_mare(nivel_num, titulo):
+    config = {
+        1: {"pct": 85, "txt": "Maré Baixa", "seta": ""},
+        2: {"pct": 70, "txt": "Maré Vazante", "seta": "↓"},
+        3: {"pct": 45, "txt": "Maré Enchente", "seta": "↑"},
+        4: {"pct": 15, "txt": "Maré Cheia", "seta": "↑"}
+    }
+    try:
+        n = int(float(nivel_num))
+        if n < 1: n = 1
+        if n > 4: n = 4
+    except: n = 1
+    c = config[n]
+    return f'''
+    <div style="text-align: center; margin-bottom: 20px; border: 1px solid #eee; padding: 10px; border-radius: 10px; background: #fff;">
+        <div style="font-size: 11px; font-weight: bold; color: #333; min-height: 35px; display: flex; align-items: center; justify-content: center; line-height: 1.2;">{titulo}</div>
+        <div style="width: 70px; height: 45px; margin: 5px auto; background: linear-gradient(to bottom, #f0f0f0 {c['pct']}%, #5DADE2 {c['pct']}%);
+                    clip-path: path('M 0 10 Q 17.5 0 35 10 T 70 10 L 70 40 Q 70 45 65 45 L 5 45 Q 0 45 0 40 Z'); border: 1px solid #ddd; position: relative;">
+            <span style="position: absolute; right: 2px; top: 5px; font-size: 12px; font-weight: bold; color: #2E86C1;">{c['seta']}</span>
+        </div>
+        <div style="font-size: 9px; color: #5DADE2; font-weight: bold; text-transform: uppercase; margin-top: 5px;">{c['txt']}</div>
+    </div>'''
+
+def render_grafico_alfabetizacao_individual(df_aluno):
+    if df_aluno.empty: 
+        st.info("Sem dados de evolução.")
+        return
+    # Removido NameError: MAPA_NIVEIS agora é global e definido no topo
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df_aluno["Avaliacao"].str.replace("Avaliação Final", "3ª Aval") + "/" + df_aluno["Ano"].astype(str),
+        y=[MAPA_NIVEIS.get(n, 0) for n in df_aluno["Nivel"]],
+        fill='tozeroy', mode='lines+markers',
+        line=dict(color="#6741d9", width=3),
+        marker=dict(size=10, color="#6741d9")
+    ))
+    fig.update_layout(height=280, margin=dict(l=0, r=10, t=20, b=0),
+        yaxis=dict(range=[0.5, 7.5], tickmode='array', tickvals=list(range(1, 8)), ticktext=[n.split(". ")[1] for n in NIVEIS_ALF]),
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(size=10))
+    st.plotly_chart(fig, use_container_width=True)
+
 # 1. Configuração e Estilo
 st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 

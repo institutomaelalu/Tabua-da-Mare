@@ -425,8 +425,6 @@ elif menu == "📊 Avaliação da Tábua da Maré":
 # --- ABA: TURNO ESTENDIDO (REGISTRO ATUALIZADO COM NOVA PALETA) ---
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
-    # Exibe a legenda idêntica
-    render_legenda_niveis()
     # --- LÓGICA DE ANOS DINÂMICOS ---
     df_h = pd.read_csv(ALF_FILE).fillna("")
     if "Ano" not in df_h.columns:
@@ -490,34 +488,45 @@ elif menu == "📖 Turno Estendido":
         al_te = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te]
         al = st.selectbox("Aluno:", sorted(al_te))
         
-        # --- LÓGICA DA TRILHA VISUAL COM NOVAS CORES ---
-        # Busca o diagnóstico mais recente do aluno para marcar na trilha
+# --- LÓGICA DA TRILHA VISUAL (AGORA IDÊNTICA À LEGENDA PASTEL) ---
         diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
         
         st.markdown("""<style>
-            .trilha-container { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 20px 0; overflow-x: auto; padding: 10px; }
-            .caixa-trilha { padding: 15px 10px; border-radius: 12px; text-align: center; font-size: 11px; font-weight: bold; min-width: 100px; line-height: 1.2; box-shadow: 1px 1px 4px rgba(0,0,0,0.1); }
-            .seta-trilha { font-weight: bold; color: #ccc; }
+            .trilha-container { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 20px 0; overflow-x: auto; padding: 10px; }
+            .caixa-trilha-nova { 
+                padding: 10px 5px; 
+                border-radius: 10px; 
+                text-align: center; 
+                font-size: 10px; 
+                font-weight: bold; 
+                min-width: 100px; 
+                min-height: 50px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                line-height: 1.1; 
+                box-shadow: 1px 1px 3px rgba(0,0,0,0.05);
+            }
+            .seta-trilha { font-weight: bold; color: #BDC3C7; font-size: 18px; }
         </style>""", unsafe_allow_html=True)
 
         ht = '<div class="trilha-container">'
         for i, n_t in enumerate(NIVEIS_ALF):
             is_current = (diag is not None and diag["Nivel"] == n_t)
             
-            # Cores baseadas na imagem (Ativo = cor real, Inativo = versão clara/pastel)
-            cor_bg = CORES_TRILHA[n_t]["ativo"] if is_current else CORES_TRILHA[n_t]["inativo"]
+            # Usa SEMPRE a cor pastel da Legenda
+            cor_bg = CORES_EXCLUSIVAS.get(n_t, "#eee")
+            cor_txt = get_text_color(n_t)
             
-            # Texto branco para níveis com cores escuras na paleta
-            if is_current:
-                cor_txt = "white" if n_t in ["1. Pré-Silábico", "5. Alfabético Inicial", "6. Alfabético Final", "7. Alfabético Ortográfico"] else "black"
-                borda = "3px solid #333"
-            else:
-                cor_txt = "#999"
-                borda = "1px solid #eee"
-
-            ht += f'<div class="caixa-trilha" style="background-color:{cor_bg}; color:{cor_txt}; border:{borda};">{n_t.split(". ")[1]}</div>'
+            # Destaque apenas na borda para o nível atual
+            borda = "3px solid #2C3E50" if is_current else "1px solid rgba(0,0,0,0.05)"
+            opacidade = "1.0" if is_current else "0.5" # Deixa os outros níveis levemente "apagados" para destacar o atual
+            
+            ht += f'<div class="caixa-trilha-nova" style="background-color:{cor_bg}; color:{cor_txt}; border:{borda}; opacity:{opacidade};">{n_t.split(". ")[1]}</div>'
+            
             if i < len(NIVEIS_ALF)-1: 
                 ht += '<div class="seta-trilha">→</div>'
+        
         st.markdown(ht + '</div>', unsafe_allow_html=True)
 
         # Seleção do Novo Nível

@@ -246,8 +246,7 @@ def safe_read(worksheet_name):
         if worksheet_name == "GERAL": url = st.secrets["connections"]["gsheets"]["geral"]
         else: url = st.secrets["connections"]["gsheets"][TURMAS_CONFIG[worksheet_name]['key']]
         url_csv = url.split("/edit")[0] + "/export?format=csv"
-        if "gid=" in url: url_csv += f"&gid={url.split('gid=')[1]}"
-        df = pd.read_csv(url_csv)
+        df = conn.read(worksheet=nome_da_aba_selecionada).fillna("")
         df.columns = [str(c).strip().upper() for c in df.columns]
         if "PADRINHO" in df.columns: df = df.rename(columns={"PADRINHO": "PADRINHO/MADRINHA"})
         return df.fillna("")
@@ -255,15 +254,16 @@ def safe_read(worksheet_name):
 
 def render_filtros(df_geral, key_suffix):
     f1, f2 = st.columns(2)
+    tn = f1.selectbox("Filtrar Turno", ["Todos", "A", "B"], key=f"tn_{key_suffix}")
     
-    # 1. Garante que 'TURNO' exista para evitar erro no selectbox
-    turno_opcoes = ["Todos", "A", "B"]
-    tn = f1.selectbox("Filtrar Turno", turno_opcoes, key=f"tn_{key_suffix}")
-    
-    # 2. Busca Comunidades (Usando o nome padronizado pela limpeza que fizemos)
-    comu_list = ["Todas"] + sorted([c for c in df_geral["COMUNIDADE"].unique() if str(c).strip()])
+    # Se a coluna não existir, ele não trava o app
+    cols = [c.upper() for c in df_geral.columns]
+    if "COMUNIDADE" in cols:
+        comu_list = ["Todas"] + sorted([c for c in df_geral["COMUNIDADE"].unique() if str(c).strip()])
+    else:
+        comu_list = ["Todas"]
+        
     cm = f2.selectbox("Filtrar Comunidade", comu_list, key=f"cm_{key_suffix}")
-    
     return tn, cm
 
 def aplicar_filtros(df_alvo, df_geral, tn, cm):
@@ -709,7 +709,7 @@ elif menu == "📊 Dados - Turno Estendido":
 
     if "Ano" not in df_h.columns:
         df_h["Ano"] = 2025
-        df_h.to_csv(ALF_FILE, index=False)
+        conn.update(worksheet="TURNO_ESTENDIDO", data=df_h)
 
     # 1. SELEÇÃO DE ANO
     st.write("Selecione o Ano:")
@@ -818,7 +818,6 @@ elif menu == "📈 Indicadores pedagógicos":
 
 elif menu == "🌊 Canal do Apadrinhamento":
     st.markdown(f"### 🤝 Canal do Apadrinhamento")
-    
     df_total = pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
     p_sel = st.session_state.nome_usuario if st.session_state.perfil == "padrinho" else st.selectbox("Simular Padrinho:", sorted([p for p in df_total["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan"]]))
     
@@ -892,7 +891,7 @@ elif menu == "🌊 Canal do Apadrinhamento":
                     """, unsafe_allow_html=True)
 
                 with col_vasilhas:
-                    df_av = pd.read_csv(df_aval.copy())
+                    df_av = (df_aval.copy())
                     dados_mare = df_av[df_av["Aluno"] == al_af]
                     
                     if not dados_mare.empty:
@@ -940,7 +939,7 @@ elif menu == "🌊 Canal do Apadrinhamento":
 
             # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---
             elif modo == "📚 Turno Estendido":
-                df_h = pd.read_csv(df_alf.copy()).fillna("")
+                df_h = (df_alf.copy()).fillna("")
                 dados_al = df_h[df_h["Aluno"] == al_af].sort_values(["Ano", "Avaliacao"])
                 dados_al = dados_al.drop_duplicates(subset=['Avaliacao', 'Ano'], keep='last')
                 
@@ -1032,7 +1031,7 @@ elif menu == "🌊 Tábua da Maré":
     # (Mantido original)
     st.markdown(f"### 🌊 Tábua da Maré")
     render_botoes_salas("btn_int", "sel_int")
-    df_av = pd.read_csv(AVAL_FILE)
+    df_av = df_aval.copy()
     df_s = safe_read(st.session_state.sel_int)
     if not df_s.empty:
         alunos_sala = [str(n).replace("**", "").strip() for n in df_s["ALUNO"].unique()]

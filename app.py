@@ -513,7 +513,7 @@ elif menu == "📊 Avaliação da Tábua da Maré":
 
     try:
         # Usamos a mesma chave 'geral' pois é a planilha mestre
-        df_av = conn.read(spreadsheet="geral", worksheet="TÁBUA DA MARÉ").fillna("")
+        df_av = conn.read(spreadsheet="geral", worksheet="TABUA_MARE").fillna("")
     except Exception as e:
         st.error(f"Erro ao carregar dados da planilha: {e}")
         st.stop()
@@ -583,7 +583,7 @@ elif menu == "📖 Turno Estendido":
     try:
         # 'geral' é o nome que está no seu secrets.toml
         # O Streamlit vai buscar a URL associada a essa chave automaticamente
-        df_h = conn.read(spreadsheet="geral", worksheet="TURNO ESTENDIDO").fillna("")
+        df_h = conn.read(spreadsheet="geral", worksheet="TURNO_ESTENDIDO").fillna("")
     except Exception as e:
         st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()

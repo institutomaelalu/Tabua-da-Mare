@@ -488,41 +488,43 @@ elif menu == "📖 Turno Estendido":
         al_te = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te]
         al = st.selectbox("Aluno:", sorted(al_te))
         
-# --- LÓGICA DA TRILHA VISUAL (AGORA IDÊNTICA À LEGENDA PASTEL) ---
+# --- TRILHA VISUAL ULTRA-COMPACTA (ESTILO LEGENDA PASTEL) ---
         diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
         
         st.markdown("""<style>
-            .trilha-container { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 20px 0; overflow-x: auto; padding: 10px; }
-            .caixa-trilha-nova { 
-                padding: 10px 5px; 
-                border-radius: 10px; 
+            .trilha-container { 
+                display: flex; align-items: center; justify-content: space-between; 
+                gap: 4px; margin: 5px 0; padding: 5px 0; overflow-x: auto; 
+            }
+            .caixa-trilha-compacta { 
+                padding: 4px 2px; 
+                border-radius: 8px; 
                 text-align: center; 
-                font-size: 10px; 
+                font-size: 9px; 
                 font-weight: bold; 
-                min-width: 100px; 
-                min-height: 50px;
+                min-width: 85px; 
+                height: 40px; /* Altura fixa reduzida */
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                line-height: 1.1; 
-                box-shadow: 1px 1px 3px rgba(0,0,0,0.05);
+                line-height: 1.0; 
+                box-shadow: 1px 1px 2px rgba(0,0,0,0.03);
             }
-            .seta-trilha { font-weight: bold; color: #BDC3C7; font-size: 18px; }
+            .seta-trilha { font-weight: bold; color: #D5DBDB; font-size: 14px; }
         </style>""", unsafe_allow_html=True)
 
         ht = '<div class="trilha-container">'
         for i, n_t in enumerate(NIVEIS_ALF):
             is_current = (diag is not None and diag["Nivel"] == n_t)
             
-            # Usa SEMPRE a cor pastel da Legenda
             cor_bg = CORES_EXCLUSIVAS.get(n_t, "#eee")
             cor_txt = get_text_color(n_t)
             
-            # Destaque apenas na borda para o nível atual
-            borda = "3px solid #2C3E50" if is_current else "1px solid rgba(0,0,0,0.05)"
-            opacidade = "1.0" if is_current else "0.5" # Deixa os outros níveis levemente "apagados" para destacar o atual
+            # Destaque com borda no nível atual, os outros ficam sutis
+            borda = "2px solid #2C3E50" if is_current else "1px solid rgba(0,0,0,0.05)"
+            opacidade = "1.0" if is_current else "0.6"
             
-            ht += f'<div class="caixa-trilha-nova" style="background-color:{cor_bg}; color:{cor_txt}; border:{borda}; opacity:{opacidade};">{n_t.split(". ")[1]}</div>'
+            ht += f'<div class="caixa-trilha-compacta" style="background-color:{cor_bg}; color:{cor_txt}; border:{borda}; opacity:{opacidade};">{n_t.split(". ")[1]}</div>'
             
             if i < len(NIVEIS_ALF)-1: 
                 ht += '<div class="seta-trilha">→</div>'

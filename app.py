@@ -312,7 +312,7 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
-# --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO FINAL SEM ERRO DE INDENTAÇÃO) ---
+# --- ABA: DADOS - TURNO ESTENDIDO (CORREÇÃO FINAL DE GEOMETRIA) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
     df_h = pd.read_csv(ALF_FILE)
@@ -358,6 +358,7 @@ elif menu == "📊 Dados - Turno Estendido":
 
     st.markdown("---")
     
+    # --- SEÇÃO DETALHES COM GEOMETRIA SINCRONIZADA ---
     salas_ativas = sorted(list(set(st.session_state["alunos_te_dict"].values())))
     if salas_ativas:
         if "sel_te_dados" not in st.session_state: st.session_state.sel_te_dados = salas_ativas[0]
@@ -372,7 +373,7 @@ elif menu == "📊 Dados - Turno Estendido":
                 valores = [MAPA_NIVEIS.get(n, 0) for n in dados_h['Nivel']]
                 ultimo_nv = dados_h['Nivel'].iloc[-1]
                 
-                # Definição de Nível da Água
+                # Definição de Nível
                 status_mare, altura = "Maré Baixa", "25%"
                 if ultimo_nv == "7. Alfabético Ortográfico": status_mare, altura = "Maré Cheia", "92%"
                 elif len(valores) >= 2:
@@ -380,7 +381,6 @@ elif menu == "📊 Dados - Turno Estendido":
                     elif valores[-1] < valores[-2]: status_mare, altura = "Maré Vazante", "40%"
                 elif valores[-1] <= 2: status_mare, altura = "Maré Baixa", "25%"
 
-                # COLUNAS DE DETALHES (Aqui estava o erro de indentação)
                 col_card, col_visual = st.columns([1, 1])
                 
                 with col_card:
@@ -399,25 +399,24 @@ elif menu == "📊 Dados - Turno Estendido":
                     st.markdown(f"#### 🌊 Nível da Maré: {status_mare}")
                     st.markdown(f"""
                     <style>
-                        .container-mare {{ position: relative; width: 240px; height: 130px; margin: auto; }}
-                        .vasilha-ondulada {{ 
-                            width: 100%; height: 100%; background: #f0f0f0;
-                            clip-path: path('M 0 20 Q 60 0 120 20 T 240 20 L 240 110 Q 240 130 220 130 L 20 130 Q 0 130 0 110 Z');
+                        .container-mare {{ 
+                            position: relative; width: 260px; height: 140px; margin: auto; 
+                            background: #f0f0f0; /* Fundo do recipiente */
+                            clip-path: path('M 0 20 Q 65 0 130 20 T 260 20 L 260 110 Q 260 140 230 140 L 30 140 Q 0 140 0 110 Z');
                         }}
-                        .agua-100-porcento {{
+                        .agua-total {{
                             position: absolute; bottom: 0; left: 0; width: 100%; height: {altura};
-                            background: #5DADE2;
-                            clip-path: path('M 0 10 Q 30 0 60 10 T 120 10 T 180 10 T 240 10 L 240 150 L 0 150 Z');
+                            background: #5DADE2; /* Azul Maré */
+                            /* A onda superior da água é desenhada para encaixar no container */
+                            clip-path: path('M 0 10 Q 32.5 0 65 10 T 130 10 T 195 10 T 260 10 L 260 200 L 0 200 Z');
                         }}
                     </style>
                     <div class="container-mare">
-                        <div class="vasilha-ondulada">
-                            <div class="agua-100-porcento"></div>
-                        </div>
+                        <div class="agua-total"></div>
                     </div>
-                    <div style="margin-top:15px; font-size:13px; color:black;">
+                    <div style="margin-top:20px; font-size:13px; color:black;">
                         <b>📍 Trilha de Evolução:</b><br>
-                        {"".join([f'<div style="padding:4px; border-bottom:1px dashed #eee;"><b>{row["Avaliacao"]}:</b> {row["Nivel"].split(". ")[1]}</div>' for _, row in dados_h.iterrows()])}
+                        {"".join([f'<div style="padding:5px; border-bottom:1px dashed #eee;"><b>{row["Avaliacao"]}:</b> {row["Nivel"].split(". ")[1]}</div>' for _, row in dados_h.iterrows()])}
                     </div>""", unsafe_allow_html=True)
             else:
                 st.info("Aguardando registros.")

@@ -4,9 +4,20 @@ import plotly.graph_objects as go
 import numpy as np
 import os
 import gspread
+from datetime import datetime
 from google.oauth2.service_account import Credentials
 
-# --- DEFINIÇÕES GLOBAIS (Margem esquerda total) ---
+# 1. DEFINIÇÕES DE DADOS (Devem vir antes de serem usadas em dicionários)
+NIVEIS_ALF = [
+    "1. Pré-Silábico", 
+    "2. Silábico s/ Valor", 
+    "3. Silábico c/ Valor", 
+    "4. Silábico Alfabético", 
+    "5. Alfabético Inicial", 
+    "6. Alfabético Final", 
+    "7. Alfabético Ortográfico"
+]
+
 MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
 
 CORES_EXCLUSIVAS = {
@@ -19,6 +30,19 @@ CORES_EXCLUSIVAS = {
     "7. Alfabético Ortográfico": "#B1A0C7"
 }
 
+# 2. INICIALIZAÇÃO DE SESSÃO (Garante que o app não trave por falta de chaves)
+chaves_necessarias = [
+    'sel_mat', 'sel_pad', 'sel_aval', 'sel_int', 
+    'sel_alf', 'sel_ind', 'sel_te', 'sel_te_dados'
+]
+for k in chaves_necessarias:
+    if k not in st.session_state:
+        st.session_state[k] = "SALA ROSA"
+
+if "alunos_te_dict" not in st.session_state:
+    st.session_state["alunos_te_dict"] = {}
+
+# 3. FUNÇÕES GLOBAIS
 def get_status_mare_html(nv_atual, hist):
     pct, txt = 85, "maré baixa"
     if nv_atual == "7. Alfabético Ortográfico": pct, txt = 15, "maré cheia"
@@ -28,7 +52,7 @@ def get_status_mare_html(nv_atual, hist):
         elif n_at < n_ant: pct, txt = 70, "maré vazante"
     return f'<div class="mare-box"><div class="mare-mini-tabela" style="background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%); clip-path: path(\'M 0 4 Q 10 0 20 4 T 40 4 L 40 20 L 0 20 Z\');"></div><span class="mare-texto-tabela">{txt}</span></div>'
 
-# 1. Configuração e Estilo
+# 4. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 
 C_ROSA, C_VERDE, C_AZUL, C_AMARELO, C_ROXO = "#ff81ba", "#a8cf45", "#5cc6d0", "#ffc713", "#6741d9"
@@ -44,66 +68,13 @@ CORES_TRILHA = {
     "6. Alfabético Final": {"ativo": "#5cc6d0", "inativo": "#d2eff2"},
     "7. Alfabético Ortográfico": {"ativo": "#ff81ba", "inativo": "#ffd9ea"}
 }
-NIVEIS_ALF = list(CORES_TRILHA.keys())
+
 ALF_FILE = "alfabetizacao.csv"
 AVAL_FILE = "avaliacoes.csv"
 
-# --- EVIDÊNCIAS DINÂMICAS (Mantidas conforme seu código) ---
-EVIDENCIAS_POR_NIVEL = {
-    "1. Pré-Silábico": ["Diferencia letras de desenhos", "Escreve o nome sem apoio", "Acredita que nomes grandes têm muitas letras", "Sabe que se escreve da esquerda para a direita"],
-    "2. Silábico s/ Valor": ["Uma letra para cada sílaba (sem som)", "Segmenta a fala em partes", "Respeita quantidade de emissões sonoras", "Faz leitura global da palavra"],
-    "3. Silábico c/ Valor": ["Usa vogais correspondentes ao som", "Identifica o som inicial das palavras", "Leitura apontada (acompanha com o dedo)", "Escreve uma letra por sílaba com som correto"],
-    "4. Silábico Alfabético": ["Oscila entre uma letra e a sílaba completa", "Começa a usar consoantes nas sílabas", "Consegue completar lacunas de letras", "Percebe a estrutura da sílaba simples"],
-    "5. Alfabético Inicial": ["Compreende o sistema de escrita", "Erros ortográficos comuns (ex: K por C)", "Lê textos curtos com fluidez", "Segmentação de palavras irregular"],
-    "6. Alfabético Final": ["Diferencia sons semelhantes (P/B, T/D)", "Usa corretamente dígrafos (LH, NH, CH)", "Domina regras básicas de pontuação", "Produz textos com coesão"],
-    "7. Alfabético Ortográfico": ["Escrita autônoma e correta", "Domina acentuação e regras complexas", "Lê com entonação e fluidez total", "Revisa o próprio texto"]
-}
-
-# Inicialização de arquivos locais
+# Verificação de arquivos locais (Atualizado com colunas corretas)
 if not os.path.exists(ALF_FILE):
-    pd.DataFrame(columns=["Aluno", "Avaliacao", "Nivel", "Gatilho", "Evidencias", "Obs", "Sala"]).to_csv(ALF_FILE, index=False)
-
-CATEGORIAS = ["1. Atividades em Grupo/Proatividade", "2. Interesse pelo Novo", "3. Compartilhamento de Materiais", "4. Clareza e Desenvoltura", "5. Respeito às Regras", "6. Vocabulário Adequado", "7. Leitura e Escrita", "8. Compreensão de Comandos", "9. Superação de Desafios", "10. Assiduidade"]
-MARE_OPCOES = {"Maré Cheia": 4, "Maré Enchente": 3, "Maré Vazante": 2, "Maré Baixa": 1}
-MARE_LABELS = {4: "Maré Cheia", 3: "Maré Enchente", 2: "Maré Vazante", 1: "Maré Baixa"}
-
-if not os.path.exists(AVAL_FILE):
-    pd.DataFrame(columns=["Aluno", "Periodo"] + CATEGORIAS + ["Observacoes"]).to_csv(AVAL_FILE, index=False)
-
-st.markdown(f"""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-    .stApp {{ background-color: #ffffff; font-family: 'Inter', sans-serif; }}
-    .main-header {{ text-align: center; padding: 20px 0; }}
-    .main-header h1 {{ font-size: 42px !important; font-weight: 800; }}
-    .custom-table {{
-        width: 100%; border-collapse: separate; border-spacing: 0;
-        border: 1px solid #f0f0f0; border-radius: 10px;
-        overflow: hidden; font-size: 13px; margin-top: 5px;
-        margin-bottom: 15px;
-    }}
-    .custom-table thead th {{ padding: 12px 10px; text-align: left; color: white !important; font-weight: 700; border: none; }}
-    .custom-table td {{ padding: 10px; border-bottom: 1px solid #f9f9f9; }}
-    
-    div.stButton > button {{
-        width: 100%; border-radius: 8px !important; font-weight: 700 !important; 
-        height: 42px; font-size: 11px !important; border: none !important;
-        transition: all 0.3s;
-    }}
-    .sala-badge {{
-        display: inline-block; padding: 4px 12px; border-radius: 20px;
-        color: white; font-weight: 700; font-size: 10px; margin-top: 5px;
-        text-transform: uppercase;
-    }}
-    .trilha-container {{ display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 0; }}
-    .caixa-trilha {{
-        flex: 1; height: 85px; border-radius: 15px; display: flex; align-items: center; justify-content: center;
-        text-align: center; font-size: 10px; font-weight: 800; padding: 5px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 2px solid transparent; line-height: 1.2;
-    }}
-    .seta-trilha {{ padding: 0 5px; color: #ccc; font-size: 18px; font-weight: bold; }}
-    </style>
-    """, unsafe_allow_html=True)
+    pd.DataFrame(columns=["Aluno", "Avaliacao", "Nivel", "Flag", "Evidencias", "Obs", "Sala", "Ano"]).to_csv(ALF_FILE, index=False)
 
 # 2. Funções de Dados
 TURMAS_CONFIG = {

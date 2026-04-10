@@ -312,7 +312,7 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
-# --- ABA: DADOS - TURNO ESTENDIDO (SOLUÇÃO DEFINITIVA DE GEOMETRIA) ---
+# --- ABA: DADOS - TURNO ESTENDIDO (SOLUÇÃO COM GRADIENTE FIXO) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
     df_h = pd.read_csv(ALF_FILE)
@@ -325,7 +325,7 @@ elif menu == "📊 Dados - Turno Estendido":
         "7. Alfabético Ortográfico": "#D6EAF8"
     }
 
-    # Legenda Superior (Mantida)
+    # Legenda Superior
     cols_leg = st.columns(len(NIVEIS_ALF))
     for idx, niv in enumerate(NIVEIS_ALF):
         cols_leg[idx].markdown(f"<div style='background-color:{CORES_EXCLUSIVAS[niv]}; padding:10px; border-radius:10px; text-align:center; font-size:9px; font-weight:bold; color:black; border: 1px solid #ccc;'>{niv.split('. ')[1]}</div>", unsafe_allow_html=True)
@@ -372,13 +372,14 @@ elif menu == "📊 Dados - Turno Estendido":
                 valores = [MAPA_NIVEIS.get(n, 0) for n in dados_h['Nivel']]
                 ultimo_nv = dados_h['Nivel'].iloc[-1]
                 
-                # Definição de Nível e Altura
-                status_mare, altura = "Maré Baixa", "25%"
-                if ultimo_nv == "7. Alfabético Ortográfico": status_mare, altura = "Maré Cheia", "92%"
+                # Cálculo da porcentagem invertida para o gradiente (CSS top-down)
+                # Se a altura é 25%, o "vazio" (cinza) vai até 75%
+                status_mare, pct = "Maré Baixa", 75
+                if ultimo_nv == "7. Alfabético Ortográfico": status_mare, pct = "Maré Cheia", 10
                 elif len(valores) >= 2:
-                    if valores[-1] > valores[-2]: status_mare, altura = "Maré Enchente", "65%"
-                    elif valores[-1] < valores[-2]: status_mare, altura = "Maré Vazante", "40%"
-                elif valores[-1] <= 2: status_mare, altura = "Maré Baixa", "25%"
+                    if valores[-1] > valores[-2]: status_mare, pct = "Maré Enchente", 40
+                    elif valores[-1] < valores[-2]: status_mare, pct = "Maré Vazante", 65
+                elif valores[-1] <= 2: status_mare, pct = "Maré Baixa", 80
 
                 col_card, col_visual = st.columns([1, 1])
                 
@@ -398,25 +399,15 @@ elif menu == "📊 Dados - Turno Estendido":
                     st.markdown(f"#### 🌊 Nível da Maré: {status_mare}")
                     st.markdown(f"""
                     <style>
-                        /* O segredo: o container define o recorte mestre */
-                        .recipiente-mestre {{ 
-                            position: relative; width: 260px; height: 140px; margin: auto; 
-                            background: #f0f0f0; /* Fundo cinza do recipiente */
-                            /* Formato da Vasilha */
+                        .vasilha-unica {{ 
+                            width: 260px; height: 140px; margin: auto; 
+                            /* O gradiente faz a separação exata entre cinza e azul */
+                            background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%);
                             clip-path: path('M 0 20 Q 65 0 130 20 T 260 20 L 260 110 Q 260 140 230 140 L 30 140 Q 0 140 0 110 Z');
-                            overflow: hidden;
-                        }}
-                        /* A água agora é apenas um bloco que sobe e desce */
-                        .agua-mestre {{
-                            position: absolute; bottom: 0; left: 0; width: 100%; height: {altura};
-                            background: #5DADE2;
-                            /* Onda superior da água independente das bordas da vasilha */
-                            clip-path: path('M 0 10 Q 32.5 0 65 10 T 130 10 T 195 10 T 260 10 L 260 200 L 0 200 Z');
+                            border-bottom: 4px solid #5D6D7E;
                         }}
                     </style>
-                    <div class="recipiente-mestre">
-                        <div class="agua-mestre"></div>
-                    </div>
+                    <div class="vasilha-unica"></div>
                     <div style="margin-top:20px; font-size:13px; color:black;">
                         <b>📍 Trilha de Evolução:</b><br>
                         {"".join([f'<div style="padding:5px; border-bottom:1px dashed #eee;"><b>{row["Avaliacao"]}:</b> {row["Nivel"].split(". ")[1]}</div>' for _, row in dados_h.iterrows()])}

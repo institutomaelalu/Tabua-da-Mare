@@ -513,7 +513,7 @@ elif menu == "📊 Avaliação da Tábua da Maré":
 
     try:
         # Chamada simplificada usando a chave do secrets
-        df_h = conn.read(spreadsheet="geral", worksheet="TABUA_MARE").fillna("")
+        df_av = conn.read(worksheet="TABUA_MARE").fillna("")
     except Exception as e:
         st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()
@@ -582,7 +582,7 @@ elif menu == "📖 Turno Estendido":
 
     try:
         # Chamada simplificada usando a chave do secrets
-        df_h = conn.read(spreadsheet="geral", worksheet="TURNO_ESTENDIDO").fillna("")
+        df_h = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
     except Exception as e:
         st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()

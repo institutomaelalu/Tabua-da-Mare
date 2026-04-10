@@ -312,22 +312,66 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
-# --- ABA: DADOS - TURNO ESTENDIDO (TABELA GERAL + DETALHES MARÉ) ---
+# --- ABA: DADOS - TURNO ESTENDIDO (AJUSTE DE COR DOS TÍTULOS) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
     
-    # Carregamento e Mapeamento
     df_h = pd.read_csv(ALF_FILE)
     MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
     CORES_EXCLUSIVAS = {
-        "1. Pré-Silábico": "#FF0000",          # Vermelho
-        "2. Silábico s/ Valor": "#FFCC00",     # Amarelo/Laranja
-        "3. Silábico c/ Valor": "#FFFF00",     # Amarelo
-        "4. Silábico Alfabético": "#00B0F0",   # Azul Claro
-        "5. Alfabético Inicial": "#00B050",    # Verde
-        "6. Alfabético Final": "#FF66CC",      # Rosa
-        "7. Alfabético Ortográfico": "#B1A0C7" # Roxo/Lavanda
+        "1. Pré-Silábico": "#FF0000",
+        "2. Silábico s/ Valor": "#FFCC00",
+        "3. Silábico c/ Valor": "#FFFF00",
+        "4. Silábico Alfabético": "#00B0F0",
+        "5. Alfabético Inicial": "#00B050",
+        "6. Alfabético Final": "#FF66CC",
+        "7. Alfabético Ortográfico": "#B1A0C7"
     }
+
+    st.markdown("#### 📈 Panorama de Sondagens")
+    
+    # Legenda de Cores
+    cols_leg = st.columns(len(NIVEIS_ALF))
+    for idx, niv in enumerate(NIVEIS_ALF):
+        cols_leg[idx].markdown(f"<div style='background-color:{CORES_EXCLUSIVAS[niv]}; padding:5px; border-radius:5px; text-align:center; font-size:10px; font-weight:bold; color:black;'>{niv.split('. ')[1]}</div>", unsafe_allow_html=True)
+
+    # Tabela com Títulos em Preto
+    html_tab = """
+    <style>
+        .cell-diag { text-align: center; font-weight: bold; font-size: 11px; color: black !important; }
+        .custom-table { width: 100%; border-collapse: collapse; margin: 20px 0; background-color: white; }
+        /* Ajuste aqui: color: black !important para os títulos */
+        .custom-table th { background-color: #f8f9fa; color: black !important; padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: bold; }
+        .custom-table td { padding: 10px; border: 1px solid #ddd; color: black; }
+    </style>
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Nome do Aluno</th>
+                <th>1ª Sondagem</th>
+                <th>2ª Sondagem</th>
+                <th>3ª Sondagem</th>
+            </tr>
+        </thead>
+        <tbody>"""
+    
+    alunos_te = sorted(st.session_state["alunos_te_dict"].keys())
+    
+    for al in alunos_te:
+        dados_al = df_h[df_h["Aluno"] == al]
+        html_tab += f'<tr><td style="font-weight:bold; color:black;">{al}</td>'
+        for etapa in ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"]:
+            row = dados_al[dados_al["Avaliacao"] == etapa]
+            if not row.empty:
+                nv = row["Nivel"].iloc[0]
+                cor = CORES_EXCLUSIVAS.get(nv, "#eee")
+                html_tab += f'<td style="background-color:{cor};"><div class="cell-diag">{nv.split(". ")[1]}</div></td>'
+            else:
+                html_tab += '<td></td>'
+        html_tab += '</tr>'
+    
+    st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)
+    st.markdown("---")
 
     # 1. TABELA GERAL DE SONDAGENS
     st.markdown("#### 📈 Panorama de Sondagens")

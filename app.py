@@ -312,12 +312,11 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
-# --- ABA: DADOS - TURNO ESTENDIDO (ESTILO ONDA DO MAR) ---
+# --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO TRILHA E VASILHA DE MARÉ) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
     df_h = pd.read_csv(ALF_FILE)
     
-    # Mapeamentos e Cores
     MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
     CORES_EXCLUSIVAS = {
         "1. Pré-Silábico": "#E8E8E8", "2. Silábico s/ Valor": "#D1F2EB",
@@ -326,47 +325,29 @@ elif menu == "📊 Dados - Turno Estendido":
         "7. Alfabético Ortográfico": "#D6EAF8"
     }
 
-    # Legenda da Trilha (7 níveis)
+    # Legenda Superior
     cols_leg = st.columns(len(NIVEIS_ALF))
     for idx, niv in enumerate(NIVEIS_ALF):
-        cols_leg[idx].markdown(f"""
-            <div style='background-color:{CORES_EXCLUSIVAS[niv]}; padding:10px; border-radius:10px; 
-            text-align:center; font-size:9px; font-weight:bold; color:black; border: 1px solid #ccc;'>
-                {niv.split('. ')[1]}
-            </div>""", unsafe_allow_html=True)
+        cols_leg[idx].markdown(f"<div style='background-color:{CORES_EXCLUSIVAS[niv]}; padding:10px; border-radius:10px; text-align:center; font-size:9px; font-weight:bold; color:black; border: 1px solid #ccc;'>{niv.split('. ')[1]}</div>", unsafe_allow_html=True)
 
     # Tabela Principal
-    html = """
-    <style>
-        .cell-diag { text-align: center; font-weight: bold; font-size: 11px; color: black !important; }
-        .card-detalhe { border: 1px solid #ddd; padding: 20px; border-radius: 15px; background-color: #f9f9f9; margin-top: 20px; color: black; }
-        .status-mare { font-weight: bold; font-size: 16px; padding: 5px 15px; border-radius: 20px; color: white; margin-bottom: 10px; display: inline-block; }
-        .box-nivel { padding: 5px 12px; border-radius: 12px; border: 1px solid #bbb; font-weight: bold; color: black; }
-    </style>
-    <table class="custom-table">
-        <thead style="background-color:#5cc6d0">
-            <tr><th>Nome</th><th>Sala</th><th>1ª Sondagem</th><th>2ª Sondagem</th><th>3ª Sondagem</th></tr>
-        </thead>
-        <tbody>
-    """
-    
+    html_tab = """<style>.cell-diag { text-align: center; font-weight: bold; font-size: 11px; color: black !important; }</style>
+    <table class="custom-table"><thead style="background-color:#5cc6d0"><tr><th>Nome</th><th>Sala</th><th>1ª Sondagem</th><th>2ª Sondagem</th><th>3ª Sondagem</th></tr></thead><tbody>"""
     for al in sorted(st.session_state["alunos_te_dict"].keys()):
-        sala_v = st.session_state["alunos_te_dict"][al]
-        dados_al = df_h[df_h["Aluno"] == al]
-        html += f'<tr><td>{al}</td><td>{sala_v}</td>'
+        sala_v = st.session_state["alunos_te_dict"][al]; dados_al = df_h[df_h["Aluno"] == al]
+        html_tab += f'<tr><td>{al}</td><td>{sala_v}</td>'
         for etapa in ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"]:
             row = dados_al[dados_al["Avaliacao"] == etapa]
             if not row.empty:
-                nv = row["Nivel"].iloc[0]
-                cor = CORES_EXCLUSIVAS.get(nv, "#eee")
-                html += f'<td style="background-color:{cor};"><div class="cell-diag">{nv.split(". ")[1]}</div></td>'
-            else: html += '<td></td>'
-        html += '</tr>'
-    st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
+                nv = row["Nivel"].iloc[0]; cor = CORES_EXCLUSIVAS.get(nv, "#eee")
+                html_tab += f'<td style="background-color:{cor};"><div class="cell-diag">{nv.split(". ")[1]}</div></td>'
+            else: html_tab += '<td></td>'
+        html_tab += '</tr>'
+    st.markdown(html_tab + '</tbody></table>', unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("### 🔍 Detalhes e Movimento da Maré")
     
+    # --- SEÇÃO DETALHES: TRILHA E VASILHA ---
     salas_ativas = sorted(list(set(st.session_state["alunos_te_dict"].values())))
     if salas_ativas:
         if "sel_te_dados" not in st.session_state: st.session_state.sel_te_dados = salas_ativas[0]
@@ -380,56 +361,53 @@ elif menu == "📊 Dados - Turno Estendido":
             if not dados_h.empty:
                 valores = [MAPA_NIVEIS.get(n, 0) for n in dados_h['Nivel']]
                 ultimo_nv = dados_h['Nivel'].iloc[-1]
-                cor_caixa = CORES_EXCLUSIVAS.get(ultimo_nv, "#eee")
                 
-                # Lógica de Status
-                status_txt, cor_status = "Maré Estável", "#808080"
+                # Lógica de Classificação da Maré
+                status_mare = "Maré Baixa"; cor_agua = "#A9CCE3"; altura_agua = "20%"; animacao = ""
+                
                 if ultimo_nv == "7. Alfabético Ortográfico":
-                    status_txt, cor_status = "🌊 Maré Cheia", "#2E86C1"
+                    status_mare = "Maré Cheia"; altura_agua = "90%"; animacao = "wave-animation 2s infinite ease-in-out"
                 elif len(valores) >= 2:
-                    if valores[-1] > valores[-2]: status_txt, cor_status = "📈 Maré Enchente", "#2ECC71"
-                    elif valores[-1] < valores[-2]: status_txt, cor_status = "📉 Maré Vazante", "#E74C3C"
+                    if valores[-1] > valores[-2]:
+                        status_mare = "Maré Enchente"; altura_agua = "60%"; animacao = "filling-animation 3s infinite"
+                    elif valores[-1] < valores[-2]:
+                        status_mare = "Maré Vazante"; altura_agua = "35%"; animacao = "draining-animation 3s infinite"
+                elif valores[-1] <= 2: # Pré-Silábico ou Silábico s/ Valor
+                    status_mare = "Maré Baixa"; altura_agua = "20%"
 
-                col_card, col_graf = st.columns([1, 1.2])
+                col_card, col_visual = st.columns([1, 1])
                 
                 with col_card:
                     st.markdown(f"""
-                    <div class="card-detalhe">
+                    <div style="border:1px solid #ddd; padding:20px; border-radius:15px; background:#f9f9f9; color:black;">
                         <h4 style="margin-top:0">Ficha: {al_sel}</h4>
-                        <div style="background-color:{cor_status};" class="status-mare">{status_txt}</div>
-                        <p><b>Nível Atual:</b> <span class="box-nivel" style="background-color:{cor_caixa};">{ultimo_nv}</span></p>
+                        <p><b>Nível Atual:</b> <span style="background:{CORES_EXCLUSIVAS.get(ultimo_nv)}; padding:4px 10px; border-radius:10px; border:1px solid #bbb;">{ultimo_nv}</span></p>
                         <p><b>Evidências:</b><br><small>{dados_h.iloc[-1]['Evidencias'] or 'Nenhum registro'}</small></p>
-                        <p><b>Obs. Pedagógicas:</b><br><i>{dados_h.iloc[-1]['Obs'] or 'Sem observações.'}</i></p>
+                        <p><b>Observações:</b><br><i>{dados_h.iloc[-1]['Obs'] or 'Sem observações.'}</i></p>
+                    </div>""", unsafe_allow_html=True)
+
+                with col_visual:
+                    st.markdown(f"#### 🌊 Nível da Maré: {status_mare}")
+                    
+                    # Estilização da Vasilha e Animações
+                    st.markdown(f"""
+                    <style>
+                        .vasilha {{ width: 150px; height: 100px; border: 4px solid #5D6D7E; border-top: none; 
+                                   border-radius: 0 0 20px 20px; position: relative; overflow: hidden; background: #fff; margin: 10px auto; }}
+                        .agua {{ position: absolute; bottom: 0; width: 100%; background: #5DADE2; height: {altura_agua}; 
+                                animation: {animacao}; opacity: 0.8; border-top: 2px solid #2E86C1; }}
+                        @keyframes wave-animation {{ 0%, 100% {{ transform: translateY(0) scaleY(1); }} 50% {{ transform: translateY(-5px) scaleY(1.05); }} }}
+                        .trilha-box {{ display: flex; flex-direction: column; gap: 8px; margin-top: 15px; font-size: 12px; }}
+                        .trilha-item {{ padding: 5px 10px; border-left: 4px solid #5cc6d0; background: #eee; border-radius: 0 5px 5px 0; }}
+                    </style>
+                    <div class="vasilha"><div class="agua"></div></div>
+                    <div class="trilha-box">
+                        <b>Trilha de Evolução:</b>
+                        {"".join([f'<div class="trilha-item"><b>{row["Avaliacao"]}:</b> {row["Nivel"].split(". ")[1]}</div>' for _, row in dados_h.iterrows()])}
                     </div>
                     """, unsafe_allow_html=True)
-
-                with col_graf:
-                    # Gráfico de Onda (Área Preenchida Spline)
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(
-                        x=list(range(len(valores))), y=valores,
-                        mode='lines+markers',
-                        fill='tozeroy',  # Preenchimento até a base
-                        fillcolor='rgba(143, 217, 251, 0.4)', # Azul maré transparente
-                        line=dict(color='#5cc6d0', width=4, shape='spline'), # Linha suave
-                        marker=dict(size=10, color='#ff81ba', line=dict(width=2, color='white')),
-                        hoverinfo='skip' # Remove popups de dados
-                    ))
-                    fig.update_layout(
-                        yaxis=dict(
-                            range=[0.8, 7.5], tickmode='array', 
-                            tickvals=list(MAPA_NIVEIS.values()), 
-                            ticktext=[n.split(". ")[1] for n in NIVEIS_ALF],
-                            gridcolor='#f0f0f0', fixedrange=True
-                        ),
-                        xaxis=dict(showticklabels=False, showgrid=False, zeroline=False, fixedrange=True),
-                        height=350, margin=dict(l=0, r=20, t=30, b=10),
-                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        showlegend=False
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
             else:
-                st.info("Aguardando registros para este aluno.")
+                st.info("Aguardando registros.")
 
 # --- PRÓXIMO MENU (Certifique-se que o elif abaixo está fora do bloco anterior) ---
 elif menu == "📈 Indicadores pedagógicos":

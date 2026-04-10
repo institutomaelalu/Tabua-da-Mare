@@ -516,10 +516,12 @@ elif menu == "📊 Avaliação da Tábua da Maré":
     
     # Tentativa de leitura com tratamento de erro
     try:
-        from urllib.parse import quote
-        # O quote() é essencial aqui por causa dos acentos em TÁBUA DA MARÉ
-        aba_limpa_mare = quote("TABUA_MARE")
-        df_av = conn.read(spreadsheet=url_planilha, worksheet=aba_limpa_mare).fillna("")
+        url_planilha = "https://docs.google.com/spreadsheets/d/1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4/edit?usp=sharing".strip()
+        
+        # O gsheets_connection lida melhor com acentos se passarmos a string limpa
+        aba_mare = "TABUA_MARE".strip()
+        
+        df_av = conn.read(spreadsheet=url_planilha, worksheet=aba_mare).fillna("")
     except Exception as e:
         st.error(f"Erro ao carregar dados da planilha: {e}")
         st.stop()
@@ -590,12 +592,13 @@ elif menu == "📖 Turno Estendido":
     url_planilha = "https://docs.google.com/spreadsheets/d/1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4/edit?usp=sharing".strip()
     
     try:
-        # O quote() resolve o erro de 'control characters' para nomes com espaço
-        from urllib.parse import quote
-        aba_limpa = quote("TURNO_ESTENDIDO") 
+        # 1. URL pura e sem espaços
+        url_planilha = "https://docs.google.com/spreadsheets/d/1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4/edit?usp=sharing".strip()
         
-        # Leitura da planilha usando a conexão gsheets
-        df_h = conn.read(spreadsheet=url_planilha, worksheet=aba_limpa).fillna("")
+        # 2. Use o nome da aba direto, mas com .strip() para garantir
+        aba_te = "TURNO_ESTENDIDO".strip()
+        
+        df_h = conn.read(spreadsheet=url_planilha, worksheet=aba_te).fillna("")
     except Exception as e:
         st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()

@@ -508,22 +508,32 @@ elif menu == "🤝 Gestão de apadrinhamento":
 
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
-    url_planilha = "https://docs.google.com/spreadsheets/d/1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4/edit?usp=sharing"
-    df_av = conn.read(spreadsheet=url_planilha, worksheet="TÁBUA DA MARÉ").fillna("") 
+    
+    # URL limpa para evitar erros de caracteres invisíveis
+    url_planilha = "https://docs.google.com/spreadsheets/d/1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4/edit?usp=sharing".strip()
+    
+    # Tentativa de leitura com tratamento de erro
+    try:
+        df_av = conn.read(spreadsheet=url_planilha, worksheet="TÁBUA DA MARÉ").fillna("")
+    except Exception as e:
+        st.error(f"Erro ao carregar dados da planilha: {e}")
+        st.stop() # Interrompe a renderização deste menu se não houver conexão
+
     # Renderiza os botões das salas
     render_botoes_salas("btn_aval", "sel_aval")
     
-    # Busca a lista de alunos da sala selecionada (usando sua lógica de session_state)
-    # Nota: Assumi que st.session_state["alunos_te_dict"] contém o mapeamento Geral
+    # Busca a lista de alunos da sala selecionada
     alunos_na_sala = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_aval]
     
     if alunos_na_sala:
         al = st.selectbox("Selecione o Aluno", sorted(alunos_na_sala))
         
+        # Opcional: Busca dados anteriores para facilitar o preenchimento
+        dados_anteriores = df_av[df_av["Aluno"] == al].iloc[-1] if not df_av[df_av["Aluno"] == al].empty else None
+        
         st.markdown("#### ⭐ 10 motivos para avaliar!")
         
         with st.form("f_av_nuvem"):
-            # Período/Semestre
             tr = st.selectbox("Período", ["1º Semestre", "2º Semestre"])
             
             cE, cD = st.columns(2)
@@ -531,19 +541,26 @@ elif menu == "📊 Avaliação da Tábua da Maré":
             
             # Itera sobre as 10 categorias criando os seletores
             for i, cat in enumerate(CATEGORIAS):
-                # Usamos as chaves (texto: Maré Cheia, etc) para respeitar a validação da planilha
+                # Define o index padrão: se já existir nota na planilha, tenta selecionar ela
+                val_anterior = dados_anteriores[cat] if dados_anteriores is not None and cat in dados_anteriores else "Maré Enchente"
+                opcoes = list(MARE_OPCOES.keys())
+                try:
+                    idx_default = opcoes.index(val_anterior)
+                except ValueError:
+                    idx_default = 2 # Maré Enchente ou similar
+                
                 n_l[cat] = (cE if i < 5 else cD).selectbox(
                     cat, 
-                    list(MARE_OPCOES.keys()), 
-                    index=2, # Default em Maré Enchente ou similar
+                    opcoes, 
+                    index=idx_default,
                     key=f"mare_s_{i}"
                 )
             
-            obs = st.text_area("Observações pedagógicas:")
+            obs_anterior = dados_anteriores["Observações pedagógicas"] if dados_anteriores is not None else ""
+            obs = st.text_area("Observações pedagógicas:", value=obs_anterior)
             
             if st.form_submit_button("🚀 Enviar para Tábua da Maré"):
-                # Chamada da função de escrita que definimos no topo
-                # Enviamos n_l diretamente porque ele já contém os textos validados
+                # Chamada da função de escrita que definimos no topo (VLOOKUP reverso)
                 sucesso = registrar_tabua_mare(
                     aluno=al,
                     sala=st.session_state.sel_aval,
@@ -555,7 +572,7 @@ elif menu == "📊 Avaliação da Tábua da Maré":
                 if sucesso:
                     st.balloons()
                     st.success(f"Avaliação de {al} sincronizada com sucesso!")
-                    st.cache_data.clear() # Limpa o cache para atualizar gráficos de radar/vasilhas
+                    st.cache_data.clear() 
                     st.rerun()
     else:
         st.warning("Nenhum aluno encontrado para esta sala.")
@@ -564,9 +581,11 @@ elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
     
     # --- 1. LEITURA DE DADOS DA NUVEM (Google Sheets) ---
+    url_planilha = "https://docs.google.com/spreadsheets/d/1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4/edit?usp=sharing".strip()
+    
     try:
-        url_planilha = "https://docs.google.com/spreadsheets/d/1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4/edit?usp=sharing"
-        df_av = conn.read(spreadsheet=url_planilha, worksheet="TURNO ESTENDIDO").fillna("")
+        # Lendo da aba correta e padronizando o nome da variável para df_h
+        df_h = conn.read(spreadsheet=url_planilha, worksheet="TURNO ESTENDIDO").fillna("")
     except Exception as e:
         st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()
@@ -615,6 +634,7 @@ elif menu == "📖 Turno Estendido":
     st.markdown("---")
 
     # --- SELEÇÃO DE ALUNO ---
+    # Usando o dicionário de alunos para filtrar por sala
     salas_te = sorted(list(set(st.session_state["alunos_te_dict"].values())))
     if salas_te:
         if st.session_state.sel_te not in salas_te: st.session_state.sel_te = salas_te[0]
@@ -628,7 +648,6 @@ elif menu == "📖 Turno Estendido":
         diag = dados_aluno.iloc[-1] if not dados_aluno.empty else None
         
         # --- TRILHA VISUAL ---
-        # (O CSS que você já tem permanece aqui para o visual)
         st.markdown("""<style>
             .trilha-container { display: flex; align-items: center; justify-content: center; gap: 0px; margin: 10px 0; padding: 5px 0; overflow-x: auto; }
             .caixa-trilha-ajustada { padding: 6px 4px; border-radius: 10px; text-align: center; font-size: 11px; font-weight: bold; min-width: 110px; height: 55px; display: flex; align-items: center; justify-content: center; line-height: 1.1; box-shadow: 1px 1px 3px rgba(0,0,0,0.05); flex-shrink: 0; }
@@ -651,7 +670,12 @@ elif menu == "📖 Turno Estendido":
         st.markdown(ht + '</div>', unsafe_allow_html=True)
 
         # --- FORMULÁRIO DE SALVAMENTO PARA GOOGLE SHEETS ---
-        idx_inicial = NIVEIS_ALF.index(diag["Diagnóstico"]) if (diag is not None and diag["Diagnóstico"] in NIVEIS_ALF) else 0
+        # Tenta achar o index do diagnóstico atual para já vir selecionado
+        try:
+            idx_inicial = NIVEIS_ALF.index(diag["Diagnóstico"]) if (diag is not None and diag["Diagnóstico"] in NIVEIS_ALF) else 0
+        except:
+            idx_inicial = 0
+            
         nV = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_inicial)
 
         with st.form("f_alf_nuvem"):
@@ -668,14 +692,12 @@ elif menu == "📖 Turno Estendido":
             obs = st.text_area("Observações Adicionais:")
             
             if st.form_submit_button("🚀 Salvar na Planilha Google"):
-                # Mapeia para os nomes das colunas da sua planilha
                 tipo_map = {
                     "1ª Avaliação": "1 Avaliação",
                     "2ª Avaliação": "2 Avaliação",
                     "Avaliação Final": "3 Avaliação"
                 }
                 
-                # Chama a função de escrita que definimos no topo
                 sucesso = registrar_turno_estendido(
                     aluno=al,
                     sala=st.session_state.sel_te,
@@ -688,7 +710,7 @@ elif menu == "📖 Turno Estendido":
                 
                 if sucesso:
                     st.success("Dados sincronizados com sucesso!")
-                    st.cache_data.clear() # Força a releitura da planilha
+                    st.cache_data.clear() 
                     st.rerun()
 # --- ABA: DADOS - TURNO ESTENDIDO (ATUALIZADO COM CORES E LEGENDA) ---
 elif menu == "📊 Dados - Turno Estendido":

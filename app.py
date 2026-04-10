@@ -508,8 +508,8 @@ elif menu == "🤝 Gestão de apadrinhamento":
 
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
-   url_planilha = "https://docs.google.com/spreadsheets/d/1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4/edit?usp=sharing"
-df_av = conn.read(spreadsheet=url_planilha, worksheet="TÁBUA DA MARÉ").fillna("") 
+    url_planilha = "https://docs.google.com/spreadsheets/d/1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4/edit?usp=sharing"
+    df_av = conn.read(spreadsheet=url_planilha, worksheet="TÁBUA DA MARÉ").fillna("") 
     # Renderiza os botões das salas
     render_botoes_salas("btn_aval", "sel_aval")
     
@@ -565,8 +565,8 @@ elif menu == "📖 Turno Estendido":
     
     # --- 1. LEITURA DE DADOS DA NUVEM (Google Sheets) ---
     try:
-        url_planilha = "https://docs.google.com/spreadsheets/d/1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4/edit?usp=sharing"
-df_av = conn.read(spreadsheet=url_planilha, worksheet="TURNO ESTENDIDO").fillna("")
+    url_planilha = "https://docs.google.com/spreadsheets/d/1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4/edit?usp=sharing"
+    df_av = conn.read(spreadsheet=url_planilha, worksheet="TURNO ESTENDIDO").fillna("")
     except Exception as e:
         st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()

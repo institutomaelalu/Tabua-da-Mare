@@ -312,12 +312,12 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
-# --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO SUAVE E COMPLETA) ---
+# --- ABA: DADOS - TURNO ESTENDIDO (ESTILO ONDA DO MAR) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
     df_h = pd.read_csv(ALF_FILE)
     
-    # Mapeamento numérico e Cores exclusivas
+    # Mapeamentos e Cores
     MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
     CORES_EXCLUSIVAS = {
         "1. Pré-Silábico": "#E8E8E8", "2. Silábico s/ Valor": "#D1F2EB",
@@ -326,7 +326,7 @@ elif menu == "📊 Dados - Turno Estendido":
         "7. Alfabético Ortográfico": "#D6EAF8"
     }
 
-    # RESTAURAÇÃO: Legenda da Trilha no topo
+    # Legenda da Trilha (7 níveis)
     cols_leg = st.columns(len(NIVEIS_ALF))
     for idx, niv in enumerate(NIVEIS_ALF):
         cols_leg[idx].markdown(f"""
@@ -382,7 +382,7 @@ elif menu == "📊 Dados - Turno Estendido":
                 ultimo_nv = dados_h['Nivel'].iloc[-1]
                 cor_caixa = CORES_EXCLUSIVAS.get(ultimo_nv, "#eee")
                 
-                # Lógica de Status da Maré
+                # Lógica de Status
                 status_txt, cor_status = "Maré Estável", "#808080"
                 if ultimo_nv == "7. Alfabético Ortográfico":
                     status_txt, cor_status = "🌊 Maré Cheia", "#2E86C1"
@@ -404,26 +404,28 @@ elif menu == "📊 Dados - Turno Estendido":
                     """, unsafe_allow_html=True)
 
                 with col_graf:
-                    # Gráfico Suave (Spline) sem Eixo X
+                    # Gráfico de Onda (Área Preenchida Spline)
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(
                         x=list(range(len(valores))), y=valores,
-                        mode='lines+markers+text',
-                        text=[n.split(". ")[1] for n in dados_h['Nivel']],
-                        textposition="top center",
-                        line=dict(color='#5cc6d0', width=5, shape='spline'), # SHAPE SPLINE para suavizar
-                        marker=dict(size=14, color='#ff81ba', line=dict(width=2, color='white'))
+                        mode='lines+markers',
+                        fill='tozeroy',  # Preenchimento até a base
+                        fillcolor='rgba(143, 217, 251, 0.4)', # Azul maré transparente
+                        line=dict(color='#5cc6d0', width=4, shape='spline'), # Linha suave
+                        marker=dict(size=10, color='#ff81ba', line=dict(width=2, color='white')),
+                        hoverinfo='skip' # Remove popups de dados
                     ))
                     fig.update_layout(
                         yaxis=dict(
-                            range=[0.5, 7.5], tickmode='array', 
+                            range=[0.8, 7.5], tickmode='array', 
                             tickvals=list(MAPA_NIVEIS.values()), 
                             ticktext=[n.split(". ")[1] for n in NIVEIS_ALF],
-                            gridcolor='#f0f0f0'
+                            gridcolor='#f0f0f0', fixedrange=True
                         ),
-                        xaxis=dict(showticklabels=False, showgrid=False, zeroline=False), # REMOVE EIXO X
-                        height=350, margin=dict(l=0, r=0, t=20, b=20),
-                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+                        xaxis=dict(showticklabels=False, showgrid=False, zeroline=False, fixedrange=True),
+                        height=350, margin=dict(l=0, r=20, t=30, b=10),
+                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                        showlegend=False
                     )
                     st.plotly_chart(fig, use_container_width=True)
             else:

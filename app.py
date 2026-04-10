@@ -666,6 +666,7 @@ elif menu == "📈 Indicadores pedagógicos":
 elif menu == "🌊 Canal do Apadrinhamento":
     st.markdown(f"### 🤝 Canal do Apadrinhamento")
     
+    # Carregamento de dados
     df_total = pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
     
     # Lógica de Login/Simulação
@@ -677,24 +678,27 @@ elif menu == "🌊 Canal do Apadrinhamento":
             lista_nomes = sorted([str(n).replace("**", "").strip() for n in afils["ALUNO"].unique()])
             al_af = st.selectbox("Selecione seu afilhado:", lista_nomes)
             
-            # 1. Verifica se participa do Turno Estendido
+            # Identifica se é do Turno Estendido
             is_turno = al_af in st.session_state.get("alunos_te_dict", {})
-            
-            # Inicializa a variável modo para evitar NameError
-            modo = "🌊 Tábua da Maré (Geral)" 
-            
+            modo = "🌊 Tábua da Maré (Geral)" # Valor padrão
+
             if is_turno:
-                st.markdown(f"""<div style="background-color: #f3e5f5; padding: 15px; border-radius: 10px; border-left: 5px solid #6741d9; margin-bottom: 20px; color: black;">
-                    ✨ <b>O seu afilhado, {al_af}, participa do nosso Turno Estendido!</b></div>""", unsafe_allow_html=True)
+                # MENSAGEM COMPLEMENTADA CONFORME SOLICITADO
+                st.markdown(f"""
+                <div style="background-color: #f3e5f5; padding: 20px; border-radius: 12px; border-left: 5px solid #6741d9; margin-bottom: 20px; color: black;">
+                    <span style="font-size: 18px;">✨ <b>O seu afilhado, {al_af}, participa do nosso Turno Estendido!</b></span><br>
+                    <p style="margin-top: 10px; line-height: 1.5;">Essa é uma ação do nosso Projeto <b>"Vamos Dar a Meia Volta e Alfabetizar"</b>, 
+                    voltado para a intensificação do processo de desenvolvimento das habilidades de leitura e escrita das nossas crianças.</p>
+                </div>""", unsafe_allow_html=True)
+                
                 modo = st.radio("O que deseja visualizar?", ["🌊 Tábua da Maré (Geral)", "📚 Turno Estendido"], horizontal=True)
 
             st.markdown("---")
 
-            # --- VISUALIZAÇÃO GERAL (10 CRITÉRIOS) ---
             if modo == "🌊 Tábua da Maré (Geral)":
+                # ... (Lógica da Tábua da Maré Geral mantida igual) ...
                 df_av = pd.read_csv(AVAL_FILE)
                 dados_mare = df_av[df_av["Aluno"] == al_af]
-                
                 if not dados_mare.empty:
                     r_mare = dados_mare.iloc[-1]
                     st.markdown("##### 📋 Desenvolvimento Socioemocional (Vasilhas por Critério)")
@@ -702,21 +706,55 @@ elif menu == "🌊 Canal do Apadrinhamento":
                     for i, cat in enumerate(CATEGORIAS):
                         m_cols[i % 5].markdown(render_vasilha_mare(r_mare[cat], cat), unsafe_allow_html=True)
                 else:
-                    st.warning("Avaliação da Tábua da Maré ainda não disponível.")
+                    st.warning("Avaliação comportamental ainda não disponível.")
 
-            # --- VISUALIZAÇÃO TURNO ESTENDIDO (TRILHA + STATUS MARÉ) ---
             elif modo == "📚 Turno Estendido":
                 df_h = pd.read_csv(ALF_FILE).fillna("")
-                # Filtra e remove duplicados (mesma avaliação no mesmo ano)
                 dados_al = df_h[df_h["Aluno"] == al_af].sort_values(["Ano", "Avaliacao"])
                 dados_al = dados_al.drop_duplicates(subset=['Avaliacao', 'Ano'], keep='last')
                 
                 if not dados_al.empty:
                     u_nv = dados_al['Nivel'].iloc[-1]
-                    c_inf, c_mare = st.columns([1, 1])
                     
+                    # --- NOVO: TRILHA VISUAL DE EVOLUÇÃO (BOTÕES COM SETAS) ---
+                    st.markdown("##### 🚀 Jornada de Alfabetização")
+                    
+                    # CSS para a trilha ficar elegante no Canal do Padrinho
+                    st.markdown("""
+                        <style>
+                        .trilha-padrinho { display: flex; align-items: center; justify-content: center; gap: 5px; margin: 20px 0; overflow-x: auto; padding: 10px; }
+                        .nivel-box { 
+                            min-width: 90px; padding: 10px 5px; border-radius: 10px; text-align: center; 
+                            font-size: 9px; font-weight: bold; border: 2px solid transparent; line-height: 1.1;
+                        }
+                        .seta-padrinho { color: #6741d9; font-weight: bold; font-size: 20px; }
+                        </style>
+                    """, unsafe_allow_html=True)
+
+                    html_trilha = '<div class="trilha-padrinho">'
+                    for i, nivel_ref in enumerate(NIVEIS_ALF):
+                        # Verifica se o aluno já passou ou está neste nível
+                        alcançado = any(MAPA_NIVEIS.get(r['Nivel'], 0) >= MAPA_NIVEIS.get(nivel_ref, 0) for _, r in dados_al.iterrows())
+                        atv = (u_nv == nivel_ref)
+                        
+                        cor_fundo = CORES_TRILHA[nivel_ref]["ativo"] if alcançado else "#f0f0f0"
+                        cor_borda = "#6741d9" if atv else "transparent"
+                        cor_texto = "black"
+                        opacidade = "1" if alcançado else "0.5"
+
+                        html_trilha += f'''
+                            <div class="nivel-box" style="background-color: {cor_fundo}; border-color: {cor_borda}; opacity: {opacidade}; color: {cor_texto};">
+                                {nivel_ref.split(". ")[1]}
+                            </div>
+                        '''
+                        if i < len(NIVEIS_ALF) - 1:
+                            html_trilha += '<span class="seta-padrinho">→</span>'
+                    
+                    st.markdown(html_trilha + '</div>', unsafe_allow_html=True)
+
+                    # --- INFO E STATUS DA MARÉ ---
+                    c_inf, c_mare = st.columns([1, 1])
                     with c_inf:
-                        # Card lateral de informações
                         st.markdown(f"""
                         <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black; min-height: 200px;">
                             <h4 style="margin:0;">{al_af}</h4>
@@ -724,11 +762,10 @@ elif menu == "🌊 Canal do Apadrinhamento":
                                <span style="background:{CORES_EXCLUSIVAS.get(u_nv, '#ddd')}; padding:4px 10px; border-radius:8px; font-weight:bold; color:black;">
                                {u_nv}</span>
                             </p>
-                            <p><b>Evidências:</b><br><small>{dados_al.iloc[-1]['Evidencias']}</small></p>
+                            <p><b>Evidências de progresso:</b><br><small>{dados_al.iloc[-1]['Evidencias'] if dados_al.iloc[-1]['Evidencias'] else 'Em desenvolvimento...'}</small></p>
                         </div>""", unsafe_allow_html=True)
                     
                     with c_mare:
-                        # Vasilha de Status da Maré (Alfabetização)
                         st.markdown("<h5 style='text-align:center;'>🌊 Status da Maré</h5>", unsafe_allow_html=True)
                         vols = [MAPA_NIVEIS.get(n, 0) for n in dados_al['Nivel']]
                         pct_g, s_txt = 85, "Maré Baixa"
@@ -745,15 +782,11 @@ elif menu == "🌊 Canal do Apadrinhamento":
                                 <b style="color:#1A5276; margin-top:10px; font-size:16px;">{s_txt}</b>
                             </div>""", unsafe_allow_html=True)
 
-                    st.markdown("---")
-                    st.write("**📍 Trilha de Evolução (Alfabetização)**")
-                    for _, r in dados_al.iterrows():
-                        txt_av = r["Avaliacao"].replace("Avaliação Final", "3ª Avaliação")
-                        st.markdown(f"""
-                        <div style="display:flex; justify-content:space-between; font-size:13px; padding:8px; border-bottom:1px dashed #eee; background:white; color:black;">
-                            <span>📅 {txt_av} / {r['Ano']}</span>
-                            <b style="color:#6741d9;">{r['Nivel'].split(". ")[1] if '.' in r['Nivel'] else r['Nivel']}</b>
-                        </div>""", unsafe_allow_html=True)
+                    # Histórico em texto abaixo
+                    with st.expander("📂 Ver histórico detalhado"):
+                        for _, r in dados_al.iterrows():
+                            txt_av = r["Avaliacao"].replace("Avaliação Final", "3ª Avaliação")
+                            st.markdown(f"📅 **{txt_av}/{r['Ano']}**: {r['Nivel']}")
                 else:
                     st.info("Ainda não há registros de alfabetização para este afilhado.")
 

@@ -312,14 +312,13 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
-# --- NOVA ABA: DADOS - TURNO ESTENDIDO (VERSÃO COM GRÁFICO DE MARÉ) ---
+# --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO SUAVE E COMPLETA) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
     df_h = pd.read_csv(ALF_FILE)
     
-    # Mapeamento numérico para o gráfico de maré
+    # Mapeamento numérico e Cores exclusivas
     MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
-    
     CORES_EXCLUSIVAS = {
         "1. Pré-Silábico": "#E8E8E8", "2. Silábico s/ Valor": "#D1F2EB",
         "3. Silábico c/ Valor": "#FCF3CF", "4. Silábico Alfabético": "#D5F5E3",
@@ -327,12 +326,22 @@ elif menu == "📊 Dados - Turno Estendido":
         "7. Alfabético Ortográfico": "#D6EAF8"
     }
 
-    # Tabela Principal (Mantida intacta)
+    # RESTAURAÇÃO: Legenda da Trilha no topo
+    cols_leg = st.columns(len(NIVEIS_ALF))
+    for idx, niv in enumerate(NIVEIS_ALF):
+        cols_leg[idx].markdown(f"""
+            <div style='background-color:{CORES_EXCLUSIVAS[niv]}; padding:10px; border-radius:10px; 
+            text-align:center; font-size:9px; font-weight:bold; color:black; border: 1px solid #ccc;'>
+                {niv.split('. ')[1]}
+            </div>""", unsafe_allow_html=True)
+
+    # Tabela Principal
     html = """
     <style>
         .cell-diag { text-align: center; font-weight: bold; font-size: 11px; color: black !important; }
         .card-detalhe { border: 1px solid #ddd; padding: 20px; border-radius: 15px; background-color: #f9f9f9; margin-top: 20px; color: black; }
-        .status-mare { font-weight: bold; font-size: 16px; padding: 5px 15px; border-radius: 20px; color: white; }
+        .status-mare { font-weight: bold; font-size: 16px; padding: 5px 15px; border-radius: 20px; color: white; margin-bottom: 10px; display: inline-block; }
+        .box-nivel { padding: 5px 12px; border-radius: 12px; border: 1px solid #bbb; font-weight: bold; color: black; }
     </style>
     <table class="custom-table">
         <thead style="background-color:#5cc6d0">
@@ -369,52 +378,51 @@ elif menu == "📊 Dados - Turno Estendido":
         if al_sel:
             dados_h = df_h[df_h["Aluno"] == al_sel].copy()
             if not dados_h.empty:
-                # Lógica da Maré
                 valores = [MAPA_NIVEIS.get(n, 0) for n in dados_h['Nivel']]
                 ultimo_nv = dados_h['Nivel'].iloc[-1]
+                cor_caixa = CORES_EXCLUSIVAS.get(ultimo_nv, "#eee")
                 
-                status_txt = "Maré Estável"
-                cor_status = "#808080"
-
+                # Lógica de Status da Maré
+                status_txt, cor_status = "Maré Estável", "#808080"
                 if ultimo_nv == "7. Alfabético Ortográfico":
-                    status_txt = "🌊 Maré Cheia"
-                    cor_status = "#2E86C1"
+                    status_txt, cor_status = "🌊 Maré Cheia", "#2E86C1"
                 elif len(valores) >= 2:
-                    if valores[-1] > valores[-2]:
-                        status_txt = "📈 Maré Enchente (Evolução)"
-                        cor_status = "#2ECC71"
-                    elif valores[-1] < valores[-2]:
-                        status_txt = "📉 Maré Vazante (Involução)"
-                        cor_status = "#E74C3C"
+                    if valores[-1] > valores[-2]: status_txt, cor_status = "📈 Maré Enchente", "#2ECC71"
+                    elif valores[-1] < valores[-2]: status_txt, cor_status = "📉 Maré Vazante", "#E74C3C"
 
-                col_card, col_graf = st.columns([1, 1])
+                col_card, col_graf = st.columns([1, 1.2])
                 
                 with col_card:
                     st.markdown(f"""
                     <div class="card-detalhe">
                         <h4 style="margin-top:0">Ficha: {al_sel}</h4>
                         <div style="background-color:{cor_status};" class="status-mare">{status_txt}</div>
-                        <p style="margin-top:15px"><b>Nível Atual:</b> {ultimo_nv}</p>
+                        <p><b>Nível Atual:</b> <span class="box-nivel" style="background-color:{cor_caixa};">{ultimo_nv}</span></p>
                         <p><b>Evidências:</b><br><small>{dados_h.iloc[-1]['Evidencias'] or 'Nenhum registro'}</small></p>
                         <p><b>Obs. Pedagógicas:</b><br><i>{dados_h.iloc[-1]['Obs'] or 'Sem observações.'}</i></p>
                     </div>
                     """, unsafe_allow_html=True)
 
                 with col_graf:
-                    # Gráfico de Movimento da Maré (Igual à Tábua da Maré)
+                    # Gráfico Suave (Spline) sem Eixo X
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(
-                        x=dados_h['Avaliacao'], y=valores,
+                        x=list(range(len(valores))), y=valores,
                         mode='lines+markers+text',
                         text=[n.split(". ")[1] for n in dados_h['Nivel']],
                         textposition="top center",
-                        line=dict(color='#5cc6d0', width=4),
-                        marker=dict(size=12, color='#ff81ba', line=dict(width=2, color='white'))
+                        line=dict(color='#5cc6d0', width=5, shape='spline'), # SHAPE SPLINE para suavizar
+                        marker=dict(size=14, color='#ff81ba', line=dict(width=2, color='white'))
                     ))
                     fig.update_layout(
-                        title="Movimento da Maré Pedagógica",
-                        yaxis=dict(range=[0.5, 7.5], tickmode='array', tickvals=list(MAPA_NIVEIS.values()), ticktext=[n.split(". ")[1] for n in NIVEIS_ALF]),
-                        height=300, margin=dict(l=0, r=0, t=40, b=0),
+                        yaxis=dict(
+                            range=[0.5, 7.5], tickmode='array', 
+                            tickvals=list(MAPA_NIVEIS.values()), 
+                            ticktext=[n.split(". ")[1] for n in NIVEIS_ALF],
+                            gridcolor='#f0f0f0'
+                        ),
+                        xaxis=dict(showticklabels=False, showgrid=False, zeroline=False), # REMOVE EIXO X
+                        height=350, margin=dict(l=0, r=0, t=20, b=20),
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
                     )
                     st.plotly_chart(fig, use_container_width=True)

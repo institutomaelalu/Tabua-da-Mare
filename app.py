@@ -771,16 +771,18 @@ elif menu == "🌊 Canal do Apadrinhamento":
                         </div>
                     """, unsafe_allow_html=True)
 
-                with col_grafico:
+with col_grafico:
                     df_av = pd.read_csv(AVAL_FILE)
                     dados_mare = df_av[df_av["Aluno"] == al_af]
                     
                     if not dados_mare.empty:
                         r_mare = dados_mare.iloc[-1]
                         
-                        # Vasilhas alinhadas
-                        m_cols = st.columns(5)
+                        # Definimos o número de colunas (5)
+                        n_cols = 5
+                        m_cols = st.columns(n_cols)
                         valores_grafico = []
+                        
                         for i, cat in enumerate(CATEGORIAS):
                             val = r_mare[cat]
                             valores_grafico.append(val)
@@ -788,7 +790,9 @@ elif menu == "🌊 Canal do Apadrinhamento":
                             html_v = render_vasilha_mare(val, cat)
                             html_v_limpo = html_v.split('<span style="position: absolute;')[0] + '</div></div>'
                             
-                            with m_cols[i]:
+                            # O operador % garante que se i for 5, ele volte para a coluna 0
+                            # evitando o IndexError
+                            with m_cols[i % n_cols]:
                                 st.markdown(f"""
                                     <div style="text-align: center;">
                                         {html_v_limpo}
@@ -801,13 +805,13 @@ elif menu == "🌊 Canal do Apadrinhamento":
                         # Gráfico ampliado horizontalmente
                         fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
                         fig_espelho.update_layout(
-                            height=300, # Altura controlada para evitar scroll
-                            margin=dict(l=20, r=20, t=30, b=20),
+                            height=350, # Aumentado levemente para preencher sem scroll
+                            margin=dict(l=10, r=10, t=30, b=10),
                             paper_bgcolor='rgba(0,0,0,0)',
-                            plot_bgcolor='rgba(0,0,0,0)'
+                            plot_bgcolor='rgba(0,0,0,0)',
+                            autosize=True # Força o preenchimento do container
                         )
-                        st.plotly_chart(fig_espelho, use_container_width=True)
-                    else:
+                        st.plotly_chart(fig_espelho, use_container_width=True)                    else:
                         st.warning("Avaliação comportamental ainda não disponível.")
 
             # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---

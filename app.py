@@ -312,8 +312,25 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
-# --- ABA: DADOS - TURNO ESTENDIDO (RESTAURAÇÃO COMPLETA + TÍTULOS PRETOS) ---
+# --- ABA: DADOS - TURNO ESTENDIDO (FIX TOTAL DE CSS E RESTAURAÇÃO) ---
 elif menu == "📊 Dados - Turno Estendido":
+    # CSS GLOBAL PARA FORÇAR CABEÇALHOS EM PRETO
+    st.markdown("""
+        <style>
+            /* Alvos: Títulos de tabelas, labels de colunas e textos de cabeçalho */
+            thead tr th, .stMarkdown th, th {
+                color: #000000 !important;
+                -webkit-text-fill-color: #000000 !important;
+                font-weight: bold !important;
+            }
+            /* Garante que o texto dentro da nossa tabela customizada não seja afetado por temas dark/light do Streamlit */
+            .custom-table th {
+                color: black !important;
+                background-color: #f8f9fa !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
     st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
     
     df_h = pd.read_csv(ALF_FILE)
@@ -340,29 +357,15 @@ elif menu == "📊 Dados - Turno Estendido":
             unsafe_allow_html=True
         )
 
-    # Tabela com Títulos em PRETO ABSOLUTO
+    # Tabela com Títulos em PRETO (Injetando a classe custom-table)
     html_tab = """
-    <style>
-        /* Seletor de altíssima especificidade para forçar a cor preta nos títulos */
-        .main div[data-testid="stMarkdownContainer"] table.custom-table thead tr th { 
-            color: #000000 !important; 
-            -webkit-text-fill-color: #000000 !important;
-            background-color: #f8f9fa !important;
-            font-weight: 900 !important;
-            text-transform: none !important;
-            letter-spacing: normal !important;
-        }
-        .custom-table { width: 100%; border-collapse: collapse; margin: 20px 0; background-color: white; border: 1px solid #ddd; }
-        .custom-table td { padding: 10px; border: 1px solid #ddd; color: black !important; }
-        .cell-diag { text-align: center; font-weight: bold; font-size: 11px; color: black !important; }
-    </style>
-    <table class="custom-table">
+    <table class="custom-table" style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: white; border: 1px solid #ddd;">
         <thead>
             <tr>
-                <th>Nome do Aluno</th>
-                <th>1ª Sondagem</th>
-                <th>2ª Sondagem</th>
-                <th>3ª Sondagem</th>
+                <th style="color: black !important; padding: 12px; border: 1px solid #ddd; background: #f8f9fa;">Nome do Aluno</th>
+                <th style="color: black !important; padding: 12px; border: 1px solid #ddd; background: #f8f9fa;">1ª Sondagem</th>
+                <th style="color: black !important; padding: 12px; border: 1px solid #ddd; background: #f8f9fa;">2ª Sondagem</th>
+                <th style="color: black !important; padding: 12px; border: 1px solid #ddd; background: #f8f9fa;">3ª Sondagem</th>
             </tr>
         </thead>
         <tbody>"""
@@ -371,21 +374,21 @@ elif menu == "📊 Dados - Turno Estendido":
     
     for al in alunos_te:
         dados_al = df_h[df_h["Aluno"] == al]
-        html_tab += f'<tr><td style="font-weight:bold; color:black !important;">{al}</td>'
+        html_tab += f'<tr><td style="font-weight:bold; color:black; padding: 10px; border: 1px solid #ddd;">{al}</td>'
         for etapa in ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"]:
             row = dados_al[dados_al["Avaliacao"] == etapa]
             if not row.empty:
                 nv = row["Nivel"].iloc[0]
                 cor = CORES_EXCLUSIVAS.get(nv, "#eee")
-                html_tab += f'<td style="background-color:{cor};"><div class="cell-diag">{nv.split(". ")[1]}</div></td>'
+                html_tab += f'<td style="background-color:{cor}; border: 1px solid #ddd; text-align: center; font-weight: bold; color: black;">{nv.split(". ")[1]}</td>'
             else:
-                html_tab += '<td></td>'
+                html_tab += '<td style="border: 1px solid #ddd;"></td>'
         html_tab += '</tr>'
     
     st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)
     st.markdown("---")
 
-    # SEÇÃO: DETALHES INDIVIDUAIS (RESTAURADO)
+    # SEÇÃO: DETALHES INDIVIDUAIS (RESTAURAÇÃO COMPLETA)
     salas_ativas = sorted(list(set(st.session_state["alunos_te_dict"].values())))
     if salas_ativas:
         if "sel_te_dados" not in st.session_state: st.session_state.sel_te_dados = salas_ativas[0]
@@ -400,7 +403,7 @@ elif menu == "📊 Dados - Turno Estendido":
                 valores = [MAPA_NIVEIS.get(n, 0) for n in dados_h['Nivel']]
                 ultimo_nv = dados_h['Nivel'].iloc[-1]
                 
-                # Lógica da Maré
+                # Lógica da Maré (0 é topo, 100 é fundo)
                 status_mare, pct = "Maré Baixa", 85
                 if ultimo_nv == "7. Alfabético Ortográfico": status_mare, pct = "Maré Cheia", 15
                 elif len(valores) >= 2:
@@ -428,14 +431,10 @@ elif menu == "📊 Dados - Turno Estendido":
                 with col_visual:
                     st.markdown(f"#### 🌊 Status: {status_mare}")
                     st.markdown(f"""
-                    <style>
-                        .vasilha-final {{ 
-                            width: 260px; height: 140px; margin: auto; 
-                            background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%);
-                            clip-path: path('M 0 30 Q 65 10 130 30 T 260 30 L 260 110 Q 260 140 230 140 L 30 140 Q 0 140 0 110 Z');
-                        }}
-                    </style>
-                    <div class="vasilha-final"></div>
+                    <div style="width: 260px; height: 140px; margin: auto; 
+                                background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%);
+                                clip-path: path('M 0 30 Q 65 10 130 30 T 260 30 L 260 110 Q 260 140 230 140 L 30 140 Q 0 140 0 110 Z');">
+                    </div>
                     <div style="margin-top:20px; font-size:13px; color:black; background:#fff; padding:10px; border-radius:10px; border:1px solid #eee;">
                         <b style="color:#2E86C1;">📍 Trilha de Evolução:</b><br>
                         {"".join([f'<div style="padding:5px; border-bottom:1px dashed #eee; display:flex; justify-content:space-between;"><span>{row["Avaliacao"]}</span><b style="color:#333;">{row["Nivel"].split(". ")[1]}</b></div>' for _, row in dados_h.iterrows()])}

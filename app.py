@@ -30,23 +30,35 @@ def registrar_turno_estendido(aluno, nivel, evidencias, sala):
         st.error(f"Erro ao salvar Turno Estendido: {e}")
         return False
 
-def registrar_tabua_mare(aluno, notas_dict, observacoes=""):
-    """Adiciona registro na aba 'Tábua da maré'"""
+def registrar_tabua_mare(aluno, sala, semestre, notas_dict, obs):
     try:
-        df_atual = conn.read(worksheet="Tábua da maré")
-        registro = {
-            "Aluno": aluno,
-            "Data": datetime.now().strftime("%d/%m/%Y"),
-            "Observacoes": observacoes
-        }
-        registro.update(notas_dict)
-        nova_linha = pd.DataFrame([registro])
-        df_final = pd.concat([df_atual, nova_linha], ignore_index=True)
-        conn.update(worksheet="Tábua da maré", data=df_final)
+        # 1. Lê a aba completa
+        df_atual = conn.read(worksheet="TÁBUA DA MARÉ")
+        
+        # 2. Verifica se o aluno já existe para aquele semestre
+        # Isso evita duplicar o nome se ele já estiver pré-cadastrado
+        mask = (df_atual["Aluno"] == aluno) & (df_atual["Semeste"] == semestre)
+        
+        if mask.any():
+            # ATUALIZAÇÃO: Se o aluno existe, preenche as notas na linha dele
+            idx = df_atual.index[mask][0]
+            for col, valor in notas_dict.items():
+                df_atual.at[idx, col] = valor
+            df_atual.at[idx, "Observações pedagógicas"] = obs
+            df_atual.at[idx, "Sala"] = sala # Garante que a sala esteja certa
+        else:
+            # INSERÇÃO: Se não existir (ex: novo semestre), cria nova linha
+            registro = {"Aluno": aluno, "Sala": sala, "Semeste": semestre, "Observações pedagógicas": obs}
+            registro.update(notas_dict)
+            df_final_row = pd.DataFrame([registro])
+            df_atual = pd.concat([df_atual, df_final_row], ignore_index=True)
+        
+        # 3. Envia a planilha atualizada de volta
+        conn.update(worksheet="TÁBUA DA MARÉ", data=df_atual)
         st.cache_data.clear()
         return True
     except Exception as e:
-        st.error(f"Erro ao salvar Tábua da Maré: {e}")
+        st.error(f"Erro ao sincronizar Tábua da Maré: {e}")
         return False
 
 # --- 1. DEFINIÇÕES DE NÍVEIS E CORES PASTÉIS ---
@@ -69,7 +81,54 @@ CORES_EXCLUSIVAS = {
 # Função de cor de texto automática para contraste
 def get_text_color(nivel=None):
     return "#2C3E50" # Texto escuro para melhor leitura nos tons pastéis
+    # --- 2. CONEXÃO E FUNÇÕES DE ESCRITA ---
+conn = st.connection("gsheets", type=GSheetsConnection)
 
+def registrar_turno_estendido(aluno, sala, avaliacao_tipo, nivel, evidencias_list, obs, ano=2026):
+    try:
+        df_atual = conn.read(worksheet="TURNO ESTENDIDO")
+        evidencias_str = "; ".join(evidencias_list)
+        
+        # Cria o dicionário garantindo que as chaves batam com as colunas da sua planilha
+        novo_registro = {
+            "Aluno": aluno,
+            "Sala": sala,
+            "1 Avaliação": nivel if avaliacao_tipo == "1 Avaliação" else "",
+            "2 Avaliação": nivel if avaliacao_tipo == "2 Avaliação" else "",
+            "3 Avaliação": nivel if avaliacao_tipo == "3 Avaliação" else "",
+            "Ano": ano,
+            "Diagnóstico": nivel,
+            "Evidências": evidencias_str,
+            "Observações pedagócias": obs
+        }
+        
+        df_final = pd.concat([df_atual, pd.DataFrame([novo_registro])], ignore_index=True)
+        conn.update(worksheet="TURNO ESTENDIDO", data=df_final)
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar Turno Estendido: {e}")
+        return False
+
+def registrar_tabua_mare(aluno, sala, semestre, notas_dict, obs):
+    try:
+        df_atual = conn.read(worksheet="TÁBUA DA MARÉ")
+        registro = {
+            "Aluno": aluno,
+            "Sala": sala,
+            "Semeste": semestre,
+            "Observações pedagógicas": obs
+        }
+        registro.update(notas_dict)
+        
+        df_final = pd.concat([df_atual, pd.DataFrame([registro])], ignore_index=True)
+        conn.update(worksheet="TÁBUA DA MARÉ", data=df_final)
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar Tábua da Maré: {e}")
+        return False
+        
 # --- 2. COMPONENTES VISUAIS PADRONIZADOS ---
 
 def render_legenda_niveis():
@@ -448,45 +507,85 @@ elif menu == "🤝 Gestão de apadrinhamento":
     else: st.warning("Nenhum dado encontrado para esta sala.")
 
 elif menu == "📊 Avaliação da Tábua da Maré":
-    # (Mantido original)
-    st.markdown(f"### 📊 Lançar Avaliação")
+    st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
+    
+    # Renderiza os botões das salas
     render_botoes_salas("btn_aval", "sel_aval")
-    df_s = safe_read(st.session_state.sel_aval)
-    if not df_s.empty:
-        n_limpos = sorted([str(n).replace("**", "").strip() for n in df_s[df_s["ALUNO"] != ""]["ALUNO"].unique()])
-        al = st.selectbox("Selecione o Aluno", n_limpos)
+    
+    # Busca a lista de alunos da sala selecionada (usando sua lógica de session_state)
+    # Nota: Assumi que st.session_state["alunos_te_dict"] contém o mapeamento Geral
+    alunos_na_sala = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_aval]
+    
+    if alunos_na_sala:
+        al = st.selectbox("Selecione o Aluno", sorted(alunos_na_sala))
+        
         st.markdown("#### ⭐ 10 motivos para avaliar!")
-        with st.form("f_av"):
+        
+        with st.form("f_av_nuvem"):
+            # Período/Semestre
             tr = st.selectbox("Período", ["1º Semestre", "2º Semestre"])
-            cE, cD = st.columns(2); n_l = {}
-            for i, cat in enumerate(CATEGORIAS): n_l[cat] = (cE if i < 5 else cD).selectbox(cat, list(MARE_OPCOES.keys()), key=f"s_{i}")
-            obs = st.text_area("Observações:")
-            if st.form_submit_button("Salvar"):
-                df_av = pd.read_csv(AVAL_FILE)
-                df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Periodo'] == tr))]
-                pd.concat([df_av, pd.DataFrame([[al, tr] + [MARE_OPCOES[n_l[c]] for c in CATEGORIAS] + [obs]], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
-                st.success("Salvo!"); st.rerun()
+            
+            cE, cD = st.columns(2)
+            n_l = {}
+            
+            # Itera sobre as 10 categorias criando os seletores
+            for i, cat in enumerate(CATEGORIAS):
+                # Usamos as chaves (texto: Maré Cheia, etc) para respeitar a validação da planilha
+                n_l[cat] = (cE if i < 5 else cD).selectbox(
+                    cat, 
+                    list(MARE_OPCOES.keys()), 
+                    index=2, # Default em Maré Enchente ou similar
+                    key=f"mare_s_{i}"
+                )
+            
+            obs = st.text_area("Observações pedagógicas:")
+            
+            if st.form_submit_button("🚀 Enviar para Tábua da Maré"):
+                # Chamada da função de escrita que definimos no topo
+                # Enviamos n_l diretamente porque ele já contém os textos validados
+                sucesso = registrar_tabua_mare(
+                    aluno=al,
+                    sala=st.session_state.sel_aval,
+                    semestre=tr,
+                    notas_dict=n_l,
+                    obs=obs
+                )
+                
+                if sucesso:
+                    st.balloons()
+                    st.success(f"Avaliação de {al} sincronizada com sucesso!")
+                    st.cache_data.clear() # Limpa o cache para atualizar gráficos de radar/vasilhas
+                    st.rerun()
+    else:
+        st.warning("Nenhum aluno encontrado para esta sala.")
 # --- ABA: TURNO ESTENDIDO (REGISTRO ATUALIZADO COM NOVA PALETA) ---
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
-    # --- LÓGICA DE ANOS DINÂMICOS ---
-    df_h = pd.read_csv(ALF_FILE).fillna("")
-    if "Ano" not in df_h.columns:
-        df_h["Ano"] = 2025
-        df_h.to_csv(ALF_FILE, index=False)
+    
+    # --- 1. LEITURA DE DADOS DA NUVEM (Google Sheets) ---
+    try:
+        df_h = conn.read(worksheet="TURNO ESTENDIDO").fillna("")
+    except Exception as e:
+        st.error(f"Erro ao conectar com a planilha: {e}")
+        st.stop()
 
-    anos_no_csv = sorted(df_h["Ano"].unique().tolist())
+    # --- LÓGICA DE ANOS DINÂMICOS ---
+    if "Ano" not in df_h.columns:
+        df_h["Ano"] = 2026
+
+    # Converte para numérico para evitar erros de comparação
+    df_h["Ano"] = pd.to_numeric(df_h["Ano"], errors='coerce').fillna(2026).astype(int)
+    anos_na_planilha = sorted(df_h["Ano"].unique().tolist())
+    
     if "lista_anos_te" not in st.session_state:
-        st.session_state.lista_anos_te = anos_no_csv if anos_no_csv else [2025, 2026]
+        st.session_state.lista_anos_te = anos_na_planilha if anos_na_planilha else [2025, 2026]
     
     if "ano_registro_te" not in st.session_state: 
         st.session_state.ano_registro_te = st.session_state.lista_anos_te[-1]
 
     st.write("**Ano da Avaliação:**")
-    
     cols_anos_all = st.columns([0.15] * len(st.session_state.lista_anos_te) + [0.1, 0.6])
     
-    # Cores para os botões de seleção de ano
     cores_interface_anos = {2025: "#2E86C1", 2026: "#28B463", 2027: "#E67E22", 2028: "#8E44AD"}
 
     for i, ano in enumerate(st.session_state.lista_anos_te):
@@ -508,90 +607,56 @@ elif menu == "📖 Turno Estendido":
                 st.session_state.lista_anos_te.append(novo_ano_input)
                 st.session_state.lista_anos_te.sort()
                 st.session_state.ano_registro_te = novo_ano_input
-                st.success(f"Ano {novo_ano_input} adicionado!")
                 st.rerun()
-            else:
-                st.warning("Este ano já existe!")
 
     st.write(f"Registrando para o ano letivo: **{st.session_state.ano_registro_te}**")
     st.markdown("---")
 
-    # --- CADASTRO MANUAL ---
-    with st.expander("➕ Cadastrar Aluno Manualmente no Turno"):
-        with st.form("f_te_m"):
-            c1, c2 = st.columns(2)
-            nM, sM = c1.text_input("Nome").strip().upper(), c2.selectbox("Sala", list(TURMAS_CONFIG.keys()))
-            if st.form_submit_button("Adicionar"):
-                if nM: st.session_state["alunos_te_dict"][nM] = sM; st.rerun()
-    
-    # --- SELEÇÃO DE ALUNO E TRILHA VISUAL ---
+    # --- SELEÇÃO DE ALUNO ---
     salas_te = sorted(list(set(st.session_state["alunos_te_dict"].values())))
     if salas_te:
         if st.session_state.sel_te not in salas_te: st.session_state.sel_te = salas_te[0]
         render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_te)
+        
         al_te = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te]
         al = st.selectbox("Aluno:", sorted(al_te))
         
-# --- TRILHA VISUAL: BLOCOS MAIORES E FONTE AMPLIADA ---
-        diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
+        # Puxa o último diagnóstico do aluno na planilha para a trilha
+        dados_aluno = df_h[df_h["Aluno"] == al]
+        diag = dados_aluno.iloc[-1] if not dados_aluno.empty else None
         
+        # --- TRILHA VISUAL ---
+        # (O CSS que você já tem permanece aqui para o visual)
         st.markdown("""<style>
-            .trilha-container { 
-                display: flex; align-items: center; justify-content: center; 
-                gap: 0px; 
-                margin: 10px 0; padding: 5px 0; overflow-x: auto; 
-            }
-            .caixa-trilha-ajustada { 
-                padding: 6px 4px; 
-                border-radius: 10px; 
-                text-align: center; 
-                font-size: 11px; /* Fonte maior para leitura */
-                font-weight: bold; 
-                min-width: 110px; /* Blocos mais largos */
-                height: 55px;    /* Blocos mais altos */
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                line-height: 1.1; 
-                box-shadow: 1px 1px 3px rgba(0,0,0,0.05);
-                flex-shrink: 0;
-            }
-            .seta-trilha { 
-                font-weight: bold; 
-                color: #D5DBDB; 
-                font-size: 16px; 
-                margin: 0 -5px; /* Mantém a proximidade com os quadros maiores */
-                z-index: 1;
-            }
+            .trilha-container { display: flex; align-items: center; justify-content: center; gap: 0px; margin: 10px 0; padding: 5px 0; overflow-x: auto; }
+            .caixa-trilha-ajustada { padding: 6px 4px; border-radius: 10px; text-align: center; font-size: 11px; font-weight: bold; min-width: 110px; height: 55px; display: flex; align-items: center; justify-content: center; line-height: 1.1; box-shadow: 1px 1px 3px rgba(0,0,0,0.05); flex-shrink: 0; }
+            .seta-trilha { font-weight: bold; color: #D5DBDB; font-size: 16px; margin: 0 -5px; z-index: 1; }
         </style>""", unsafe_allow_html=True)
 
         ht = '<div class="trilha-container">'
         for i, n_t in enumerate(NIVEIS_ALF):
-            is_current = (diag is not None and diag["Nivel"] == n_t)
+            # Lógica para destacar o nível atual baseado no diagnóstico da planilha
+            nivel_atual_planilha = diag["Diagnóstico"] if diag is not None else ""
+            is_current = (nivel_atual_planilha == n_t)
             
             cor_bg = CORES_EXCLUSIVAS.get(n_t, "#eee")
             cor_txt = get_text_color(n_t)
-            
-            # Borda mais nítida para o nível selecionado
             borda = "3px solid #2C3E50" if is_current else "1px solid rgba(0,0,0,0.1)"
             opacidade = "1.0" if is_current else "0.65"
             
             ht += f'<div class="caixa-trilha-ajustada" style="background-color:{cor_bg}; color:{cor_txt}; border:{borda}; opacity:{opacidade};">{n_t.split(". ")[1]}</div>'
-            
-            if i < len(NIVEIS_ALF)-1: 
-                ht += '<div class="seta-trilha">→</div>'
-        
+            if i < len(NIVEIS_ALF)-1: ht += '<div class="seta-trilha">→</div>'
         st.markdown(ht + '</div>', unsafe_allow_html=True)
-        # Seleção do Novo Nível
-        idx_inicial = NIVEIS_ALF.index(diag["Nivel"]) if diag is not None else 0
+
+        # --- FORMULÁRIO DE SALVAMENTO PARA GOOGLE SHEETS ---
+        idx_inicial = NIVEIS_ALF.index(diag["Diagnóstico"]) if (diag is not None and diag["Diagnóstico"] in NIVEIS_ALF) else 0
         nV = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_inicial)
-        
-        # FORMULÁRIO DE SALVAMENTO
-        with st.form("f_alf_dinamico"):
+
+        with st.form("f_alf_nuvem"):
             tipo = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
             evidencias_atuais = EVIDENCIAS_POR_NIVEL.get(nV, [])
             
-            st.write(f"**Evidências para {nV}:**")
+            st.write(f"**Evidências observadas para {nV}:**")
             e_cols = st.columns(3)
             s_ev = []
             for i, ev in enumerate(evidencias_atuais):
@@ -600,21 +665,29 @@ elif menu == "📖 Turno Estendido":
             
             obs = st.text_area("Observações Adicionais:")
             
-            if st.form_submit_button("Salvar Diagnóstico"):
-                new_data = {
-                    "Aluno": al, 
-                    "Avaliacao": tipo, 
-                    "Nivel": nV,
-                    "Flag": datetime.now().strftime("%d/%m/%Y"), 
-                    "Evidencias": ", ".join(s_ev), 
-                    "Obs": obs,
-                    "Sala": st.session_state.sel_te,
-                    "Ano": int(st.session_state.ano_registro_te)
+            if st.form_submit_button("🚀 Salvar na Planilha Google"):
+                # Mapeia para os nomes das colunas da sua planilha
+                tipo_map = {
+                    "1ª Avaliação": "1 Avaliação",
+                    "2ª Avaliação": "2 Avaliação",
+                    "Avaliação Final": "3 Avaliação"
                 }
-                df_h = pd.concat([df_h, pd.DataFrame([new_data])], ignore_index=True)
-                df_h.to_csv(ALF_FILE, index=False)
-                st.success(f"Diagnóstico de {al} para {st.session_state.ano_registro_te} salvo com sucesso!"); 
-                st.rerun()
+                
+                # Chama a função de escrita que definimos no topo
+                sucesso = registrar_turno_estendido(
+                    aluno=al,
+                    sala=st.session_state.sel_te,
+                    avaliacao_tipo=tipo_map.get(tipo),
+                    nivel=nV,
+                    evidencias_list=s_ev,
+                    obs=obs,
+                    ano=int(st.session_state.ano_registro_te)
+                )
+                
+                if sucesso:
+                    st.success("Dados sincronizados com sucesso!")
+                    st.cache_data.clear() # Força a releitura da planilha
+                    st.rerun()
 # --- ABA: DADOS - TURNO ESTENDIDO (ATUALIZADO COM CORES E LEGENDA) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("""

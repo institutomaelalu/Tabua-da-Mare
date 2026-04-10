@@ -6,27 +6,37 @@ import os
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
-# --- CARREGAMENTO INICIAL ---
+# --- CARREGAMENTO INICIAL (Bancada de Dados) ---
 try:
-    # Em vez de verificar arquivo local, tentamos ler a aba da nuvem
+    # 1. Lê a aba mestre de alunos (GERAL)
     df_g = conn.read(worksheet="GERAL").fillna("")
     df_g.columns = [str(c).strip().upper() for c in df_g.columns]
     
-    # Se você precisar de um DataFrame de alfabetização que vinha do ALF_FILE,
-    # agora ele deve vir da aba correspondente (ex: TURNO_ESTENDIDO)
+    # 2. Lê a aba de alfabetização/turno estendido
     df_alf = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
+    df_alf.columns = [str(c).strip().upper() for c in df_alf.columns]
+
+    # 3. Lê a aba de avaliações (TÁBUA DA MARÉ)
+    df_aval = conn.read(worksheet="TABUA_MARE").fillna("")
+    df_aval.columns = [str(c).strip().upper() for c in df_aval.columns]
     
 except Exception as e:
     st.error(f"Erro ao carregar dados da nuvem: {e}")
-    # Cria dataframes vazios para o app não quebrar totalmente se a rede falhar
-    df_g = pd.DataFrame(columns=["ALUNO", "TURNO", "COMUNIDADE"])
+    # Fallback: Dataframes vazios com colunas padrão para o app não travar
+    df_g = pd.DataFrame(columns=["ALUNO", "TURNO", "COMUNIDADE", "SALA"])
     df_alf = pd.DataFrame()
-CATEGORIAS = ["1. Atividades em Grupo/Proatividade", "2. Interesse pelo Novo", "3. Compartilhamento de Materiais", "4. Clareza e Desenvoltura", "5. Respeito às Regras", "6. Vocabulário Adequado", "7. Leitura e Escrita", "8. Compreensão de Comandos", "9. Superação de Desafios", "10. Assiduidade"]
+    df_aval = pd.DataFrame()
+
+# --- CONFIGURAÇÕES DE CRITÉRIOS ---
+CATEGORIAS = [
+    "1. Atividades em Grupo/Proatividade", "2. Interesse pelo Novo", 
+    "3. Compartilhamento de Materiais", "4. Clareza e Desenvoltura", 
+    "5. Respeito às Regras", "6. Vocabulário Adequado", 
+    "7. Leitura e Escrita", "8. Compreensão de Comandos", 
+    "9. Superação de Desafios", "10. Assiduidade"
+]
 MARE_OPCOES = {"Maré Cheia": 4, "Maré Enchente": 3, "Maré Vazante": 2, "Maré Baixa": 1}
 MARE_LABELS = {4: "Maré Cheia", 3: "Maré Enchente", 2: "Maré Vazante", 1: "Maré Baixa"}
-
-if not os.path.exists(AVAL_FILE):
-    pd.DataFrame(columns=["Aluno", "Periodo"] + CATEGORIAS + ["Observacoes"]).to_csv(AVAL_FILE, index=False)
 # Defina os nomes dos arquivos ou abas no topo do script
 ALF_FILE = "alfabetizacao.csv"  # Se ainda usar backup local
 # Mas o ideal é usar a conexão direta que configuramos

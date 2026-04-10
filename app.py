@@ -312,7 +312,7 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
-# --- ABA: DADOS - TURNO ESTENDIDO (CORREÇÃO FINAL DE GEOMETRIA) ---
+# --- ABA: DADOS - TURNO ESTENDIDO (SOLUÇÃO DEFINITIVA DE GEOMETRIA) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
     df_h = pd.read_csv(ALF_FILE)
@@ -325,7 +325,7 @@ elif menu == "📊 Dados - Turno Estendido":
         "7. Alfabético Ortográfico": "#D6EAF8"
     }
 
-    # Legenda Superior
+    # Legenda Superior (Mantida)
     cols_leg = st.columns(len(NIVEIS_ALF))
     for idx, niv in enumerate(NIVEIS_ALF):
         cols_leg[idx].markdown(f"<div style='background-color:{CORES_EXCLUSIVAS[niv]}; padding:10px; border-radius:10px; text-align:center; font-size:9px; font-weight:bold; color:black; border: 1px solid #ccc;'>{niv.split('. ')[1]}</div>", unsafe_allow_html=True)
@@ -335,7 +335,7 @@ elif menu == "📊 Dados - Turno Estendido":
     <style>
         .cell-diag { text-align: center; font-weight: bold; font-size: 11px; color: black !important; }
         .custom-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        .custom-table th { background-color: #5cc6d0; color: white; padding: 12px; border: 1px solid #ddd; text-align: center; }
+        .custom-table th { background-color: #5cc6d0; color: white; padding: 12px; border: 1px solid #ddd; }
         .custom-table td { padding: 10px; border: 1px solid #ddd; color: black; }
     </style>
     <table class="custom-table">
@@ -358,7 +358,6 @@ elif menu == "📊 Dados - Turno Estendido":
 
     st.markdown("---")
     
-    # --- SEÇÃO DETALHES COM GEOMETRIA SINCRONIZADA ---
     salas_ativas = sorted(list(set(st.session_state["alunos_te_dict"].values())))
     if salas_ativas:
         if "sel_te_dados" not in st.session_state: st.session_state.sel_te_dados = salas_ativas[0]
@@ -373,7 +372,7 @@ elif menu == "📊 Dados - Turno Estendido":
                 valores = [MAPA_NIVEIS.get(n, 0) for n in dados_h['Nivel']]
                 ultimo_nv = dados_h['Nivel'].iloc[-1]
                 
-                # Definição de Nível
+                # Definição de Nível e Altura
                 status_mare, altura = "Maré Baixa", "25%"
                 if ultimo_nv == "7. Alfabético Ortográfico": status_mare, altura = "Maré Cheia", "92%"
                 elif len(valores) >= 2:
@@ -399,27 +398,29 @@ elif menu == "📊 Dados - Turno Estendido":
                     st.markdown(f"#### 🌊 Nível da Maré: {status_mare}")
                     st.markdown(f"""
                     <style>
-                        .container-mare {{ 
+                        /* O segredo: o container define o recorte mestre */
+                        .recipiente-mestre {{ 
                             position: relative; width: 260px; height: 140px; margin: auto; 
-                            background: #f0f0f0; /* Fundo do recipiente */
+                            background: #f0f0f0; /* Fundo cinza do recipiente */
+                            /* Formato da Vasilha */
                             clip-path: path('M 0 20 Q 65 0 130 20 T 260 20 L 260 110 Q 260 140 230 140 L 30 140 Q 0 140 0 110 Z');
+                            overflow: hidden;
                         }}
-                        .agua-total {{
+                        /* A água agora é apenas um bloco que sobe e desce */
+                        .agua-mestre {{
                             position: absolute; bottom: 0; left: 0; width: 100%; height: {altura};
-                            background: #5DADE2; /* Azul Maré */
-                            /* A onda superior da água é desenhada para encaixar no container */
+                            background: #5DADE2;
+                            /* Onda superior da água independente das bordas da vasilha */
                             clip-path: path('M 0 10 Q 32.5 0 65 10 T 130 10 T 195 10 T 260 10 L 260 200 L 0 200 Z');
                         }}
                     </style>
-                    <div class="container-mare">
-                        <div class="agua-total"></div>
+                    <div class="recipiente-mestre">
+                        <div class="agua-mestre"></div>
                     </div>
                     <div style="margin-top:20px; font-size:13px; color:black;">
                         <b>📍 Trilha de Evolução:</b><br>
                         {"".join([f'<div style="padding:5px; border-bottom:1px dashed #eee;"><b>{row["Avaliacao"]}:</b> {row["Nivel"].split(". ")[1]}</div>' for _, row in dados_h.iterrows()])}
                     </div>""", unsafe_allow_html=True)
-            else:
-                st.info("Aguardando registros.")
 # --- PRÓXIMO MENU (Certifique-se que o elif abaixo está fora do bloco anterior) ---
 elif menu == "📈 Indicadores pedagógicos":
 

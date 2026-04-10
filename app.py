@@ -312,7 +312,7 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
-# --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO FINAL CONSOLIDADA) ---
+# --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO FINAL - TEXTO LIMPO) ---
 elif menu == "📊 Dados - Turno Estendido":
     # CSS Global para Cabeçalhos, Miniaturas e Botões
     st.markdown("""
@@ -333,12 +333,13 @@ elif menu == "📊 Dados - Turno Estendido":
                 width: 35px; height: 20px; border: 1px solid #999; border-radius: 3px;
             }
             .mare-texto-tabela {
-                font-size: 9px; color: #555; font-weight: bold; line-height: 1;
+                font-size: 10px; color: #555; font-weight: bold; line-height: 1;
+                text-transform: lowercase;
             }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("### 📋 Panorama Geral e Linha do Tempo")
+    st.markdown("### 📋 Panorama de Avaliações")
     
     df_h = pd.read_csv(ALF_FILE).fillna("")
 
@@ -351,9 +352,9 @@ elif menu == "📊 Dados - Turno Estendido":
     st.write("Selecione o Ano:")
     if "ano_ativo_te" not in st.session_state: st.session_state.ano_ativo_te = 2025
     
-    col_anos = st.columns([0.15, 0.15, 0.7]) # Colunas estreitas para aproximar os botões
+    col_anos = st.columns([0.15, 0.15, 0.7]) 
     anos = [2025, 2026]
-    cores = {2025: "#2E86C1", 2026: "#28B463"} # Azul e Verde
+    cores = {2025: "#2E86C1", 2026: "#28B463"} 
 
     for i, ano in enumerate(anos):
         is_active = st.session_state.ano_ativo_te == ano
@@ -364,7 +365,6 @@ elif menu == "📊 Dados - Turno Estendido":
             st.session_state.ano_ativo_te = ano
             st.rerun()
         
-        # Estilização do botão via CSS injetado para o ID específico
         st.markdown(f"<style>div[data-testid='stHorizontalBlock'] div:nth-child({i+1}) button {{ background-color: {cor_btn} !important; color: {txt_cor} !important; border: {'2px solid black' if is_active else '1px solid #ccc'} !important; }}</style>", unsafe_allow_html=True)
 
     ano_sel = st.session_state.ano_ativo_te
@@ -379,7 +379,7 @@ elif menu == "📊 Dados - Turno Estendido":
         "7. Alfabético Ortográfico": "#B1A0C7"
     }
 
-    # Função para gerar a célula de Status (Miniatura + Texto)
+    # Função para gerar a célula de Status (Miniatura + Texto Limpo)
     def get_status_mare_html(nv_atual, hist):
         pct, txt = 85, "maré baixa"
         if nv_atual == "7. Alfabético Ortográfico": pct, txt = 15, "maré cheia"
@@ -391,12 +391,12 @@ elif menu == "📊 Dados - Turno Estendido":
         return f'''
         <div class="mare-box">
             <div class="mare-mini-tabela" style="background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%); clip-path: path('M 0 4 Q 10 0 20 4 T 40 4 L 40 20 L 0 20 Z');"></div>
-            <span class="mare-texto-tabela">status: {txt}</span>
+            <span class="mare-texto-tabela">{txt}</span>
         </div>'''
 
     # 2. TABELA GERAL (STATUS NA ÚLTIMA COLUNA)
     cols_header = ["Nome do Aluno", "1ª Sondagem", "2ª Sondagem", "3ª Sondagem", "STATUS MARÉ"]
-    if ano_sel == 2026: cols_header.insert(1, "Diagnóstico Inicial (2025)")
+    if ano_sel == 2026: cols_header.insert(1, "Diagnóstico Atual")
 
     html_tab = f"""<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white; border: 1px solid #ddd;">
         <thead><tr>{"".join([f'<th style="color:black !important; padding:10px; border:1px solid #ddd;">{c}</th>' for c in cols_header])}</tr></thead>
@@ -408,7 +408,6 @@ elif menu == "📊 Dados - Turno Estendido":
         dados_ano = df_h[(df_h["Aluno"] == al) & (df_h["Ano"] == ano_sel)]
         html_tab += f'<tr><td style="font-weight:bold; color:black; padding:8px; border:1px solid #ddd; font-size:12px;">{al}</td>'
         
-        # Coluna Diagnóstico (apenas 2026)
         if ano_sel == 2026:
             d_ant = df_h[(df_h["Aluno"] == al) & (df_h["Ano"] == 2025) & (df_h["Avaliacao"] == "Avaliação Final")]
             if not d_ant.empty:
@@ -416,7 +415,6 @@ elif menu == "📊 Dados - Turno Estendido":
                 html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv)}; text-align:center; font-weight:bold; font-size:10px;">{nv.split(". ")[1]}</td>'
             else: html_tab += '<td style="text-align:center;">-</td>'
 
-        # Colunas de Sondagem
         for etapa in ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"]:
             r = dados_ano[dados_ano["Avaliacao"] == etapa]
             if not r.empty:
@@ -424,7 +422,6 @@ elif menu == "📊 Dados - Turno Estendido":
                 html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv)}; text-align:center; font-weight:bold; color:black; border:1px solid #ddd; font-size:11px;">{nv.split(". ")[1]}</td>'
             else: html_tab += '<td style="border:1px solid #ddd;"></td>'
 
-        # Coluna Final: STATUS MARÉ
         status_html = "<td>-</td>"
         if not dados_ano.empty:
             status_html = f'<td style="border:1px solid #ddd; background:#fcfcfc;">{get_status_mare_html(dados_ano["Nivel"].iloc[-1], dados_ano["Nivel"].tolist())}</td>'
@@ -433,7 +430,7 @@ elif menu == "📊 Dados - Turno Estendido":
     st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)
     st.markdown("---")
 
-    # 3. FICHA INDIVIDUAL (GRÁFICO GRANDE MANTIDO)
+    # 3. FICHA INDIVIDUAL
     salas_ativas = sorted(list(set(st.session_state["alunos_te_dict"].values())))
     if salas_ativas:
         render_botoes_salas("btn_te_dados", "sel_te_dados", salas_permitidas=salas_ativas)
@@ -446,7 +443,6 @@ elif menu == "📊 Dados - Turno Estendido":
                 u_nv = dados_al['Nivel'].iloc[-1]
                 vols = [MAPA_NIVEIS.get(n, 0) for n in dados_al['Nivel']]
                 
-                # Cálculo Maré Grande
                 s_txt, pct_g = "Maré Baixa", 85
                 if u_nv == "7. Alfabético Ortográfico": s_txt, pct_g = "Maré Cheia", 15
                 elif len(vols) >= 2:
@@ -455,12 +451,14 @@ elif menu == "📊 Dados - Turno Estendido":
 
                 col_info, col_graf = st.columns([1, 1])
                 with col_info:
+                    evid = dados_al.iloc[-1]['Evidencias']
+                    obs = dados_al.iloc[-1]['Obs']
                     st.markdown(f"""
                     <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black;">
                         <h3 style="margin:0;">{al_sel}</h3>
                         <p><b>Nível Atual:</b> <span style="background:{CORES_EXCLUSIVAS.get(u_nv)}; padding:3px 8px; border-radius:8px; font-weight:bold;">{u_nv}</span></p>
-                        <p><b>Evidências:</b><br><small>{dados_al.iloc[-1]['Evidencias']}</small></p>
-                        <p><b>Observações:</b><br><small>{dados_al.iloc[-1]['Obs']}</small></p>
+                        <p><b>Evidências:</b><br><small>{evid if evid != "" else "<i>Não preenchido</i>"}</small></p>
+                        <p><b>Observações:</b><br><small>{obs if obs != "" else "<i>Sem observações</i>"}</small></p>
                     </div>""", unsafe_allow_html=True)
                 
                 with col_graf:

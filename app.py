@@ -791,6 +791,7 @@ elif modo == "📚 Turno Estendido":
                 <span>📅 <b>{t_av}/{r['Ano']}</b></span>
                 <span>Nível: <b style="color:{cor_label};">{r['Nivel']}</b></span>
             </div>""", unsafe_allow_html=True)elif menu == "🌊 Tábua da Maré":
+            
     # (Mantido original)
     st.markdown(f"### 🌊 Tábua da Maré")
     render_botoes_salas("btn_int", "sel_int")

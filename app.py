@@ -389,68 +389,110 @@ elif menu == "📊 Avaliação da Tábua da Maré":
                 df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Periodo'] == tr))]
                 pd.concat([df_av, pd.DataFrame([[al, tr] + [MARE_OPCOES[n_l[c]] for c in CATEGORIAS] + [obs]], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
                 st.success("Salvo!"); st.rerun()
+# --- ABA: TURNO ESTENDIDO (REGISTRO COM ADIÇÃO DINÂMICA DE ANO) ---
+elif menu == "📖 Turno Estendido":
+    st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
+    
+    # --- LÓGICA DE ANOS DINÂMICOS ---
+    df_h = pd.read_csv(ALF_FILE).fillna("")
+    if "Ano" not in df_h.columns:
+        df_h["Ano"] = 2025
+        df_h.to_csv(ALF_FILE, index=False)
 
-elif modo == "📚 Turno Estendido":
-                df_h = pd.read_csv(ALF_FILE).fillna("")
-                
-                # 1. Filtro e Limpeza (Evita duplicados do mesmo ano/avaliação)
-                dados_al = df_h[df_h["Aluno"] == al_af].sort_values(["Ano", "Avaliacao"])
-                dados_al = dados_al.drop_duplicates(subset=['Avaliacao', 'Ano'], keep='last')
-                
-                if not dados_al.empty:
-                    u_nv = dados_al['Nivel'].iloc[-1]
-                    
-                    # Layout em duas colunas: Info e Status da Maré
-                    c_inf, c_mare = st.columns([1, 1])
-                    
-                    with c_inf:
-                        # Card de Informações do Aluno
-                        st.markdown(f"""
-                        <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black; min-height: 220px;">
-                            <h4 style="margin:0;">{al_af}</h4>
-                            <p style="margin-top:10px;"><b>Nível Atual:</b> <br>
-                               <span style="background:{CORES_EXCLUSIVAS.get(u_nv, '#ddd')}; padding:4px 10px; border-radius:8px; font-weight:bold; color:black;">
-                               {u_nv}</span>
-                            </p>
-                            <p><b>Evidências:</b><br><small>{dados_al.iloc[-1]['Evidencias']}</small></p>
-                        </div>""", unsafe_allow_html=True)
-                    
-                    with c_mare:
-                        # 2. STATUS DA MARÉ (Vasilha Grande)
-                        st.markdown("<h5 style='text-align:center; margin:0;'>🌊 Status da Maré</h5>", unsafe_allow_html=True)
-                        
-                        # Lógica de preenchimento da vasilha baseada na evolução
-                        vols = [MAPA_NIVEIS.get(n, 0) for n in dados_al['Nivel']]
-                        pct_g, s_txt = 85, "Maré Baixa" # Padrão
-                        
-                        if u_nv == "7. Alfabético Ortográfico": 
-                            pct_g, s_txt = 15, "Maré Cheia"
-                        elif len(vols) >= 2:
-                            if vols[-1] > vols[-2]: pct_g, s_txt = 45, "Maré Enchente"
-                            elif vols[-1] < vols[-2]: pct_g, s_txt = 70, "Maré Vazante"
-                        
-                        st.markdown(f"""
-                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 180px;">
-                                <div style="width: 200px; height: 100px; background: linear-gradient(to bottom, #f0f0f0 {pct_g}%, #5DADE2 {pct_g}%); 
-                                     clip-path: path('M 0 30 Q 65 10 130 30 T 260 30 L 260 110 Q 260 140 230 140 L 30 140 Q 0 140 0 110 Z'); border: 1px solid #ccc;">
-                                </div>
-                                <b style="color:#1A5276; margin-top:15px; font-size: 18px;">{s_txt}</b>
-                            </div>
-                        """, unsafe_allow_html=True)
+    # Pegamos os anos que já existem no CSV + o que está no estado da sessão
+    anos_no_csv = sorted(df_h["Ano"].unique().tolist())
+    if "lista_anos_te" not in st.session_state:
+        st.session_state.lista_anos_te = anos_no_csv if anos_no_csv else [2025, 2026]
+    
+    if "ano_registro_te" not in st.session_state: 
+        st.session_state.ano_registro_te = st.session_state.lista_anos_te[-1]
 
-                    # 3. TRILHA DE EVOLUÇÃO (Embaixo dos cards)
-                    st.markdown("---")
-                    st.write("**📍 Trilha de Evolução (Alfabetização)**")
-                    
-                    for _, r in dados_al.iterrows():
-                        txt_av = r["Avaliacao"].replace("Avaliação Final", "3ª Avaliação")
-                        st.markdown(f"""
-                        <div style="display:flex; justify-content:space-between; font-size:13px; padding:8px; border-bottom:1px dashed #eee; background:white; color:black;">
-                            <span>📅 {txt_av} / {r['Ano']}</span>
-                            <b style="color:#6741d9;">{r['Nivel'].split(". ")[1] if '.' in r['Nivel'] else r['Nivel']}</b>
-                        </div>""", unsafe_allow_html=True)
-                else:
-                    st.info("Ainda não existem registros de Turno Estendido para este afilhado.")
+    st.write("**Ano da Avaliação:**")
+    
+    # Layout para os botões de ano + botão de Adicionar
+    cols_anos_all = st.columns([0.15] * len(st.session_state.lista_anos_te) + [0.1, 0.6])
+    
+    cores_anos = {2025: "#2E86C1", 2026: "#28B463", 2027: "#E67E22", 2028: "#8E44AD"} # Cores sugeridas
+
+    for i, ano in enumerate(st.session_state.lista_anos_te):
+        is_active = st.session_state.ano_registro_te == ano
+        # Se for um ano novo sem cor definida, usa um cinza azulado
+        cor_base = cores_anos.get(ano, "#34495E")
+        cor_btn = cor_base if is_active else "#D5DBDB"
+        txt_cor = "white" if is_active else "#566573"
+        
+        if cols_anos_all[i].button(f"📅 {ano}", key=f"btn_reg_ano_{ano}", use_container_width=True):
+            st.session_state.ano_registro_te = ano
+            st.rerun()
+        
+        st.markdown(f"<style>div[data-testid='stHorizontalBlock'] div:nth-child({i+1}) button {{ background-color: {cor_btn} !important; color: {txt_cor} !important; border: {'2px solid black' if is_active else '1px solid #ccc'} !important; }}</style>", unsafe_allow_html=True)
+
+    # BOTÃO DE ADICIONAR ANO (+)
+    with cols_anos_all[len(st.session_state.lista_anos_te)].popover("➕"):
+        novo_ano_input = st.number_input("Digite o novo ano:", min_value=2024, max_value=2100, value=st.session_state.lista_anos_te[-1] + 1)
+        if st.button("Confirmar Novo Ano"):
+            if novo_ano_input not in st.session_state.lista_anos_te:
+                st.session_state.lista_anos_te.append(novo_ano_input)
+                st.session_state.lista_anos_te.sort()
+                st.session_state.ano_registro_te = novo_ano_input
+                st.success(f"Ano {novo_ano_input} adicionado!")
+                st.rerun()
+            else:
+                st.warning("Este ano já existe!")
+
+    st.write(f"Registrando para o ano letivo: **{st.session_state.ano_registro_te}**")
+    st.markdown("---")
+
+    # (Início do seu formulário de registro original...)
+    with st.expander("➕ Cadastrar Aluno Manualmente no Turno"):
+        # ... (restante do código de cadastro manual mantido igual) ...
+        with st.form("f_te_m"):
+            c1, c2 = st.columns(2)
+            nM, sM = c1.text_input("Nome").strip().upper(), c2.selectbox("Sala", list(TURMAS_CONFIG.keys()))
+            if st.form_submit_button("Adicionar"):
+                if nM: st.session_state["alunos_te_dict"][nM] = sM; st.rerun()
+    
+    # ... (Seleção de Aluno e Trilha Visual mantidos igual) ...
+    salas_te = sorted(list(set(st.session_state["alunos_te_dict"].values())))
+    if salas_te:
+        if st.session_state.sel_te not in salas_te: st.session_state.sel_te = salas_te[0]
+        render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_te)
+        al_te = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te]
+        al = st.selectbox("Aluno:", sorted(al_te))
+        
+        # ... (Lógica da Trilha Visual) ...
+        diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
+        ht = '<div class="trilha-container">'
+        for i, n_t in enumerate(NIVEIS_ALF):
+            atv = (diag is not None and diag["Nivel"] == n_t)
+            ht += f'<div class="caixa-trilha" style="background-color:{CORES_TRILHA[n_t]["ativo" if atv else "inativo"]}; color:{"white" if atv else "#444"}">{n_t.split(". ")[1]}</div>'
+            if i < len(NIVEIS_ALF)-1: ht += '<div class="seta-trilha">→</div>'
+        st.markdown(ht + '</div>', unsafe_allow_html=True)
+
+        nV = st.selectbox("Novo Nível:", NIVEIS_ALF, index=NIVEIS_ALF.index(diag["Nivel"]) if diag is not None else 0)
+        
+        with st.form("f_alf_dinamico"):
+            tipo = st.selectbox("Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
+            evidencias_atuais = EVIDENCIAS_POR_NIVEL.get(nV, [])
+            st.write(f"**Evidências para {nV}:**")
+            e_cols = st.columns(3)
+            s_ev = []
+            for i, ev in enumerate(evidencias_atuais):
+                if e_cols[i % 3].checkbox(ev, key=f"chk_{nV}_{i}"):
+                    s_ev.append(ev)
+            obs = st.text_area("Obs:")
+            
+            if st.form_submit_button("Salvar Diagnóstico"):
+                new_data = {
+                    "Aluno": al, "Avaliacao": tipo, "Nivel": nV,
+                    "Flag": datetime.now().strftime("%d/%m/%Y"), # Exemplo de uso da coluna Flag para Data
+                    "Evidencias": ", ".join(s_ev), "Obs": obs,
+                    "Sala": st.session_state.sel_te,
+                    "Ano": int(st.session_state.ano_registro_te)
+                }
+                df_h = pd.concat([df_h, pd.DataFrame([new_data])], ignore_index=True)
+                df_h.to_csv(ALF_FILE, index=False)
+                st.success(f"Diagnóstico de {st.session_state.ano_registro_te} salvo!"); st.rerun()
 # --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO FINAL - TEXTO LIMPO) ---
 elif menu == "📊 Dados - Turno Estendido":
     # CSS Global para Cabeçalhos, Miniaturas e Botões

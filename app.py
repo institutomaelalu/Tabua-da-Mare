@@ -666,7 +666,6 @@ elif menu == "📈 Indicadores pedagógicos":
 elif menu == "🌊 Canal do Apadrinhamento":
     st.markdown(f"### 🤝 Canal do Apadrinhamento")
     
-    # Carregamento de dados para busca de afilhados
     df_total = pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
     
     # Lógica de Login/Simulação
@@ -678,71 +677,85 @@ elif menu == "🌊 Canal do Apadrinhamento":
             lista_nomes = sorted([str(n).replace("**", "").strip() for n in afils["ALUNO"].unique()])
             al_af = st.selectbox("Selecione seu afilhado:", lista_nomes)
             
-            # 1. Verificar se é do Turno Estendido
+            # 1. Verifica se participa do Turno Estendido
             is_turno = al_af in st.session_state.get("alunos_te_dict", {})
             
+            # Inicializa a variável modo para evitar NameError
+            modo = "🌊 Tábua da Maré (Geral)" 
+            
             if is_turno:
-                st.markdown(f"""<div style="background-color: #f3e5f5; padding: 15px; border-radius: 10px; border-left: 5px solid #6741d9; margin-bottom: 20px;">
-                    ✨ <b>O seu afilhado, {al_af}, participa do nosso Turno Estendido!</b><br>
-                    Um projeto focado no desenvolvimento intensivo da alfabetização.</div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div style="background-color: #f3e5f5; padding: 15px; border-radius: 10px; border-left: 5px solid #6741d9; margin-bottom: 20px; color: black;">
+                    ✨ <b>O seu afilhado, {al_af}, participa do nosso Turno Estendido!</b></div>""", unsafe_allow_html=True)
                 modo = st.radio("O que deseja visualizar?", ["🌊 Tábua da Maré (Geral)", "📚 Turno Estendido"], horizontal=True)
-            else:
-                modo = "🌊 Tábua da Maré (Geral)"
 
             st.markdown("---")
 
+            # --- VISUALIZAÇÃO GERAL (10 CRITÉRIOS) ---
             if modo == "🌊 Tábua da Maré (Geral)":
                 df_av = pd.read_csv(AVAL_FILE)
-                df_h = pd.read_csv(ALF_FILE)
                 dados_mare = df_av[df_av["Aluno"] == al_af]
                 
-                col1, col2 = st.columns([1, 2])
-                
-                with col1:
-                    st.markdown(f"""
-                    <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#fff; text-align:center;">
-                        <div style="width: 80px; height: 80px; background: #eee; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 30px;">👤</div>
-                        <h4 style="margin:0; color:#333;">{al_af}</h4>
-                        <p style="font-size:12px; color:gray;">Desenvolvimento Holístico</p>
-                    </div>""", unsafe_allow_html=True)
-                    
-                    st.markdown("<br><b>📈 Evolução da Alfabetização</b>", unsafe_allow_html=True)
-                    render_grafico_alfabetizacao_individual(df_h[df_h["Aluno"] == al_af])
-                
-                with col2:
-                    st.markdown("##### 📋 Desenvolvimento Socioemocional (10 Critérios)")
-                    if not dados_mare.empty:
-                        r_mare = dados_mare.iloc[-1]
-                        m_cols = st.columns(5)
-                        for i, cat in enumerate(CATEGORIAS):
-                            # cat já é o nome completo (ex: "1. Proatividade")
-                            m_cols[i % 5].markdown(render_vasilha_mare(r_mare[cat], cat), unsafe_allow_html=True)
-                        st.caption(f"*Última avaliação registrada em: {r_mare.get('Periodo', 'N/A')}*")
-                    else: 
-                        st.warning("Avaliação comportamental (Tábua da Maré) ainda não realizada para este aluno.")
+                if not dados_mare.empty:
+                    r_mare = dados_mare.iloc[-1]
+                    st.markdown("##### 📋 Desenvolvimento Socioemocional (Vasilhas por Critério)")
+                    m_cols = st.columns(5)
+                    for i, cat in enumerate(CATEGORIAS):
+                        m_cols[i % 5].markdown(render_vasilha_mare(r_mare[cat], cat), unsafe_allow_html=True)
+                else:
+                    st.warning("Avaliação da Tábua da Maré ainda não disponível.")
 
+            # --- VISUALIZAÇÃO TURNO ESTENDIDO (TRILHA + STATUS MARÉ) ---
             elif modo == "📚 Turno Estendido":
-                df_h = pd.read_csv(ALF_FILE)
-                dados_al = df_h[df_h["Aluno"] == al_af].copy()
+                df_h = pd.read_csv(ALF_FILE).fillna("")
+                # Filtra e remove duplicados (mesma avaliação no mesmo ano)
+                dados_al = df_h[df_h["Aluno"] == al_af].sort_values(["Ano", "Avaliacao"])
+                dados_al = dados_al.drop_duplicates(subset=['Avaliacao', 'Ano'], keep='last')
+                
                 if not dados_al.empty:
                     u_nv = dados_al['Nivel'].iloc[-1]
-                    c_inf, c_grf = st.columns([1, 1])
+                    c_inf, c_mare = st.columns([1, 1])
+                    
                     with c_inf:
+                        # Card lateral de informações
                         st.markdown(f"""
-                        <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black;">
+                        <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black; min-height: 200px;">
                             <h4 style="margin:0;">{al_af}</h4>
-                            <p><b>Nível Atual:</b> <br><span style="background:#d1c4e9; padding:4px 10px; border-radius:8px; font-weight:bold;">{u_nv}</span></p>
+                            <p><b>Nível Atual:</b> <br>
+                               <span style="background:{CORES_EXCLUSIVAS.get(u_nv, '#ddd')}; padding:4px 10px; border-radius:8px; font-weight:bold; color:black;">
+                               {u_nv}</span>
+                            </p>
                             <p><b>Evidências:</b><br><small>{dados_al.iloc[-1]['Evidencias']}</small></p>
-                            <p><b>Observações:</b><br><small>{dados_al.iloc[-1]['Obs']}</small></p>
                         </div>""", unsafe_allow_html=True)
-                    with c_grf:
-                        st.markdown("##### 📍 Trilha de Evolução do Turno")
-                        for _, r in dados_al.iterrows():
-                            txt_av = r["Avaliacao"].replace("Avaliação Final", "3ª Avaliação")
-                            st.markdown(f"""<div style="display:flex; justify-content:space-between; font-size:12px; padding:5px; border-bottom:1px dashed #eee; background:white;">
-                                <span>{txt_av}/{r['Ano']}</span>
-                                <b style="color:#6741d9;">{r['Nivel'].split(". ")[1]}</b>
+                    
+                    with c_mare:
+                        # Vasilha de Status da Maré (Alfabetização)
+                        st.markdown("<h5 style='text-align:center;'>🌊 Status da Maré</h5>", unsafe_allow_html=True)
+                        vols = [MAPA_NIVEIS.get(n, 0) for n in dados_al['Nivel']]
+                        pct_g, s_txt = 85, "Maré Baixa"
+                        if u_nv == "7. Alfabético Ortográfico": pct_g, s_txt = 15, "Maré Cheia"
+                        elif len(vols) >= 2:
+                            if vols[-1] > vols[-2]: pct_g, s_txt = 45, "Maré Enchente"
+                            elif vols[-1] < vols[-2]: pct_g, s_txt = 70, "Maré Vazante"
+                        
+                        st.markdown(f"""
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <div style="width: 180px; height: 90px; background: linear-gradient(to bottom, #f0f0f0 {pct_g}%, #5DADE2 {pct_g}%); 
+                                     clip-path: path('M 0 30 Q 65 10 130 30 T 260 30 L 260 110 Q 260 140 230 140 L 30 140 Q 0 140 0 110 Z'); border: 1px solid #ccc;">
+                                </div>
+                                <b style="color:#1A5276; margin-top:10px; font-size:16px;">{s_txt}</b>
                             </div>""", unsafe_allow_html=True)
+
+                    st.markdown("---")
+                    st.write("**📍 Trilha de Evolução (Alfabetização)**")
+                    for _, r in dados_al.iterrows():
+                        txt_av = r["Avaliacao"].replace("Avaliação Final", "3ª Avaliação")
+                        st.markdown(f"""
+                        <div style="display:flex; justify-content:space-between; font-size:13px; padding:8px; border-bottom:1px dashed #eee; background:white; color:black;">
+                            <span>📅 {txt_av} / {r['Ano']}</span>
+                            <b style="color:#6741d9;">{r['Nivel'].split(". ")[1] if '.' in r['Nivel'] else r['Nivel']}</b>
+                        </div>""", unsafe_allow_html=True)
+                else:
+                    st.info("Ainda não há registros de alfabetização para este afilhado.")
 
 elif menu == "🌊 Tábua da Maré":
     # (Mantido original)

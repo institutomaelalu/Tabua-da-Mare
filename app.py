@@ -26,9 +26,12 @@ NIVEIS_ALF = list(CORES_TRILHA.keys())
 ALF_FILE = "alfabetizacao.csv"
 
 EVIDENCIAS_PADRAO = [
-    "Reconhece letras do nome", "Diferencia desenhos de letras", 
-    "Identifica rimas", "Relaciona som à letra", 
-    "Lê palavras simples", "Escreve frases curtas"
+    "Reconhece letras do nome", 
+    "Diferencia desenhos de letras", 
+    "Identifica rimas", 
+    "Relaciona som à letra", 
+    "Lê palavras simples", 
+    "Escreve frases curtas"
 ]
 
 if not os.path.exists(ALF_FILE):
@@ -130,8 +133,10 @@ def criar_grafico_mare(categorias, valores):
         xaxis=dict(showgrid=False, zeroline=False), height=400, margin=dict(l=20, r=20, t=30, b=80))
     return fig
 
-# --- LOGICA DE SESSÃO ---
+# --- INICIALIZAÇÃO E LOGIN ---
 if "logado" not in st.session_state: st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
+if "aluno_selecionado_alf" not in st.session_state: st.session_state["aluno_selecionado_alf"] = None
+
 for k in ['sel_mat', 'sel_pad', 'sel_aval', 'sel_int', 'sel_alf', 'sel_ind']:
     if k not in st.session_state: st.session_state[k] = "SALA ROSA"
 
@@ -159,19 +164,20 @@ if not st.session_state.logado:
                     else: st.error("Acesso negado.")
     st.stop()
 
-if st.sidebar.button("🚪 Sair"):
+if st.sidebar.button("🚪 Sair (Logoff)"):
     st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
     st.rerun()
 
+# --- NAVEGAÇÃO ---
 menu_options = ["👤 Cadastro", "📝 Matrículas", "🤝 Apadrinhamento", "📊 Lançar Avaliação", "📖 Programa Alfabetização", "📈 Indicadores Pedagógicos", "🌊 Evolução (Padrinhos)", "🌊 Tábua da Maré - Interno"] if st.session_state.perfil == "admin" else ["🌊 Evolução (Padrinhos)"]
-menu = st.sidebar.radio("Menu", menu_options)
+menu = st.sidebar.radio("Navegação", menu_options)
 
 st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Instituto</span> <span style='color:{C_AZUL}'>Mãe</span> <span style='color:{C_VERDE}'>Lalu</span></h1></div><hr>", unsafe_allow_html=True)
 
-# --- ABAS ---
+# --- LOGICA DAS ABAS ---
 
 if menu == "👤 Cadastro":
-    st.markdown(f"### 👤 Novo Cadastro")
+    st.markdown(f"<h3 style='color:{C_ROSA}'>👤 Novo Cadastro</h3>", unsafe_allow_html=True)
     with st.form("form_cad"):
         c1, c2 = st.columns(2)
         nome = c1.text_input("Nome Completo").strip().upper()
@@ -188,18 +194,24 @@ if menu == "👤 Cadastro":
                 st.success("Cadastrado com sucesso!"); st.rerun()
 
 elif menu == "📝 Matrículas":
-    st.markdown(f"### 📋 Quadro de Matrículas")
+    st.markdown(f"<h3 style='color:{C_VERDE}'>📋 Quadro de Matrículas</h3>", unsafe_allow_html=True)
     render_botoes_salas("btn_mat", "sel_mat")
     df_g, df_s = safe_read("GERAL"), safe_read(st.session_state.sel_mat)
     tn, cm = render_filtros(df_g, "mat"); df_f = aplicar_filtros(df_s, df_g, tn, cm)
     cor_h = TURMAS_CONFIG[st.session_state.sel_mat]["cor"]
-    v_cols = ["ALUNO", "IDADE", "COMUNIDADE"]
-    html = f'<table class="custom-table"><thead style="background-color:{cor_h}"><tr>' + "".join([f'<th>{c}</th>' for c in v_cols]) + '</tr></thead><tbody>'
-    for _, r in df_f.iterrows(): html += '<tr>' + "".join([f'<td>{r[c]}</td>' for c in v_cols]) + '</tr>'
-    st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
+    
+    for _, r in df_f.iterrows():
+        c1, c2, c3, c4 = st.columns([3, 1, 2, 1])
+        c1.write(f"**{r['ALUNO']}**")
+        c2.write(f"{r['IDADE']} anos")
+        c3.write(f"{r['COMUNIDADE']}")
+        if c4.button("Trilha", key=f"trilha_{r['ALUNO']}"):
+            st.session_state["aluno_selecionado_alf"] = r['ALUNO']
+            st.session_state["sel_alf"] = st.session_state.sel_mat
+            st.success(f"{r['ALUNO']} pronto para diagnóstico!")
 
 elif menu == "🤝 Apadrinhamento":
-    st.markdown(f"### 🤝 Gestão de Apadrinhamento")
+    st.markdown(f"<h3 style='color:{C_AZUL}'>🤝 Gestão de Apadrinhamento</h3>", unsafe_allow_html=True)
     render_botoes_salas("btn_pad", "sel_pad")
     df_g, df_s = safe_read("GERAL"), safe_read(st.session_state.sel_pad)
     tn, cm = render_filtros(df_g, "pad"); df_f = aplicar_filtros(df_s, df_g, tn, cm)
@@ -210,11 +222,12 @@ elif menu == "🤝 Apadrinhamento":
     st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 
 elif menu == "📊 Lançar Avaliação":
-    st.markdown(f"### 📊 Lançar Tábua da Maré")
+    st.markdown(f"<h3 style='color:{C_AMARELO}'>📊 Lançar Tábua da Maré</h3>", unsafe_allow_html=True)
     render_botoes_salas("btn_aval", "sel_aval")
     df_s = safe_read(st.session_state.sel_aval)
     if not df_s.empty:
         al = st.selectbox("Selecione o Aluno", sorted(df_s[df_s["ALUNO"] != ""]["ALUNO"].unique()))
+        st.markdown(f"#### ⭐ 10 motivos para avaliar!")
         with st.form("form_aval"):
             tr = st.selectbox("Período", ["1º Semestre", "2º Semestre"])
             col_e, col_d = st.columns(2); notas_letras = {}
@@ -230,45 +243,31 @@ elif menu == "📊 Lançar Avaliação":
 elif menu == "📖 Programa Alfabetização":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Trilha de Alfabetização</h3>", unsafe_allow_html=True)
     
-    abas_busca = ["GERAL", "SALA AZUL", "SALA VERDE", "CIRAND. MUNDO"]
-    lista_dfs = []
-    for aba in abas_busca:
-        temp_df = safe_read(aba)
-        if not temp_df.empty:
-            temp_df["ORIGEM_ABA"] = aba
-            lista_dfs.append(temp_df)
+    with st.expander("➕ Cadastrar Aluno Extra (Fora de Turma)"):
+        with st.form("cad_extra"):
+            nome_ex = st.text_input("Nome do Aluno").strip().upper()
+            if st.form_submit_button("Habilitar para Diagnóstico"):
+                st.session_state["aluno_selecionado_alf"] = nome_ex
+                st.session_state["sel_alf"] = "EXTRA"
+                st.success(f"{nome_ex} habilitado!")
     
-    df_consolidado = pd.concat(lista_dfs, ignore_index=True) if lista_dfs else pd.DataFrame()
-    metodo_busca = st.radio("Escolha como encontrar o aluno:", ["Buscar por Nome", "Filtrar por Turma", "Cadastrar Novo (Não matriculado)"], horizontal=True)
+    render_botoes_salas("btn_alf", "sel_alf")
+    df_s = safe_read(st.session_state.sel_alf)
     
-    al_final = None
-    sala_final = "Não informada"
+    lista_alunos = sorted(df_s["ALUNO"].unique()) if not df_s.empty else []
+    if st.session_state["aluno_selecionado_alf"] and st.session_state["aluno_selecionado_alf"] not in lista_alunos:
+        lista_alunos.append(st.session_state["aluno_selecionado_alf"])
 
-    if metodo_busca == "Buscar por Nome":
-        if not df_consolidado.empty:
-            al_final = st.selectbox("Selecione o Aluno (Geral, Azul, Verde, Cirand. Mundo):", [""] + sorted(df_consolidado["ALUNO"].unique()))
-            if al_final:
-                info = df_consolidado[df_consolidado["ALUNO"] == al_final].iloc[0]
-                sala_final = info["ORIGEM_ABA"]
-        else: st.warning("Dados não carregados.")
-
-    elif metodo_busca == "Filtrar por Turma":
-        turma_sel = st.selectbox("Selecione a Turma:", ["SALA VERDE", "SALA AZUL", "CIRAND. MUNDO"])
-        df_turma = safe_read(turma_sel)
-        if not df_turma.empty:
-            al_final = st.selectbox(f"Alunos da {turma_sel}:", [""] + sorted(df_turma["ALUNO"].unique()))
-            sala_final = turma_sel
-
-    elif metodo_busca == "Cadastrar Novo (Não matriculado)":
-        al_final = st.text_input("Nome Completo:").strip().upper()
-        sala_final = "SEM MATRÍCULA"
-
-    if al_final:
-        st.divider()
-        st.subheader(f"Aluno: {al_final} | Turma: {sala_final}")
+    if lista_alunos:
+        idx_sel = 0
+        if st.session_state["aluno_selecionado_alf"] in lista_alunos:
+            idx_sel = lista_alunos.index(st.session_state["aluno_selecionado_alf"])
+            
+        al = st.selectbox("Selecione o Aluno:", lista_alunos, index=idx_sel)
         df_h = pd.read_csv(ALF_FILE)
-        diag = df_h[df_h["Aluno"] == al_final].iloc[-1] if not df_h[df_h["Aluno"] == al_final].empty else None
+        diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
         
+        # Trilha Visual
         html_trilha = '<div class="trilha-container">'
         for i, n_text in enumerate(NIVEIS_ALF):
             ativo = (diag is not None and diag["Nivel"] == n_text)
@@ -288,12 +287,13 @@ elif menu == "📖 Programa Alfabetização":
                 if ev_cols[idx % 3].checkbox(ev): sel_ev.append(ev)
             obs = st.text_area("Observações Pedagógicas:")
             if st.form_submit_button("Registrar Diagnóstico"):
-                df_h = df_h[~((df_h["Aluno"] == al_final) & (df_h["Avaliacao"] == tipo))]
-                pd.concat([df_h, pd.DataFrame([[al_final, tipo, novo_nv, False, ", ".join(sel_ev), obs, sala_final]], columns=df_h.columns)], ignore_index=True).to_csv(ALF_FILE, index=False)
-                st.success("Salvo!"); st.rerun()
+                df_h = df_h[~((df_h["Aluno"] == al) & (df_h["Avaliacao"] == tipo))]
+                pd.concat([df_h, pd.DataFrame([[al, tipo, novo_nv, False, ", ".join(sel_ev), obs, st.session_state.sel_alf]], columns=df_h.columns)], ignore_index=True).to_csv(ALF_FILE, index=False)
+                st.session_state["aluno_selecionado_alf"] = None # Limpa seleção após salvar
+                st.success("Diagnóstico Salvo!"); st.rerun()
 
 elif menu == "📈 Indicadores Pedagógicos":
-    st.markdown(f"### 📈 Indicadores de Impacto")
+    st.markdown(f"<h3 style='color:{C_VERDE}'>📈 Indicadores de Impacto</h3>", unsafe_allow_html=True)
     render_botoes_salas("btn_ind", "sel_ind")
     df_h = pd.read_csv(ALF_FILE)
     df_sala = df_h[df_h["Sala"] == st.session_state.sel_ind] if "Sala" in df_h.columns else pd.DataFrame()
@@ -305,26 +305,26 @@ elif menu == "📈 Indicadores Pedagógicos":
         m2.metric("Nível Alfabético+", len(df_ult[df_ult["Nivel"].str.contains("Alfabético")]))
         m3.metric("Ortográficos", len(df_ult[df_ult["Nivel"] == "7. Alfabético Ortográfico"]))
         avancou = sum(1 for _, r in df_ult.iterrows() if not df_1[df_1["Aluno"]==r["Aluno"]].empty and NIVEIS_ALF.index(r["Nivel"]) > NIVEIS_ALF.index(df_1[df_1["Aluno"]==r["Aluno"]].iloc[0]["Nivel"]))
-        m4.metric("% Avanço", f"{(avancou/len(df_ult)*100):.1f}%" if len(df_ult)>0 else "0%")
+        m4.metric("% Avanço Geral", f"{(avancou/len(df_ult)*100):.1f}%" if len(df_ult)>0 else "0%")
         st.dataframe(df_ult[["Aluno", "Avaliacao", "Nivel", "Evidencias"]], use_container_width=True)
 
 elif menu == "🌊 Evolução (Padrinhos)":
-    st.markdown(f"### 🌊 Evolução dos Afilhados")
+    st.markdown(f"<h3 style='color:{C_AZUL}'>🌊 Evolução dos Afilhados</h3>", unsafe_allow_html=True)
     df_av = pd.read_csv(AVAL_FILE)
     df_total = pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
     pad_sel = st.session_state.nome_usuario if st.session_state.perfil == "padrinho" else st.selectbox("Padrinho/Madrinha:", sorted([p for p in df_total["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan"]]))
     if pad_sel:
         afilhados = df_total[df_total["PADRINHO/MADRINHA"].astype(str).str.upper() == pad_sel.upper()]
         al_afil = st.selectbox("Selecione o Afilhado:", sorted(afilhados["ALUNO"].unique()))
-        if al_afil in df_av["Aluno"].unique():
+        if al_afil not in df_av["Aluno"].unique(): st.warning(f"Sem avaliações para **{al_afil}**.")
+        else:
             df_hist = df_av[df_av["Aluno"] == al_afil]
             for _, r in df_hist.iterrows():
                 st.markdown(f"**Período:** {r['Periodo']}")
                 st.plotly_chart(criar_grafico_mare(CATEGORIAS, [float(r[c]) for c in CATEGORIAS]), use_container_width=True)
-        else: st.warning("Sem avaliações registradas.")
 
 elif menu == "🌊 Tábua da Maré - Interno":
-    st.markdown(f"### 🌊 Tábua da Maré")
+    st.markdown(f"<h3 style='color:{C_VERDE}'>🌊 Tábua da Maré</h3>", unsafe_allow_html=True)
     render_botoes_salas("btn_int", "sel_int")
     df_g, df_s = safe_read("GERAL"), safe_read(st.session_state.sel_int)
     tn, cm = render_filtros(df_g, "int"); df_f = aplicar_filtros(df_s, df_g, tn, cm)

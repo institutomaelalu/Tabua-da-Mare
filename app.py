@@ -331,7 +331,6 @@ elif menu == "📊 Avaliação da Tábua da Maré":
                 pd.concat([df_av, pd.DataFrame([[al, tr] + [MARE_OPCOES[n_l[c]] for c in CATEGORIAS] + [obs]], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
                 st.success("Salvo!"); st.rerun()
 
-# --- ABA: TURNO ESTENDIDO (REGISTRO COM ADIÇÃO DINÂMICA DE ANO) ---
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
     

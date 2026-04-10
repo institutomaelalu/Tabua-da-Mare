@@ -811,7 +811,8 @@ with col_grafico:
                             plot_bgcolor='rgba(0,0,0,0)',
                             autosize=True # Força o preenchimento do container
                         )
-                        st.plotly_chart(fig_espelho, use_container_width=True)                    else:
+                        st.plotly_chart(fig_espelho, use_container_width=True) 
+                    else:
                         st.warning("Avaliação comportamental ainda não disponível.")
 
             # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---

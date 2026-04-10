@@ -508,7 +508,7 @@ elif menu == "🤝 Gestão de apadrinhamento":
 
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
-    
+    df_av = conn.read(worksheet="TÁBUA DA MARÉ").fillna("") 
     # Renderiza os botões das salas
     render_botoes_salas("btn_aval", "sel_aval")
     

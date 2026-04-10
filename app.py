@@ -6,6 +6,49 @@ import os
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
+# --- NOVO: CONEXÃO COM GOOGLE SHEETS ---
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+def registrar_turno_estendido(aluno, nivel, evidencias, sala):
+    """Adiciona registro na aba 'Turno estendido'"""
+    try:
+        df_atual = conn.read(worksheet="Turno estendido")
+        nova_linha = pd.DataFrame([{
+            "Data": datetime.now().strftime("%d/%m/%Y"),
+            "Ano": 2026,
+            "Tipo de Avaliação": "Avaliação Contínua",
+            "ALUNO": aluno,
+            "Nível de Escrita": nivel,
+            "Evidências": evidencias,
+            "Sala": sala
+        }])
+        df_final = pd.concat([df_atual, nova_linha], ignore_index=True)
+        conn.update(worksheet="Turno estendido", data=df_final)
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar Turno Estendido: {e}")
+        return False
+
+def registrar_tabua_mare(aluno, notas_dict, observacoes=""):
+    """Adiciona registro na aba 'Tábua da maré'"""
+    try:
+        df_atual = conn.read(worksheet="Tábua da maré")
+        registro = {
+            "Aluno": aluno,
+            "Data": datetime.now().strftime("%d/%m/%Y"),
+            "Observacoes": observacoes
+        }
+        registro.update(notas_dict)
+        nova_linha = pd.DataFrame([registro])
+        df_final = pd.concat([df_atual, nova_linha], ignore_index=True)
+        conn.update(worksheet="Tábua da maré", data=df_final)
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar Tábua da Maré: {e}")
+        return False
+
 # --- 1. DEFINIÇÕES DE NÍVEIS E CORES PASTÉIS ---
 NIVEIS_ALF = [
     "1. Pré-Silábico", "2. Silábico s/ Valor", "3. Silábico c/ Valor", 

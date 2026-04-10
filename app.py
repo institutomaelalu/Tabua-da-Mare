@@ -737,7 +737,7 @@ elif menu == "🌊 Canal do Apadrinhamento":
             st.markdown("---")
 
 # --- VISUALIZAÇÃO 1: GERAL (SOCIOEMOCIONAL COM FICHA E VASILHAS LIMPAS) ---
-            if modo == "🌊 Tábua da Maré":
+            if modo == "🌊 Tábua da Maré (Geral)":
                 # Resgate de dados extras do afilhado para a Ficha
                 info_afilhado = afils[afils["ALUNO"].astype(str).str.contains(al_af, na=False)].iloc[0]
                 
@@ -761,7 +761,7 @@ elif menu == "🌊 Canal do Apadrinhamento":
                     
                     if not dados_mare.empty:
                         r_mare = dados_mare.iloc[-1]
-                        st.markdown("##### 📋 Nível das Marés Pedagógicas")
+                        st.markdown("##### 📋 Nível das Marés (Socioemocional)")
                         
                         # Layout das Vasilhas sem setas e com nomes abaixo
                         m_cols = st.columns(5)

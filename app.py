@@ -488,35 +488,35 @@ elif menu == "📖 Turno Estendido":
         al_te = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te]
         al = st.selectbox("Aluno:", sorted(al_te))
         
-# --- TRILHA VISUAL COM ESPAÇAMENTO RECOLHIDO ---
+# --- TRILHA VISUAL: BLOCOS MAIORES E FONTE AMPLIADA ---
         diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
         
         st.markdown("""<style>
             .trilha-container { 
                 display: flex; align-items: center; justify-content: center; 
-                gap: 0px; /* Remove o espaço entre os elementos */
-                margin: 5px 0; padding: 5px 0; overflow-x: auto; 
+                gap: 0px; 
+                margin: 10px 0; padding: 5px 0; overflow-x: auto; 
             }
-            .caixa-trilha-compacta { 
-                padding: 4px 2px; 
-                border-radius: 8px; 
+            .caixa-trilha-ajustada { 
+                padding: 6px 4px; 
+                border-radius: 10px; 
                 text-align: center; 
-                font-size: 9px; 
+                font-size: 11px; /* Fonte maior para leitura */
                 font-weight: bold; 
-                min-width: 95px; /* Mantive o tamanho que você gostou */
-                height: 45px; 
+                min-width: 110px; /* Blocos mais largos */
+                height: 55px;    /* Blocos mais altos */
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                line-height: 1.0; 
-                box-shadow: 1px 1px 2px rgba(0,0,0,0.03);
+                line-height: 1.1; 
+                box-shadow: 1px 1px 3px rgba(0,0,0,0.05);
                 flex-shrink: 0;
             }
             .seta-trilha { 
                 font-weight: bold; 
                 color: #D5DBDB; 
-                font-size: 14px; 
-                margin: 0 -4px; /* Margem negativa para "colar" nos quadros */
+                font-size: 16px; 
+                margin: 0 -5px; /* Mantém a proximidade com os quadros maiores */
                 z-index: 1;
             }
         </style>""", unsafe_allow_html=True)
@@ -528,17 +528,16 @@ elif menu == "📖 Turno Estendido":
             cor_bg = CORES_EXCLUSIVAS.get(n_t, "#eee")
             cor_txt = get_text_color(n_t)
             
-            # Destaque com borda no nível atual
-            borda = "2px solid #2C3E50" if is_current else "1px solid rgba(0,0,0,0.05)"
-            opacidade = "1.0" if is_current else "0.6"
+            # Borda mais nítida para o nível selecionado
+            borda = "3px solid #2C3E50" if is_current else "1px solid rgba(0,0,0,0.1)"
+            opacidade = "1.0" if is_current else "0.65"
             
-            ht += f'<div class="caixa-trilha-compacta" style="background-color:{cor_bg}; color:{cor_txt}; border:{borda}; opacity:{opacidade};">{n_t.split(". ")[1]}</div>'
+            ht += f'<div class="caixa-trilha-ajustada" style="background-color:{cor_bg}; color:{cor_txt}; border:{borda}; opacity:{opacidade};">{n_t.split(". ")[1]}</div>'
             
             if i < len(NIVEIS_ALF)-1: 
                 ht += '<div class="seta-trilha">→</div>'
         
         st.markdown(ht + '</div>', unsafe_allow_html=True)
-
         # Seleção do Novo Nível
         idx_inicial = NIVEIS_ALF.index(diag["Nivel"]) if diag is not None else 0
         nV = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_inicial)

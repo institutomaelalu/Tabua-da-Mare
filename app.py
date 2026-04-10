@@ -742,13 +742,13 @@ elif menu == "🌊 Canal do Apadrinhamento":
                 info_row = afils[afils["ALUNO"].astype(str).str.contains(al_af, na=False)].iloc[0]
                 
                 nome_sala = "Não informada"
-                cor_sala_bg = "#ffffff" # Cor padrão
+                cor_sala_bg = "#ffffff" 
                 
+                # Identifica a sala e define a cor de fundo da ficha
                 for nome_aba, config in TURMAS_CONFIG.items():
                     df_temp = safe_read(nome_aba)
                     if not df_temp.empty and al_af in df_temp["ALUNO"].astype(str).values:
                         nome_sala = nome_aba
-                        # Mapeamento de cores baseado na identidade visual das salas
                         if "Azul" in nome_aba: cor_sala_bg = "#e3f2fd"
                         elif "Rosa" in nome_aba: cor_sala_bg = "#fce4ec"
                         elif "Verde" in nome_aba: cor_sala_bg = "#e8f5e9"
@@ -756,13 +756,12 @@ elif menu == "🌊 Canal do Apadrinhamento":
                         elif "Laranja" in nome_aba: cor_sala_bg = "#fff3e0"
                         break
 
-                # Colunas com proporção ajustada para gráfico maior
+                # Colunas: Ficha menor (0.8) e Gráfico bem largo (3.2)
                 col_ficha, col_grafico = st.columns([0.8, 3.2])
                 
                 with col_ficha:
-                    # FICHA COM COR DA SALA
                     st.markdown(f"""
-                        <div style="background-color: {cor_sala_bg}; padding: 15px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); color: #2c3e50; min-height: 380px;">
+                        <div style="background-color: {cor_sala_bg}; padding: 15px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); color: #2c3e50; min-height: 350px;">
                             <h4 style="margin-top: 0; color: #1A5276; border-bottom: 2px solid rgba(0,0,0,0.1); padding-bottom: 5px;">📋 Ficha</h4>
                             <p style="margin: 8px 0; font-size: 13px;"><b>👤 Nome:</b><br>{al_af}</p>
                             <p style="margin: 8px 0; font-size: 13px;"><b>🏫 Sala:</b><br>{nome_sala}</p>
@@ -771,16 +770,16 @@ elif menu == "🌊 Canal do Apadrinhamento":
                         </div>
                     """, unsafe_allow_html=True)
 
-with col_grafico:
+                with col_grafico:
                     df_av = pd.read_csv(AVAL_FILE)
                     dados_mare = df_av[df_av["Aluno"] == al_af]
                     
                     if not dados_mare.empty:
                         r_mare = dados_mare.iloc[-1]
                         
-                        # Definimos o número de colunas (5)
-                        n_cols = 5
-                        m_cols = st.columns(n_cols)
+                        # Exibição das Vasilhas (Limpas e com nome abaixo)
+                        n_cols_v = 5
+                        m_cols = st.columns(n_cols_v)
                         valores_grafico = []
                         
                         for i, cat in enumerate(CATEGORIAS):
@@ -790,9 +789,7 @@ with col_grafico:
                             html_v = render_vasilha_mare(val, cat)
                             html_v_limpo = html_v.split('<span style="position: absolute;')[0] + '</div></div>'
                             
-                            # O operador % garante que se i for 5, ele volte para a coluna 0
-                            # evitando o IndexError
-                            with m_cols[i % n_cols]:
+                            with m_cols[i % n_cols_v]:
                                 st.markdown(f"""
                                     <div style="text-align: center;">
                                         {html_v_limpo}
@@ -802,16 +799,16 @@ with col_grafico:
                                     </div>
                                 """, unsafe_allow_html=True)
                         
-                        # Gráfico ampliado horizontalmente
+                        # Gráfico Otimizado para ocupar o espaço lateral
                         fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
                         fig_espelho.update_layout(
-                            height=350, # Aumentado levemente para preencher sem scroll
+                            height=320, 
                             margin=dict(l=10, r=10, t=30, b=10),
                             paper_bgcolor='rgba(0,0,0,0)',
-                            plot_bgcolor='rgba(0,0,0,0)',
-                            autosize=True # Força o preenchimento do container
+                            plot_bgcolor='rgba(0,0,0,0)'
                         )
-                        st.plotly_chart(fig_espelho, use_container_width=True) 
+                        st.plotly_chart(fig_espelho, use_container_width=True)
+                    
                     else:
                         st.warning("Avaliação comportamental ainda não disponível.")
 

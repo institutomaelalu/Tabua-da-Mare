@@ -194,7 +194,71 @@ if not st.session_state.logado:
 if st.sidebar.button("🚪 Sair"):
     st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
     st.rerun()
+# --- FUNÇÕES DE SUPORTE VISUAL (ADICIONAR NO TOPO) ---
 
+def render_vasilha_mare(nivel_num, titulo):
+    # Mapeamento conforme sua regra: 1: Baixa, 2: Vazante, 3: Enchente, 4: Cheia
+    config = {
+        1: {"pct": 85, "txt": "Maré Baixa", "seta": ""},
+        2: {"pct": 70, "txt": "Maré Vazante", "seta": "↓"},
+        3: {"pct": 45, "txt": "Maré Enchente", "seta": "↑"},
+        4: {"pct": 15, "txt": "Maré Cheia", "seta": "↑"}
+    }
+    # Garante que o nível seja um int e esteja entre 1 e 4
+    try:
+        n = int(float(nivel_num))
+        if n < 1: n = 1
+        if n > 4: n = 4
+    except:
+        n = 1
+        
+    c = config[n]
+    
+    return f'''
+    <div style="text-align: center; margin-bottom: 20px; border: 1px solid #eee; padding: 10px; border-radius: 10px; background: #fff;">
+        <div style="font-size: 11px; font-weight: bold; color: #333; min-height: 35px; display: flex; align-items: center; justify-content: center; line-height: 1.2;">{titulo}</div>
+        <div style="width: 70px; height: 45px; margin: 5px auto; background: linear-gradient(to bottom, #f0f0f0 {c['pct']}%, #5DADE2 {c['pct']}%);
+                    clip-path: path('M 0 10 Q 17.5 0 35 10 T 70 10 L 70 40 Q 70 45 65 45 L 5 45 Q 0 45 0 40 Z'); border: 1px solid #ddd; position: relative;">
+            <span style="position: absolute; right: 2px; top: 5px; font-size: 12px; font-weight: bold; color: #2E86C1;">{c['seta']}</span>
+        </div>
+        <div style="font-size: 9px; color: #5DADE2; font-weight: bold; text-transform: uppercase; margin-top: 5px;">{c['txt']}</div>
+    </div>
+    '''
+
+def render_grafico_alfabetizacao_individual(df_aluno):
+    if df_aluno.empty: 
+        st.warning("Sem dados históricos de alfabetização.")
+        return
+    
+    # Ordenar por data ou ano/avaliação se necessário
+    df_plot = df_aluno.copy()
+    
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df_plot["Avaliacao"].str.replace("Avaliação Final", "3ª Aval") + "/" + df_plot["Ano"].astype(str),
+        y=[MAPA_NIVEIS.get(n, 0) for n in df_plot["Nivel"]],
+        fill='tozeroy', 
+        mode='lines+markers',
+        line=dict(color="#6741d9", width=3),
+        marker=dict(size=10, color="#6741d9", symbol="circle")
+    ))
+    
+    fig.update_layout(
+        height=280, 
+        margin=dict(l=0, r=10, t=20, b=0),
+        yaxis=dict(
+            range=[0.5, 7.5], 
+            tickmode='array', 
+            tickvals=list(range(1, 8)), 
+            ticktext=[n.split(". ")[1] for n in NIVEIS_ALF],
+            gridcolor="#eee"
+        ),
+        xaxis=dict(gridcolor="#eee"),
+        paper_bgcolor='rgba(0,0,0,0)', 
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(size=10)
+    )
+    st.plotly_chart(fig, use_container_width=True)
 # --- MENU ---
 menu_options = ["👤 Matrícula", "📝 Alunos matriculados", "📊 Dados - Turno Estendido", "🤝 Gestão de apadrinhamento", "📊 Avaliação da Tábua da Maré", "📖 Turno Estendido", "📈 Indicadores pedagógicos", "🌊 Canal do Apadrinhamento", "🌊 Tábua da Maré"]
 if st.session_state.perfil != "admin": menu_options = ["🌊 Canal do Apadrinhamento"]
@@ -556,20 +620,85 @@ elif menu == "📈 Indicadores pedagógicos":
     else: st.info("Sem dados.")
 
 elif menu == "🌊 Canal do Apadrinhamento":
-    # (Mantido original)
-    st.markdown(f"### 🌊 Canal do Apadrinhamento")
-    df_av = pd.read_csv(AVAL_FILE)
+    st.markdown(f"### 🤝 Canal do Apadrinhamento")
+    
+    # Carregamento de dados para busca de afilhados
     df_total = pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
+    
+    # Lógica de Login/Simulação
     p_sel = st.session_state.nome_usuario if st.session_state.perfil == "padrinho" else st.selectbox("Simular Padrinho:", sorted([p for p in df_total["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan"]]))
+    
     if p_sel:
         afils = df_total[df_total["PADRINHO/MADRINHA"].astype(str).str.upper() == p_sel.upper()]
         if not afils.empty:
-            al_af = st.selectbox("Afilhado:", sorted([str(n).replace("**", "").strip() for n in afils["ALUNO"].unique()]))
-            if al_af in df_av["Aluno"].unique():
-                for _, r in df_av[df_av["Aluno"] == al_af].iterrows():
-                    st.write(f"**{r['Periodo']}**")
-                    st.plotly_chart(criar_grafico_mare(CATEGORIAS, [float(r[c]) for c in CATEGORIAS]), use_container_width=True)
-            else: st.warning("Sem avaliações.")
+            lista_nomes = sorted([str(n).replace("**", "").strip() for n in afils["ALUNO"].unique()])
+            al_af = st.selectbox("Selecione seu afilhado:", lista_nomes)
+            
+            # 1. Verificar se é do Turno Estendido
+            is_turno = al_af in st.session_state.get("alunos_te_dict", {})
+            
+            if is_turno:
+                st.markdown(f"""<div style="background-color: #f3e5f5; padding: 15px; border-radius: 10px; border-left: 5px solid #6741d9; margin-bottom: 20px;">
+                    ✨ <b>O seu afilhado, {al_af}, participa do nosso Turno Estendido!</b><br>
+                    Um projeto focado no desenvolvimento intensivo da alfabetização.</div>""", unsafe_allow_html=True)
+                modo = st.radio("O que deseja visualizar?", ["🌊 Tábua da Maré (Geral)", "📚 Turno Estendido"], horizontal=True)
+            else:
+                modo = "🌊 Tábua da Maré (Geral)"
+
+            st.markdown("---")
+
+            if modo == "🌊 Tábua da Maré (Geral)":
+                df_av = pd.read_csv(AVAL_FILE)
+                df_h = pd.read_csv(ALF_FILE)
+                dados_mare = df_av[df_av["Aluno"] == al_af]
+                
+                col1, col2 = st.columns([1, 2])
+                
+                with col1:
+                    st.markdown(f"""
+                    <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#fff; text-align:center;">
+                        <div style="width: 80px; height: 80px; background: #eee; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 30px;">👤</div>
+                        <h4 style="margin:0; color:#333;">{al_af}</h4>
+                        <p style="font-size:12px; color:gray;">Desenvolvimento Holístico</p>
+                    </div>""", unsafe_allow_html=True)
+                    
+                    st.markdown("<br><b>📈 Evolução da Alfabetização</b>", unsafe_allow_html=True)
+                    render_grafico_alfabetizacao_individual(df_h[df_h["Aluno"] == al_af])
+                
+                with col2:
+                    st.markdown("##### 📋 Desenvolvimento Socioemocional (10 Critérios)")
+                    if not dados_mare.empty:
+                        r_mare = dados_mare.iloc[-1]
+                        m_cols = st.columns(5)
+                        for i, cat in enumerate(CATEGORIAS):
+                            # cat já é o nome completo (ex: "1. Proatividade")
+                            m_cols[i % 5].markdown(render_vasilha_mare(r_mare[cat], cat), unsafe_allow_html=True)
+                        st.caption(f"*Última avaliação registrada em: {r_mare.get('Periodo', 'N/A')}*")
+                    else: 
+                        st.warning("Avaliação comportamental (Tábua da Maré) ainda não realizada para este aluno.")
+
+            elif modo == "📚 Turno Estendido":
+                df_h = pd.read_csv(ALF_FILE)
+                dados_al = df_h[df_h["Aluno"] == al_af].copy()
+                if not dados_al.empty:
+                    u_nv = dados_al['Nivel'].iloc[-1]
+                    c_inf, c_grf = st.columns([1, 1])
+                    with c_inf:
+                        st.markdown(f"""
+                        <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black;">
+                            <h4 style="margin:0;">{al_af}</h4>
+                            <p><b>Nível Atual:</b> <br><span style="background:#d1c4e9; padding:4px 10px; border-radius:8px; font-weight:bold;">{u_nv}</span></p>
+                            <p><b>Evidências:</b><br><small>{dados_al.iloc[-1]['Evidencias']}</small></p>
+                            <p><b>Observações:</b><br><small>{dados_al.iloc[-1]['Obs']}</small></p>
+                        </div>""", unsafe_allow_html=True)
+                    with c_grf:
+                        st.markdown("##### 📍 Trilha de Evolução do Turno")
+                        for _, r in dados_al.iterrows():
+                            txt_av = r["Avaliacao"].replace("Avaliação Final", "3ª Avaliação")
+                            st.markdown(f"""<div style="display:flex; justify-content:space-between; font-size:12px; padding:5px; border-bottom:1px dashed #eee; background:white;">
+                                <span>{txt_av}/{r['Ano']}</span>
+                                <b style="color:#6741d9;">{r['Nivel'].split(". ")[1]}</b>
+                            </div>""", unsafe_allow_html=True)
 
 elif menu == "🌊 Tábua da Maré":
     # (Mantido original)

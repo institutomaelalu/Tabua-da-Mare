@@ -11,7 +11,6 @@ st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 
 C_ROSA, C_VERDE, C_AZUL, C_AMARELO, C_ROXO = "#ff81ba", "#a8cf45", "#5cc6d0", "#ffc713", "#6741d9"
 C_AZUL_MARE = "#8fd9fb" 
-C_ROXO_PASTEL = "#e0d7f7" # Tom pastel para alunos não selecionados
 
 # Configurações para Alfabetização
 CORES_TRILHA = {
@@ -49,18 +48,17 @@ st.markdown(f"""
     .custom-table thead th {{ padding: 12px 10px; text-align: left; color: white !important; font-weight: 700; border: none; }}
     .custom-table tbody td {{ padding: 8px 10px; border-bottom: 1px solid #fafafa; color: #444 !important; font-weight: 500; }}
     
-    /* Botão Padrão */
     div.stButton > button {{
         width: 100%; border-radius: 8px !important; font-weight: 700 !important; 
         height: 42px; font-size: 11px !important; border: none !important;
         transition: all 0.3s;
     }}
 
-    /* Estilo específico para o botão Turno Estendido na listagem (Menor) */
-    .btn-estendido-col div.stButton > button {{
-        height: 32px !important;
-        font-size: 10px !important;
-        padding: 0 5px !important;
+    /* Crachá de Sala no Turno Estendido */
+    .sala-badge {{
+        display: inline-block; padding: 4px 12px; border-radius: 20px;
+        color: white; font-weight: 700; font-size: 10px; margin-top: 5px;
+        text-transform: uppercase;
     }}
 
     .trilha-container {{ display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 0; }}
@@ -122,9 +120,11 @@ def aplicar_filtros(df_alvo, df_geral, tn, cm):
     if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
     return df_f
 
-def render_botoes_salas(key_prefix, session_key):
-    cols = st.columns(5)
-    for i, (sala, cfg) in enumerate(TURMAS_CONFIG.items()):
+def render_botoes_salas(key_prefix, session_key, salas_permitidas=None):
+    salas = salas_permitidas if salas_permitidas else list(TURMAS_CONFIG.keys())
+    cols = st.columns(len(salas))
+    for i, sala in enumerate(salas):
+        cfg = TURMAS_CONFIG[sala]
         op = "1.0" if st.session_state[session_key] == sala else "0.3"
         st.markdown(f'<style>div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button {{ background-color: {cfg["cor"]} !important; color: white !important; opacity: {op}; }}</style>', unsafe_allow_html=True)
         if cols[i].button(sala, key=f"{key_prefix}_{sala}"):
@@ -143,9 +143,10 @@ def criar_grafico_mare(categorias, valores):
 
 # --- INICIALIZAÇÃO DE SESSÃO ---
 if "logado" not in st.session_state: st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
-if "alunos_turno_estendido" not in st.session_state: st.session_state["alunos_turno_estendido"] = []
+# Armazenamos como dicionário para guardar a sala de origem {nome: sala}
+if "alunos_te_dict" not in st.session_state: st.session_state["alunos_te_dict"] = {}
 
-for k in ['sel_mat', 'sel_pad', 'sel_aval', 'sel_int', 'sel_alf', 'sel_ind']:
+for k in ['sel_mat', 'sel_pad', 'sel_aval', 'sel_int', 'sel_alf', 'sel_ind', 'sel_te']:
     if k not in st.session_state: st.session_state[k] = "SALA ROSA"
 
 if not st.session_state.logado:
@@ -211,27 +212,32 @@ elif menu == "📝 Alunos matriculados":
     df_g, df_s = safe_read("GERAL"), safe_read(st.session_state.sel_mat)
     tn, cm = render_filtros(df_g, "mat"); df_f = aplicar_filtros(df_s, df_g, tn, cm)
     
+    # Lista para capturar seleções
+    selecionados = []
+    
     for i, r in df_f.iterrows():
-        c1, c2, c3, c4 = st.columns([3, 1, 2, 1.3])
+        c0, c1, c2, c3 = st.columns([0.5, 3, 1, 2])
+        está_no_turno = r['ALUNO'] in st.session_state["alunos_te_dict"]
+        
+        # Checkbox alinhado
+        if está_no_turno:
+            c0.markdown("✅")
+        else:
+            if c0.checkbox("", key=f"chk_{i}"):
+                selecionados.append(r['ALUNO'])
+        
         c1.write(f"**{r['ALUNO']}**")
         c2.write(f"{r['IDADE']} anos")
         c3.write(f"{r['COMUNIDADE']}")
-        
-        # Lógica de Cor e Tamanho do Botão
-        está_no_turno = r['ALUNO'] in st.session_state["alunos_turno_estendido"]
-        cor_btn = C_ROXO if está_no_turno else C_ROXO_PASTEL
-        
-        with c4:
-            st.markdown(f'<div class="btn-estendido-col">', unsafe_allow_html=True)
-            st.markdown(f"""<style>button[key="btn_te_{i}"] {{ background-color: {cor_btn} !important; color: white !important; }}</style>""", unsafe_allow_html=True)
-            if st.button("Turno Estendido", key=f"btn_te_{i}"):
-                if not está_no_turno:
-                    st.session_state["alunos_turno_estendido"].append(r['ALUNO'])
-                    st.success(f"Adicionado!")
-                    st.rerun()
-                else:
-                    st.info(f"Já na lista.")
-            st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown("---")
+    if selecionados:
+        cor_turma = TURMAS_CONFIG[st.session_state.sel_mat]["cor"]
+        st.markdown(f"""<style>div.stButton > button[key="btn_bulk_te"] {{ background-color: {cor_turma} !important; color: white !important; }}</style>""", unsafe_allow_html=True)
+        if st.button(f"Matricular {len(selecionados)} aluno(s) no Turno Estendido", key="btn_bulk_te"):
+            for al in selecionados:
+                st.session_state["alunos_te_dict"][al] = st.session_state.sel_mat
+            st.success("Matrículas realizadas!"); st.rerun()
 
 elif menu == "🤝 Gestão de apadrinhamento":
     st.markdown(f"### 🤝 Gestão de Apadrinhamento")
@@ -264,21 +270,29 @@ elif menu == "📊 Avaliação da Tábua da Maré":
 
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
-    with st.expander("➕ Cadastrar novo aluno"):
-        with st.form("cad_extra"):
-            nome_ex = st.text_input("Nome do Aluno").strip().upper()
-            if st.form_submit_button("Confirmar Cadastro"):
-                if nome_ex and nome_ex not in st.session_state["alunos_turno_estendido"]:
-                    st.session_state["alunos_turno_estendido"].append(nome_ex)
-                    st.success(f"Cadastrado!")
-                    st.rerun()
-
-    lista_final = sorted(st.session_state["alunos_turno_estendido"])
-    if lista_final:
-        al = st.selectbox("Aluno para Diagnóstico:", lista_final)
+    
+    # Filtrar salas que possuem alunos no Turno Estendido
+    salas_com_alunos = sorted(list(set(st.session_state["alunos_te_dict"].values())))
+    
+    if salas_com_alunos:
+        if st.session_state.sel_te not in salas_com_alunos:
+            st.session_state.sel_te = salas_com_alunos[0]
+            
+        render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_com_alunos)
+        
+        # Filtrar alunos da sala selecionada
+        alunos_na_sala = [nome for nome, sala in st.session_state["alunos_te_dict"].items() if sala == st.session_state.sel_te]
+        
+        al = st.selectbox("Selecione o Aluno para Diagnóstico:", sorted(alunos_na_sala))
+        
+        # Crachá da Turma
+        cor_origem = TURMAS_CONFIG[st.session_state.sel_te]["cor"]
+        st.markdown(f'<div class="sala-badge" style="background-color:{cor_origem}">{st.session_state.sel_te}</div>', unsafe_allow_html=True)
+        
         df_h = pd.read_csv(ALF_FILE)
         diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
         
+        # Trilha Visual
         html_trilha = '<div class="trilha-container">'
         for i, n_text in enumerate(NIVEIS_ALF):
             ativo = (diag is not None and diag["Nivel"] == n_text)
@@ -301,7 +315,8 @@ elif menu == "📖 Turno Estendido":
                 df_h = df_h[~((df_h["Aluno"] == al) & (df_h["Avaliacao"] == tipo))]
                 pd.concat([df_h, pd.DataFrame([[al, tipo, novo_nv, False, ", ".join(sel_ev), obs, "TURNO ESTENDIDO"]], columns=df_h.columns)], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico Salvo!"); st.rerun()
-    else: st.info("Nenhum aluno na lista.")
+    else:
+        st.info("Nenhum aluno cadastrado no Turno Estendido. Selecione-os na aba 'Alunos Matriculados'.")
 
 elif menu == "📈 Indicadores pedagógicos":
     st.markdown(f"### 📈 Indicadores Pedagógicos")
@@ -315,18 +330,19 @@ elif menu == "🌊 Canal do Apadrinhamento":
     df_av = pd.read_csv(AVAL_FILE)
     df_total = pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
     
-    # Restauração da Simulação para Admin
     pad_sel = st.session_state.nome_usuario if st.session_state.perfil == "padrinho" else st.selectbox("Simular Padrinho/Madrinha:", sorted([p for p in df_total["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan"]]))
     
     if pad_sel:
         afilhados = df_total[df_total["PADRINHO/MADRINHA"].astype(str).str.upper() == pad_sel.upper()]
-        al_afil = st.selectbox("Selecione o Afilhado:", sorted(afilhados["ALUNO"].unique()))
-        if al_afil in df_av["Aluno"].unique():
-            df_hist = df_av[df_av["Aluno"] == al_afil]
-            for _, r in df_hist.iterrows():
-                st.markdown(f"**Período:** {r['Periodo']}")
-                st.plotly_chart(criar_grafico_mare(CATEGORIAS, [float(r[c]) for c in CATEGORIAS]), use_container_width=True)
-        else: st.warning("Sem avaliações.")
+        if not afilhados.empty:
+            al_afil = st.selectbox("Selecione o Afilhado:", sorted(afilhados["ALUNO"].unique()))
+            if al_afil in df_av["Aluno"].unique():
+                df_hist = df_av[df_av["Aluno"] == al_afil]
+                for _, r in df_hist.iterrows():
+                    st.markdown(f"**Período:** {r['Periodo']}")
+                    st.plotly_chart(criar_grafico_mare(CATEGORIAS, [float(r[c]) for c in CATEGORIAS]), use_container_width=True)
+            else: st.warning("Sem avaliações registradas.")
+        else: st.info("Nenhum afilhado vinculado a este padrinho.")
 
 elif menu == "🌊 Tábua da Maré":
     st.markdown(f"### 🌊 Tábua da Maré (Interno)")

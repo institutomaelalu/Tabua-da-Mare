@@ -818,24 +818,34 @@ elif menu == "📈 Indicadores pedagógicos":
 
 elif menu == "🌊 Canal do Apadrinhamento":
     st.markdown(f"### 🤝 Canal do Apadrinhamento")
-    df_total = pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
-   # --- SEGURANÇA R&D: PADRONIZAÇÃO DE COLUNAS ---
-df_total.columns = [str(c).strip().upper() for c in df_total.columns]
-
-# Agora a linha 822 com tratamento de erro (se a coluna não existir, ele não trava)
-if "PADRINHO/MADRINHA" in df_total.columns:
-    padrinhos_lista = sorted([p for p in df_total["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan", "None"]])
-else:
-    padrinhos_lista = ["Nenhum Padrinho Encontrado"]
-
-p_sel = st.session_state.nome_usuario if st.session_state.perfil == "padrinho" else st.selectbox("Simular Padrinho:", padrinhos_lista)
-    p_sel = st.session_state.nome_usuario if st.session_state.perfil == "padrinho" else st.selectbox("Simular Padrinho:", sorted([p for p in df_total["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan"]]))
     
-    if p_sel:
+    # Unindo as turmas
+    df_total = pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
+    
+    # --- SEGURANÇA R&D: PADRONIZAÇÃO DE COLUNAS ---
+    df_total.columns = [str(c).strip().upper() for c in df_total.columns]
+
+    # Verifica se a coluna existe para evitar KeyError
+    if "PADRINHO/MADRINHA" in df_total.columns:
+        padrinhos_lista = sorted([p for p in df_total["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan", "None"]])
+    else:
+        padrinhos_lista = ["Nenhum Padrinho Encontrado"]
+
+    # Define o padrinho selecionado (Removida a linha duplicada que causava erro)
+    if st.session_state.perfil == "padrinho":
+        p_sel = st.session_state.nome_usuario
+    else:
+        p_sel = st.selectbox("Simular Padrinho:", padrinhos_lista)
+    
+    if p_sel and p_sel != "Nenhum Padrinho Encontrado":
+        # Filtra os afilhados
         afils = df_total[df_total["PADRINHO/MADRINHA"].astype(str).str.upper() == p_sel.upper()]
+        
         if not afils.empty:
             lista_nomes = sorted([str(n).replace("**", "").strip() for n in afils["ALUNO"].unique()])
             al_af = st.selectbox("Selecione seu afilhado:", lista_nomes)
+            
+            # Verifica se participa do turno estendido
             is_turno = al_af in st.session_state.get("alunos_te_dict", {})
             modo = "🌊 Tábua da Maré (Geral)"
 

@@ -312,7 +312,7 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
-# --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO VASILHA ONDULADA) ---
+# --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO FINAL ESTÁTICA) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
     df_h = pd.read_csv(ALF_FILE)
@@ -330,15 +330,17 @@ elif menu == "📊 Dados - Turno Estendido":
     for idx, niv in enumerate(NIVEIS_ALF):
         cols_leg[idx].markdown(f"<div style='background-color:{CORES_EXCLUSIVAS[niv]}; padding:10px; border-radius:10px; text-align:center; font-size:9px; font-weight:bold; color:black; border: 1px solid #ccc;'>{niv.split('. ')[1]}</div>", unsafe_allow_html=True)
 
-    # Tabela Principal com Correção de Renderização
+    # Tabela Principal
     html_tab = """
     <style>
         .cell-diag { text-align: center; font-weight: bold; font-size: 11px; color: black !important; }
-        .custom-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        .custom-table th { background-color: #5cc6d0; color: white; padding: 10px; border: 1px solid #ddd; }
-        .custom-table td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+        .custom-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .custom-table th { background-color: #5cc6d0; color: white; padding: 12px; border: 1px solid #ddd; text-align: center; }
+        .custom-table td { padding: 10px; border: 1px solid #ddd; color: black; }
     </style>
-    <table class="custom-table"><thead><tr><th>Nome</th><th>Sala</th><th>1ª Sondagem</th><th>2ª Sondagem</th><th>3ª Sondagem</th></tr></thead><tbody>"""
+    <table class="custom-table">
+        <thead><tr><th>Nome</th><th>Sala</th><th>1ª Sondagem</th><th>2ª Sondagem</th><th>3ª Sondagem</th></tr></thead>
+        <tbody>"""
     
     for al in sorted(st.session_state["alunos_te_dict"].keys()):
         sala_v = st.session_state["alunos_te_dict"][al]
@@ -352,11 +354,12 @@ elif menu == "📊 Dados - Turno Estendido":
                 html_tab += f'<td style="background-color:{cor};"><div class="cell-diag">{nv.split(". ")[1]}</div></td>'
             else: html_tab += '<td></td>'
         html_tab += '</tr>'
-    st.markdown(html_tab + '</tbody></table>', unsafe_allow_html=True)
+    
+    st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)
 
     st.markdown("---")
     
-    # --- SEÇÃO DETALHES: TRILHA E VASILHA ONDULADA ---
+    # --- SEÇÃO DETALHES: TRILHA E VASILHA FIXA ---
     salas_ativas = sorted(list(set(st.session_state["alunos_te_dict"].values())))
     if salas_ativas:
         if "sel_te_dados" not in st.session_state: st.session_state.sel_te_dados = salas_ativas[0]
@@ -371,13 +374,13 @@ elif menu == "📊 Dados - Turno Estendido":
                 valores = [MAPA_NIVEIS.get(n, 0) for n in dados_h['Nivel']]
                 ultimo_nv = dados_h['Nivel'].iloc[-1]
                 
-                # Definição dos Estados da Maré
-                status_mare, altura, animacao = "Maré Baixa", "25%", ""
+                # Definição Estática de Níveis
+                status_mare, altura = "Maré Baixa", "25%"
                 if ultimo_nv == "7. Alfabético Ortográfico":
-                    status_mare, altura, animacao = "Maré Cheia", "92%", "wave-move 2s infinite linear"
+                    status_mare, altura = "Maré Cheia", "92%"
                 elif len(valores) >= 2:
-                    if valores[-1] > valores[-2]: status_mare, altura, animacao = "Maré Enchente", "65%", "wave-move 4s infinite linear"
-                    elif valores[-1] < valores[-2]: status_mare, altura, animacao = "Maré Vazante", "40%", "wave-move 6s infinite linear"
+                    if valores[-1] > valores[-2]: status_mare, altura = "Maré Enchente", "65%"
+                    elif valores[-1] < valores[-2]: status_mare, altura = "Maré Vazante", "40%"
                 elif valores[-1] <= 2: status_mare, altura = "Maré Baixa", "25%"
 
                 col_card, col_visual = st.columns([1, 1])
@@ -386,7 +389,10 @@ elif menu == "📊 Dados - Turno Estendido":
                     st.markdown(f"""
                     <div style="border:1px solid #ddd; padding:20px; border-radius:15px; background:#f9f9f9; color:black;">
                         <h4 style="margin-top:0">Ficha: {al_sel}</h4>
-                        <p><b>Nível Atual:</b> <br><span style="background:{CORES_EXCLUSIVAS.get(ultimo_nv)}; padding:6px 12px; border-radius:12px; border:1px solid #bbb; display:inline-block; margin-top:5px;">{ultimo_nv}</span></p>
+                        <p><b>Nível Atual:</b><br>
+                        <span style="background:{CORES_EXCLUSIVAS.get(ultimo_nv)}; padding:6px 12px; border-radius:12px; border:1px solid #bbb; display:inline-block; margin-top:5px; font-weight:bold;">
+                            {ultimo_nv}
+                        </span></p>
                         <p><b>Evidências:</b><br><small>{dados_h.iloc[-1]['Evidencias'] or 'Nenhum registro'}</small></p>
                         <p><b>Observações:</b><br><i>{dados_h.iloc[-1]['Obs'] or 'Sem observações.'}</i></p>
                     </div>""", unsafe_allow_html=True)
@@ -397,22 +403,21 @@ elif menu == "📊 Dados - Turno Estendido":
                     <style>
                         .container-mare {{ position: relative; width: 180px; height: 120px; margin: auto; }}
                         .vasilha-ondulada {{ 
-                            width: 100%; height: 100%; background: #eee;
+                            width: 100%; height: 100%; background: #f0f0f0;
                             clip-path: path('M 0 20 Q 45 0 90 20 T 180 20 L 180 100 Q 180 120 160 120 L 20 120 Q 0 120 0 100 Z');
-                            position: relative; border-bottom: 4px solid #5D6D7E;
+                            position: relative; border-bottom: 3px solid #5D6D7E;
                         }}
-                        .agua-onda {{
-                            position: absolute; bottom: 0; width: 200%; height: {altura};
-                            background: linear-gradient(to top, #5DADE2, #8fd9fb);
-                            clip-path: path('M 0 10 Q 25 0 50 10 T 100 10 T 150 10 T 200 10 L 200 150 L 0 150 Z');
-                            animation: {animacao}; opacity: 0.8;
+                        .agua-fixa {{
+                            position: absolute; bottom: 0; width: 100%; height: {altura};
+                            background: #5DADE2; /* Azul Maré Fixo */
+                            clip-path: path('M 0 10 Q 25 0 50 10 T 100 10 T 150 10 T 180 10 L 180 150 L 0 150 Z');
+                            opacity: 0.9;
                         }}
-                        @keyframes wave-move {{ 0% {{ transform: translateX(0); }} 100% {{ transform: translateX(-50%); }} }}
                         .trilha-box {{ margin-top: 15px; font-size: 13px; color: black; }}
                         .trilha-item {{ padding: 6px; border-bottom: 1px dashed #ccc; }}
                     </style>
                     <div class="container-mare">
-                        <div class="vasilha-ondulada"><div class="agua-onda"></div></div>
+                        <div class="vasilha-ondulada"><div class="agua-fixa"></div></div>
                     </div>
                     <div class="trilha-box">
                         <b>📍 Trilha de Evolução:</b><br>

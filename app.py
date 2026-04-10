@@ -3,9 +3,11 @@ import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 import os
+import gspread
+from google.oauth2.service_account import Credentials
 from datetime import datetime
 
-# --- 1. DEFINIÇÕES DE DADOS (Ajustado para bater com os dicionários de cores) ---
+# --- 1. DEFINIÇÕES DE DADOS (Cores da Imagem e Níveis) ---
 NIVEIS_ALF = [
     "1. Pré-Silábico", 
     "2. Silábico s/ Valor", 
@@ -18,6 +20,7 @@ NIVEIS_ALF = [
 
 MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
 
+# Estas são as cores sólidas para tabelas e legendas
 CORES_EXCLUSIVAS = {
     "1. Pré-Silábico": "#E74C3C",        # Vermelho
     "2. Silábico s/ Valor": "#E67E22",   # Laranja
@@ -28,6 +31,7 @@ CORES_EXCLUSIVAS = {
     "7. Alfabético Ortográfico": "#9B59B6" # Roxo/Lilás
 }
 
+# Estas são as cores para a trilha visual (Ativo e Fundo Pastel)
 CORES_TRILHA = {
     "1. Pré-Silábico": {"ativo": "#E74C3C", "inativo": "#FDEDEC"},
     "2. Silábico s/ Valor": {"ativo": "#E67E22", "inativo": "#FEF5E7"},
@@ -37,6 +41,10 @@ CORES_TRILHA = {
     "6. Alfabético Final": {"ativo": "#3498DB", "inativo": "#EBF5FB"},
     "7. Alfabético Ortográfico": {"ativo": "#9B59B6", "inativo": "#F5EEF8"}
 }
+
+# Arquivos de Dados
+ALF_FILE = "alfabetizacao.csv"
+AVAL_FILE = "avaliacoes.csv"
 
 # --- 2. FUNÇÕES DE SUPORTE ---
 

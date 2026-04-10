@@ -736,30 +736,38 @@ elif menu == "🌊 Canal do Apadrinhamento":
 
             st.markdown("---")
 
-# --- VISUALIZAÇÃO 1: GERAL (SOCIOEMOCIONAL COM FICHA E VASILHAS LIMPAS) ---
+# --- VISUALIZAÇÃO 1: GERAL (SOCIOEMOCIONAL COM FICHA COLORIDA E GRÁFICO AMPLO) ---
             if modo == "🌊 Tábua da Maré (Geral)":
                 # Identificando a linha e a sala correta do afilhado
                 info_row = afils[afils["ALUNO"].astype(str).str.contains(al_af, na=False)].iloc[0]
                 
-                # Para pegar o nome da Sala (Aba), verificamos em qual aba o aluno está
                 nome_sala = "Não informada"
+                cor_sala_bg = "#ffffff" # Cor padrão
+                
                 for nome_aba, config in TURMAS_CONFIG.items():
                     df_temp = safe_read(nome_aba)
                     if not df_temp.empty and al_af in df_temp["ALUNO"].astype(str).values:
                         nome_sala = nome_aba
+                        # Mapeamento de cores baseado na identidade visual das salas
+                        if "Azul" in nome_aba: cor_sala_bg = "#e3f2fd"
+                        elif "Rosa" in nome_aba: cor_sala_bg = "#fce4ec"
+                        elif "Verde" in nome_aba: cor_sala_bg = "#e8f5e9"
+                        elif "Amarela" in nome_aba: cor_sala_bg = "#fffde7"
+                        elif "Laranja" in nome_aba: cor_sala_bg = "#fff3e0"
                         break
 
-                col_ficha, col_grafico = st.columns([1, 2.5])
+                # Colunas com proporção ajustada para gráfico maior
+                col_ficha, col_grafico = st.columns([0.8, 3.2])
                 
                 with col_ficha:
-                    # FICHA DO AFILHADO (Dados integrados com a Sheet)
+                    # FICHA COM COR DA SALA
                     st.markdown(f"""
-                        <div style="background-color: #ffffff; padding: 20px; border-radius: 15px; border: 1px solid #e0e0e0; box-shadow: 2px 2px 10px rgba(0,0,0,0.05); color: #2c3e50;">
-                            <h3 style="margin-top: 0; color: #1A5276; border-bottom: 2px solid #5DADE2; padding-bottom: 10px;">📋 Ficha do Afilhado</h3>
-                            <p style="margin: 10px 0; font-size: 14px;"><b>👤 Nome:</b><br>{al_af}</p>
-                            <p style="margin: 10px 0; font-size: 14px;"><b>🏫 Sala:</b><br>{nome_sala}</p>
-                            <p style="margin: 10px 0; font-size: 14px;"><b>🎂 Idade:</b><br>{info_row.get('IDADE', '---')} anos</p>
-                            <p style="margin: 10px 0; font-size: 14px;"><b>🏡 Comunidade:</b><br>{info_row.get('COMUNIDADE', 'Não informada')}</p>
+                        <div style="background-color: {cor_sala_bg}; padding: 15px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); color: #2c3e50; min-height: 380px;">
+                            <h4 style="margin-top: 0; color: #1A5276; border-bottom: 2px solid rgba(0,0,0,0.1); padding-bottom: 5px;">📋 Ficha</h4>
+                            <p style="margin: 8px 0; font-size: 13px;"><b>👤 Nome:</b><br>{al_af}</p>
+                            <p style="margin: 8px 0; font-size: 13px;"><b>🏫 Sala:</b><br>{nome_sala}</p>
+                            <p style="margin: 8px 0; font-size: 13px;"><b>🎂 Idade:</b><br>{info_row.get('IDADE', '---')} anos</p>
+                            <p style="margin: 8px 0; font-size: 13px;"><b>🏡 Comunidade:</b><br>{info_row.get('COMUNIDADE', 'Não informada')}</p>
                         </div>
                     """, unsafe_allow_html=True)
 
@@ -769,30 +777,35 @@ elif menu == "🌊 Canal do Apadrinhamento":
                     
                     if not dados_mare.empty:
                         r_mare = dados_mare.iloc[-1]
-                        st.markdown("##### 📋 Nível das Marés (Socioemocional)")
                         
+                        # Vasilhas alinhadas
                         m_cols = st.columns(5)
                         valores_grafico = []
                         for i, cat in enumerate(CATEGORIAS):
                             val = r_mare[cat]
                             valores_grafico.append(val)
                             
-                            # Renderiza vasilha limpa (sem setas)
                             html_v = render_vasilha_mare(val, cat)
                             html_v_limpo = html_v.split('<span style="position: absolute;')[0] + '</div></div>'
                             
-                            with m_cols[i % 5]:
+                            with m_cols[i]:
                                 st.markdown(f"""
                                     <div style="text-align: center;">
                                         {html_v_limpo}
-                                        <div style="font-size: 10px; font-weight: bold; color: #5D6D7E; margin-top: 8px; line-height: 1.1; height: 30px; display: flex; align-items: center; justify-content: center;">
-                                            {cat.upper()}
+                                        <div style="font-size: 9px; font-weight: bold; color: #5D6D7E; margin-top: 5px; text-transform: uppercase;">
+                                            {cat}
                                         </div>
                                     </div>
                                 """, unsafe_allow_html=True)
                         
-                        st.markdown("<br>", unsafe_allow_html=True)
+                        # Gráfico ampliado horizontalmente
                         fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
+                        fig_espelho.update_layout(
+                            height=300, # Altura controlada para evitar scroll
+                            margin=dict(l=20, r=20, t=30, b=20),
+                            paper_bgcolor='rgba(0,0,0,0)',
+                            plot_bgcolor='rgba(0,0,0,0)'
+                        )
                         st.plotly_chart(fig_espelho, use_container_width=True)
                     else:
                         st.warning("Avaliação comportamental ainda não disponível.")

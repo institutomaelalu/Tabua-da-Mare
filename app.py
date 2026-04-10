@@ -736,38 +736,60 @@ elif menu == "🌊 Canal do Apadrinhamento":
 
             st.markdown("---")
 
-            # --- VISUALIZAÇÃO 1: GERAL (SOCIOEMOCIONAL) ---
-            if modo == "🌊 Tábua da Maré (Geral)":
-                df_av = pd.read_csv(AVAL_FILE)
-                dados_mare = df_av[df_av["Aluno"] == al_af]
+# --- VISUALIZAÇÃO 1: GERAL (SOCIOEMOCIONAL COM FICHA E VASILHAS LIMPAS) ---
+            if modo == "🌊 Tábua da Maré":
+                # Resgate de dados extras do afilhado para a Ficha
+                info_afilhado = afils[afils["ALUNO"].astype(str).str.contains(al_af, na=False)].iloc[0]
                 
-                if not dados_mare.empty:
-                    r_mare = dados_mare.iloc[-1]
-                    st.markdown("##### 📋 Desenvolvimento Socioemocional")
+                col_ficha, col_grafico = st.columns([1, 2.5])
+                
+                with col_ficha:
+                    # FICHA DO AFILHADO (Estilo Imagem 2)
+                    st.markdown(f"""
+                        <div style="background-color: #ffffff; padding: 20px; border-radius: 15px; border: 1px solid #e0e0e0; box-shadow: 2px 2px 10px rgba(0,0,0,0.05); color: #2c3e50;">
+                            <h3 style="margin-top: 0; color: #1A5276; border-bottom: 2px solid #5DADE2; padding-bottom: 10px;">📋 Ficha do Afilhado</h3>
+                            <p style="margin: 10px 0;"><b>👤 Nome:</b><br>{al_af}</p>
+                            <p style="margin: 10px 0;"><b>🏫 Sala:</b><br>{info_afilhado.get('SALA', 'Não informada')}</p>
+                            <p style="margin: 10px 0;"><b>🎂 Idade:</b><br>{info_afilhado.get('IDADE', '---')} anos</p>
+                            <p style="margin: 10px 0;"><b>🏡 Comunidade:</b><br>{info_afilhado.get('COMUNIDADE', 'Não informada')}</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                with col_grafico:
+                    df_av = pd.read_csv(AVAL_FILE)
+                    dados_mare = df_av[df_av["Aluno"] == al_af]
                     
-                    m_cols = st.columns(5)
-                    valores_grafico = []
-                    for i, cat in enumerate(CATEGORIAS):
-                        val = r_mare[cat]
-                        valores_grafico.append(val)
-                        seta = "↑" if val >= 3 else "↓"
-                        cor_seta = "#2ecc71" if val >= 3 else "#e74c3c"
+                    if not dados_mare.empty:
+                        r_mare = dados_mare.iloc[-1]
+                        st.markdown("##### 📋 Nível das Marés Pedagógicas")
                         
-                        html_v = render_vasilha_mare(val, cat)
-                        html_v_limpo = html_v.split('<span style="position: absolute;')[0] + '</div></div>'
+                        # Layout das Vasilhas sem setas e com nomes abaixo
+                        m_cols = st.columns(5)
+                        valores_grafico = []
+                        for i, cat in enumerate(CATEGORIAS):
+                            val = r_mare[cat]
+                            valores_grafico.append(val)
+                            
+                            # Renderiza a vasilha (sem a parte das setas que estava no seu código original)
+                            html_v = render_vasilha_mare(val, cat)
+                            # Removemos qualquer resquício de posicionamento absoluto de setas se houver na função original
+                            html_v_limpo = html_v.split('<span style="position: absolute;')[0] + '</div></div>'
+                            
+                            with m_cols[i % 5]:
+                                st.markdown(f"""
+                                    <div style="text-align: center;">
+                                        {html_v_limpo}
+                                        <div style="font-size: 10px; font-weight: bold; color: #5D6D7E; margin-top: 5px; line-height: 1.1; height: 30px; display: flex; align-items: center; justify-content: center;">
+                                            {cat.upper()}
+                                        </div>
+                                    </div>
+                                """, unsafe_allow_html=True)
                         
-                        m_cols[i % 5].markdown(f"""
-                            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
-                                {html_v_limpo}
-                                <div style="font-size: 28px; font-weight: bold; color: {cor_seta}; margin-left: -5px; margin-top: 20px;">{seta}</div>
-                            </div>
-                        """, unsafe_allow_html=True)
-                    
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
-                    st.plotly_chart(fig_espelho, use_container_width=True)
-                else:
-                    st.warning("Avaliação comportamental ainda não disponível.")
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
+                        st.plotly_chart(fig_espelho, use_container_width=True)
+                    else:
+                        st.warning("Avaliação comportamental ainda não disponível para este afilhado.")
 
             # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---
             elif modo == "📚 Turno Estendido":

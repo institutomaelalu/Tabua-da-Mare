@@ -510,16 +510,13 @@ elif menu == "🤝 Gestão de apadrinhamento":
 # --- ABA: AVALIAÇÃO TÁBUA DA MARÉ ---
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
-    
-    # URL limpa (apenas o ID da planilha)
-    id_planilha = "1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4"
-    url_final = f"https://docs.google.com/spreadsheets/d/{id_planilha}/edit"
 
     try:
-        # Lendo a aba direta
-        df_av = conn.read(spreadsheet=url_final, worksheet="TABUA_MARE").fillna("")
+        # Puxa a URL diretamente do secrets usando a chave 'geral'
+        # O gsheets_connection resolve o resto sozinho
+        df_h = conn.read(worksheet="TABUA_MARE").fillna("") 
     except Exception as e:
-        st.error(f"Erro ao carregar dados da planilha: {e}")
+        st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()
 
     # Renderiza os botões das salas
@@ -583,14 +580,11 @@ elif menu == "📊 Avaliação da Tábua da Maré":
 # --- ABA: TURNO ESTENDIDO ---
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
-    
-# URL limpa (apenas o ID da planilha para evitar erro 400)
-    id_planilha = "1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4"
-    url_final = f"https://docs.google.com/spreadsheets/d/{id_planilha}/edit"
 
     try:
-        # Lendo a aba direta (Certifique-se que não há espaços extras no Google Sheets)
-        df_h = conn.read(spreadsheet=url_final, worksheet="TURNO_ESTENDIDO").fillna("")
+        # Puxa a URL diretamente do secrets usando a chave 'geral'
+        # O gsheets_connection resolve o resto sozinho
+        df_h = conn.read(worksheet="TURNO ESTENDIDO").fillna("") 
     except Exception as e:
         st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()

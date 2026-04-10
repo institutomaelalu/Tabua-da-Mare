@@ -736,9 +736,9 @@ elif menu == "🌊 Canal do Apadrinhamento":
 
             st.markdown("---")
 
-# --- VISUALIZAÇÃO 1: GERAL (SOCIOEMOCIONAL - AJUSTE FINAL DE LAYOUT) ---
+# --- VISUALIZAÇÃO 1: GERAL (LAYOUT FULL WIDTH PARA O GRÁFICO) ---
             if modo == "🌊 Tábua da Maré (Geral)":
-                # 1. Identificação da Sala e Cor (Melhorado para busca parcial)
+                # 1. Busca de dados e Cor da Sala
                 info_row = afils[afils["ALUNO"].astype(str).str.contains(al_af, na=False)].iloc[0]
                 nome_sala = "Não informada"
                 cor_sala_bg = "#ffffff" 
@@ -755,19 +755,21 @@ elif menu == "🌊 Canal do Apadrinhamento":
                         elif "LARANJA" in aba_upper: cor_sala_bg = "#FFF3E0"
                         break
 
-                # 2. CSS para remover recuos do Streamlit e alinhar legendas
+                # 2. CSS para alinhar legendas e status
                 st.markdown("""
                     <style>
-                    [data-testid="column"] { padding: 0 5px !important; }
-                    .legenda-mare {
+                    .status-mare {
                         font-size: 10px !important;
-                        font-weight: bold;
                         color: #5D6D7E;
-                        margin-top: 2px;
-                        text-transform: uppercase;
-                        line-height: 1;
-                        text-align: center;
-                        min-height: 25px;
+                        margin-top: -5px;
+                        font-weight: normal;
+                    }
+                    .legenda-v-nome {
+                        font-size: 9px !important;
+                        font-weight: bold;
+                        color: #2c3e50;
+                        margin-bottom: 5px;
+                        height: 25px;
                         display: flex;
                         align-items: center;
                         justify-content: center;
@@ -775,59 +777,62 @@ elif menu == "🌊 Canal do Apadrinhamento":
                     </style>
                 """, unsafe_allow_html=True)
 
-                # 3. Colunas: Ficha (25%) | Gráfico (75%)
-                col_ficha, col_grafico = st.columns([1, 3])
+                # PARTE SUPERIOR: FICHA + VASILHAS
+                col_ficha, col_vasilhas = st.columns([1, 2.5])
                 
                 with col_ficha:
                     st.markdown(f"""
-                        <div style="background-color: {cor_sala_bg}; padding: 20px; border-radius: 15px; border: 1px solid rgba(0,0,0,0.1); color: #2c3e50; height: 100%;">
-                            <h4 style="margin-top: 0; color: #1A5276; border-bottom: 2px solid rgba(0,0,0,0.1); padding-bottom: 8px;">📋 Ficha</h4>
-                            <p style="margin: 12px 0;"><b>👤 Nome:</b><br>{al_af}</p>
-                            <p style="margin: 12px 0;"><b>🏫 Sala:</b><br>{nome_sala}</p>
-                            <p style="margin: 12px 0;"><b>🎂 Idade:</b><br>{info_row.get('IDADE', '---')} anos</p>
-                            <p style="margin: 12px 0;"><b>🏡 Comunidade:</b><br>{info_row.get('COMUNIDADE', 'Não informada')}</p>
+                        <div style="background-color: {cor_sala_bg}; padding: 15px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1);">
+                            <h4 style="margin: 0 0 10px 0; color: #1A5276; border-bottom: 1px solid rgba(0,0,0,0.1);">📋 Ficha</h4>
+                            <p style="margin: 5px 0; font-size: 13px;"><b>👤 Nome:</b><br>{al_af}</p>
+                            <p style="margin: 5px 0; font-size: 13px;"><b>🏫 Sala:</b><br>{nome_sala}</p>
+                            <p style="margin: 5px 0; font-size: 13px;"><b>🎂 Idade:</b><br>{info_row.get('IDADE', '---')} anos</p>
+                            <p style="margin: 5px 0; font-size: 13px;"><b>🏡 Comunidade:</b><br>{info_row.get('COMUNIDADE', 'Não informada')}</p>
                         </div>
                     """, unsafe_allow_html=True)
 
-                with col_grafico:
+                with col_vasilhas:
                     df_av = pd.read_csv(AVAL_FILE)
                     dados_mare = df_av[df_av["Aluno"] == al_af]
                     
                     if not dados_mare.empty:
                         r_mare = dados_mare.iloc[-1]
-                        
-                        # Vasilhas: n_cols fixo em 5 para garantir alinhamento
-                        m_cols = st.columns(5)
+                        v_cols = st.columns(5)
                         valores_grafico = []
                         
                         for i, cat in enumerate(CATEGORIAS):
                             val = r_mare[cat]
                             valores_grafico.append(val)
                             
+                            # Define o texto do status baseado no valor
+                            status_txt = "Maré Baixa" if val <= 1 else "Maré Cheia" if val >= 3 else "Maré Alta"
+                            
                             html_v = render_vasilha_mare(val, cat)
-                            # Limpa setas e IDs da função original
+                            # Remove as setas originais (limpeza absoluta)
                             html_v_limpo = html_v.split('<span style="position: absolute;')[0] + '</div></div>'
                             
-                            with m_cols[i % 5]:
+                            with v_cols[i % 5]:
                                 st.markdown(f"""
                                     <div style="text-align: center;">
+                                        <div class="legenda-v-nome">{cat}</div>
                                         {html_v_limpo}
-                                        <div class="legenda-mare">{cat}</div>
+                                        <div class="status-mare">{status_txt}</div>
                                     </div>
                                 """, unsafe_allow_html=True)
-                        
-                        # Gráfico Plotly: Forçando expansão máxima
-                        fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
-                        fig_espelho.update_layout(
-                            height=350,
-                            margin=dict(l=0, r=0, t=30, b=0),
-                            autosize=True,
-                            paper_bgcolor='rgba(0,0,0,0)',
-                            plot_bgcolor='rgba(0,0,0,0)'
-                        )
-                        st.plotly_chart(fig_espelho, use_container_width=True, config={'displayModeBar': False})
-                    else:
-                        st.warning("Avaliação comportamental ainda não disponível.")
+
+                # PARTE INFERIOR: GRÁFICO (FORA DAS COLUNAS PARA LARGURA TOTAL)
+                st.markdown("<br>", unsafe_allow_html=True)
+                if not dados_mare.empty:
+                    fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
+                    fig_espelho.update_layout(
+                        height=380, # Altura boa para visualizar sem scroll excessivo
+                        margin=dict(l=0, r=0, t=20, b=0), # Margens zero para ocupar os lados
+                        autosize=True,
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)'
+                    )
+                    # use_container_width=True aqui fará o gráfico ocupar toda a largura da página
+                    st.plotly_chart(fig_espelho, use_container_width=True, config={'displayModeBar': False})
 
             # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---
             elif modo == "📚 Turno Estendido":

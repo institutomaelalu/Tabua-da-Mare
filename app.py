@@ -5,28 +5,30 @@ import numpy as np
 import os
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
-
+# 1. CONFIGURAÇÃO E ESTILO (Sempre o primeiro comando Streamlit)
+st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 # --- 1. ESTABELECER CONEXÃO (OBRIGATÓRIO SER AQUI) ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- 2. CARREGAMENTO INICIAL ---
 try:
-    # Tentativa de leitura das abas
+    # 1. Base Geral de Alunos
     df_g = conn.read(worksheet="GERAL").fillna("")
     df_g.columns = [str(c).strip().upper() for c in df_g.columns]
     
+    # 2. Base do Turno Estendido (Substitui o ALF_FILE)
     df_alf = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
     df_alf.columns = [str(c).strip().upper() for c in df_alf.columns]
 
+    # 3. Base da Tábua da Maré (Substitui o AVAL_FILE)
     df_aval = conn.read(worksheet="TABUA_MARE").fillna("")
     df_aval.columns = [str(c).strip().upper() for c in df_aval.columns]
     
 except Exception as e:
     st.error(f"Erro ao carregar dados da nuvem: {e}")
-    # Se falhar, criamos colunas MÍNIMAS para os filtros não darem KeyError
     df_g = pd.DataFrame(columns=["ALUNO", "TURNO", "COMUNIDADE", "SALA"])
-    df_alf = pd.DataFrame(columns=["ALUNO", "SALA"])
-    df_aval = pd.DataFrame(columns=["ALUNO", "SALA"])
+    df_alf = pd.DataFrame(columns=["ALUNO", "SALA", "ANO", "AVALIAÇÃO", "DIAGNÓSTICO"])
+    df_aval = pd.DataFrame(columns=["ALUNO", "SEMESTRE"] + CATEGORIAS)
 
 # --- 3. FUNÇÕES DE FILTRO (Ajustadas para os novos nomes) ---
 def render_filtros(df_geral, key_suffix):
@@ -41,9 +43,6 @@ def render_filtros(df_geral, key_suffix):
         
     cm = f2.selectbox("Filtrar Comunidade", comu_list, key=f"cm_{key_suffix}")
     return tn, cm
-
-# 1. CONFIGURAÇÃO E ESTILO (Sempre o primeiro comando Streamlit)
-st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 
 # --- DEFINIÇÕES DE NÍVEIS E CORES (MATRIZES) ---
 NIVEIS_ALF = [
@@ -706,7 +705,7 @@ elif menu == "📊 Dados - Turno Estendido":
 
     st.markdown("### 📋 Panorama de Avaliações")
     
-    df_h = pd.read_csv(ALF_FILE).fillna("")
+    df_h = df_alf.copy()
 
     if "Ano" not in df_h.columns:
         df_h["Ano"] = 2025
@@ -810,7 +809,7 @@ elif menu == "📈 Indicadores pedagógicos":
 
     st.markdown(f"### 📈 Indicadores")
     render_botoes_salas("btn_ind", "sel_ind")
-    df_h = pd.read_csv(ALF_FILE)
+    df_h = df_alf.copy()
     if not df_h.empty:
         df_ult = df_h.sort_values("Avaliacao").groupby("Aluno").last().reset_index()
         df_ult["Aluno"] = df_ult["Aluno"].str.replace("**", "", regex=False)
@@ -893,7 +892,7 @@ elif menu == "🌊 Canal do Apadrinhamento":
                     """, unsafe_allow_html=True)
 
                 with col_vasilhas:
-                    df_av = pd.read_csv(AVAL_FILE)
+                    df_av = pd.read_csv(df_aval.copy())
                     dados_mare = df_av[df_av["Aluno"] == al_af]
                     
                     if not dados_mare.empty:
@@ -941,7 +940,7 @@ elif menu == "🌊 Canal do Apadrinhamento":
 
             # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---
             elif modo == "📚 Turno Estendido":
-                df_h = pd.read_csv(ALF_FILE).fillna("")
+                df_h = pd.read_csv(df_alf.copy()).fillna("")
                 dados_al = df_h[df_h["Aluno"] == al_af].sort_values(["Ano", "Avaliacao"])
                 dados_al = dados_al.drop_duplicates(subset=['Avaliacao', 'Ano'], keep='last')
                 

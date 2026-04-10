@@ -792,20 +792,26 @@ elif modo == "📚 Turno Estendido":
                 <span>Nível: <b style="color:{cor_label};">{r['Nivel']}</b></span>
             </div>""", unsafe_allow_html=True)
     
-    elif menu == "🌊 Tábua da Maré:# 
-            (Mantido original)
+ # --- FIM DA ABA CANAL DO APADRINHAMENTO E INÍCIO DA PRÓXIMA ABA ---
+elif menu == "🌊 Tábua da Maré":
     st.markdown(f"### 🌊 Tábua da Maré")
     render_botoes_salas("btn_int", "sel_int")
+    
     df_av = pd.read_csv(AVAL_FILE)
     df_s = safe_read(st.session_state.sel_int)
+    
     if not df_s.empty:
         alunos_sala = [str(n).replace("**", "").strip() for n in df_s["ALUNO"].unique()]
         df_f = df_av[df_av["Aluno"].isin(alunos_sala)]
+        
         if not df_f.empty:
             for al in sorted(df_f["Aluno"].unique()):
                 with st.expander(f"📊 {al}"):
                     for _, r in df_f[df_f["Aluno"] == al].iterrows():
                         st.write(f"**{r['Periodo']}**")
+                        # Certifique-se que a função criar_grafico_mare existe no seu código
                         st.plotly_chart(criar_grafico_mare(CATEGORIAS, [float(r[c]) for c in CATEGORIAS]), key=f"g_{al}_{r['Periodo']}")
-        else: st.info("Nenhuma avaliação lançada para esta sala.")
-    else: st.error("Erro ao carregar dados da sala.")
+        else:
+            st.info("Nenhuma avaliação lançada para esta sala.")
+    else:
+        st.error("Erro ao carregar dados da sala.")

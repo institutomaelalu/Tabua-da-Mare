@@ -312,32 +312,32 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
-# --- NOVA ABA: DADOS - TURNO ESTENDIDO (VERSÃO FINAL) ---
+# --- NOVA ABA: DADOS - TURNO ESTENDIDO (VERSÃO CORRIGIDA) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
     df_h = pd.read_csv(ALF_FILE)
     
-    # 7 Cores exclusivas e suaves para os 7 níveis
+    # 7 Cores exclusivas, suaves e distintas (sem repetição)
     CORES_EXCLUSIVAS = {
-        "1. Pré-Silábico": "#f2f2f2",          # Cinza Claro
-        "2. Silábico s/ Valor": "#e2f0cb",     # Verde Menta
-        "3. Silábico c/ Valor": "#ffcc99",     # Laranja Pastel
-        "4. Silábico Alfabético": "#ffffcc",   # Amarelo Pastel
-        "5. Alfabético Inicial": "#ff99cc",    # Rosa Pastel
-        "6. Alfabético Final": "#c7ceea",      # Azul Lavanda
-        "7. Alfabético Ortográfico": "#b2e2f2" # Azul Turquesa Suave
+        "1. Pré-Silábico": "#E8E8E8",          # Cinza suave
+        "2. Silábico s/ Valor": "#D1F2EB",     # Verde água
+        "3. Silábico c/ Valor": "#FCF3CF",     # Amarelo claro
+        "4. Silábico Alfabético": "#D5F5E3",   # Verde menta
+        "5. Alfabético Inicial": "#FADBD8",    # Rosa pastel
+        "6. Alfabético Final": "#E8DAEF",      # Lavanda
+        "7. Alfabético Ortográfico": "#D6EAF8" # Azul céu claro
     }
 
     # Legenda da Trilha no topo
     cols_leg = st.columns(len(NIVEIS_ALF))
     for idx, niv in enumerate(NIVEIS_ALF):
-        cols_leg[idx].markdown(f"<div style='background-color:{CORES_EXCLUSIVAS[niv]}; padding:10px; border-radius:10px; text-align:center; font-size:9px; font-weight:bold; color:black; border: 1px solid #ddd;'>{niv.split('. ')[1]}</div>", unsafe_allow_html=True)
+        cols_leg[idx].markdown(f"<div style='background-color:{CORES_EXCLUSIVAS[niv]}; padding:10px; border-radius:10px; text-align:center; font-size:9px; font-weight:bold; color:black; border: 1px solid #ccc;'>{niv.split('. ')[1]}</div>", unsafe_allow_html=True)
 
-    # Tabela Principal (Sem Observações)
+    # Tabela Principal (Sem Observações e com Fonte Preta)
     html = """
     <style>
-        .cell-diag { text-align: center; font-weight: bold; font-size: 11px; color: black; border-radius: 4px; }
-        .card-detalhe { border: 1px solid #eee; padding: 20px; border-radius: 15px; background-color: #fcfcfc; margin-top: 20px; }
+        .cell-diag { text-align: center; font-weight: bold; font-size: 11px; color: black !important; }
+        .card-detalhe { border: 1px solid #ddd; padding: 20px; border-radius: 15px; background-color: #f9f9f9; margin-top: 20px; color: black; }
     </style>
     <table class="custom-table">
         <thead style="background-color:#5cc6d0">
@@ -368,13 +368,12 @@ elif menu == "📊 Dados - Turno Estendido":
     
     salas_ativas = sorted(list(set(st.session_state["alunos_te_dict"].values())))
     if salas_ativas:
-        # Botões de Sala (Apenas as que têm alunos no turno)
+        # Botões de Sala para filtrar alunos do Turno Estendido
         if "sel_te_dados" not in st.session_state: st.session_state.sel_te_dados = salas_ativas[0]
         render_botoes_salas("btn_te_dados", "sel_te_dados", salas_permitidas=salas_ativas)
         
-        # Filtro de Aluno baseado na sala selecionada
         alunos_da_sala = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te_dados]
-        al_sel = st.selectbox("Selecione o aluno para ver detalhes:", sorted(alunos_da_sala), key="detalhe_aluno")
+        al_sel = st.selectbox("Selecione o aluno para ficha pedagógica:", sorted(alunos_da_sala), key="detalhe_aluno")
         
         if al_sel:
             dados_h = df_h[df_h["Aluno"] == al_sel]
@@ -384,15 +383,18 @@ elif menu == "📊 Dados - Turno Estendido":
                 
                 st.markdown(f"""
                 <div class="card-detalhe">
-                    <h4 style="margin-top:0">Ficha Pedagógica: {al_sel}</h4>
-                    <p><b>Nível Atual:</b> <span style="background-color:{cor_nivel}; padding:3px 10px; border-radius:10px;">{ultimo['Nivel']}</span></p>
-                    <p><b>Evidências Identificadas:</b><br><small>{ultimo['Evidencias'] if ultimo['Evidencias'] else 'Nenhuma evidência registrada.'}</small></p>
-                    <p><b>Observações Pedagógicas:</b><br><i>{ultimo['Obs'] if ultimo['Obs'] else 'Sem observações.'}</i></p>
+                    <h4 style="margin-top:0; color:black;">Ficha de Evolução: {al_sel}</h4>
+                    <p style="color:black;"><b>Nível Diagnosticado:</b> <span style="background-color:{cor_nivel}; padding:5px 12px; border-radius:12px; border: 1px solid #bbb;">{ultimo['Nivel']}</span></p>
+                    <p style="color:black;"><b>Evidências Notadas:</b><br>{ultimo['Evidencias'] if ultimo['Evidencias'] else 'Nenhuma evidência registrada.'}</p>
+                    <p style="color:black;"><b>Observações Pedagógicas:</b><br><i>{ultimo['Obs'] if ultimo['Obs'] else 'Sem observações.'}</i></p>
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                st.info("Este aluno ainda não possui diagnósticos registrados.")elif menu == "📈 Indicadores pedagógicos"
-    # (Mantido original)
+                st.info("Este aluno ainda não possui diagnósticos registrados.")
+
+# --- PRÓXIMO MENU (Certifique-se que o elif abaixo está fora do bloco anterior) ---
+elif menu == "📈 Indicadores pedagógicos":
+
     st.markdown(f"### 📈 Indicadores")
     render_botoes_salas("btn_ind", "sel_ind")
     df_h = pd.read_csv(ALF_FILE)

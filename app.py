@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import numpy as np
 import os
 from datetime import datetime
+from streamlit_gsheets import GSheetsConnection
 
 # --- 1. DEFINIÇÕES DE NÍVEIS E CORES PASTÉIS ---
 NIVEIS_ALF = [

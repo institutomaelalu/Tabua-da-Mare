@@ -266,60 +266,79 @@ elif menu == "📊 Avaliação da Tábua da Maré":
                 pd.concat([df_av, pd.DataFrame([[al, tr] + [MARE_OPCOES[n_l[c]] for c in CATEGORIAS] + [obs]], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
                 st.success("Salvo!"); st.rerun()
 
-# --- ABA: TURNO ESTENDIDO (REGISTRO COM ANO) ---
+# --- ABA: TURNO ESTENDIDO (REGISTRO COM ADIÇÃO DINÂMICA DE ANO) ---
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
     
-    # --- NOVO: SELEÇÃO DE ANO PARA REGISTRO ---
-    st.write("**Ano da Avaliação:**")
+    # --- LÓGICA DE ANOS DINÂMICOS ---
+    df_h = pd.read_csv(ALF_FILE).fillna("")
+    if "Ano" not in df_h.columns:
+        df_h["Ano"] = 2025
+        df_h.to_csv(ALF_FILE, index=False)
+
+    # Pegamos os anos que já existem no CSV + o que está no estado da sessão
+    anos_no_csv = sorted(df_h["Ano"].unique().tolist())
+    if "lista_anos_te" not in st.session_state:
+        st.session_state.lista_anos_te = anos_no_csv if anos_no_csv else [2025, 2026]
+    
     if "ano_registro_te" not in st.session_state: 
-        st.session_state.ano_registro_te = 2026
+        st.session_state.ano_registro_te = st.session_state.lista_anos_te[-1]
 
-    col_anos_reg = st.columns([0.15, 0.15, 0.7])
-    anos_opcoes = [2025, 2026]
-    cores_opcoes = {2025: "#2E86C1", 2026: "#28B463"}
+    st.write("**Ano da Avaliação:**")
+    
+    # Layout para os botões de ano + botão de Adicionar
+    cols_anos_all = st.columns([0.15] * len(st.session_state.lista_anos_te) + [0.1, 0.6])
+    
+    cores_anos = {2025: "#2E86C1", 2026: "#28B463", 2027: "#E67E22", 2028: "#8E44AD"} # Cores sugeridas
 
-    for i, ano in enumerate(anos_opcoes):
+    for i, ano in enumerate(st.session_state.lista_anos_te):
         is_active = st.session_state.ano_registro_te == ano
-        cor_btn = cores_opcoes[ano] if is_active else "#D5DBDB"
+        # Se for um ano novo sem cor definida, usa um cinza azulado
+        cor_base = cores_anos.get(ano, "#34495E")
+        cor_btn = cor_base if is_active else "#D5DBDB"
         txt_cor = "white" if is_active else "#566573"
         
-        if col_anos_reg[i].button(f"📅 {ano}", key=f"btn_reg_ano_{ano}", use_container_width=True):
+        if cols_anos_all[i].button(f"📅 {ano}", key=f"btn_reg_ano_{ano}", use_container_width=True):
             st.session_state.ano_registro_te = ano
             st.rerun()
         
-        # CSS para aproximar botões e colorir
         st.markdown(f"<style>div[data-testid='stHorizontalBlock'] div:nth-child({i+1}) button {{ background-color: {cor_btn} !important; color: {txt_cor} !important; border: {'2px solid black' if is_active else '1px solid #ccc'} !important; }}</style>", unsafe_allow_html=True)
-    
+
+    # BOTÃO DE ADICIONAR ANO (+)
+    with cols_anos_all[len(st.session_state.lista_anos_te)].popover("➕"):
+        novo_ano_input = st.number_input("Digite o novo ano:", min_value=2024, max_value=2100, value=st.session_state.lista_anos_te[-1] + 1)
+        if st.button("Confirmar Novo Ano"):
+            if novo_ano_input not in st.session_state.lista_anos_te:
+                st.session_state.lista_anos_te.append(novo_ano_input)
+                st.session_state.lista_anos_te.sort()
+                st.session_state.ano_registro_te = novo_ano_input
+                st.success(f"Ano {novo_ano_input} adicionado!")
+                st.rerun()
+            else:
+                st.warning("Este ano já existe!")
+
     st.write(f"Registrando para o ano letivo: **{st.session_state.ano_registro_te}**")
     st.markdown("---")
 
-    # (Mantido original: Cadastro Manual)
+    # (Início do seu formulário de registro original...)
     with st.expander("➕ Cadastrar Aluno Manualmente no Turno"):
+        # ... (restante do código de cadastro manual mantido igual) ...
         with st.form("f_te_m"):
             c1, c2 = st.columns(2)
             nM, sM = c1.text_input("Nome").strip().upper(), c2.selectbox("Sala", list(TURMAS_CONFIG.keys()))
             if st.form_submit_button("Adicionar"):
                 if nM: st.session_state["alunos_te_dict"][nM] = sM; st.rerun()
     
+    # ... (Seleção de Aluno e Trilha Visual mantidos igual) ...
     salas_te = sorted(list(set(st.session_state["alunos_te_dict"].values())))
     if salas_te:
         if st.session_state.sel_te not in salas_te: st.session_state.sel_te = salas_te[0]
         render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_te)
         al_te = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te]
         al = st.selectbox("Aluno:", sorted(al_te))
-        cor_o = TURMAS_CONFIG[st.session_state.sel_te]["cor"]
-        st.markdown(f'<div class="sala-badge" style="background-color:{cor_o}">{st.session_state.sel_te}</div>', unsafe_allow_html=True)
         
-        df_h = pd.read_csv(ALF_FILE)
-        
-        # Garantir que a coluna Ano existe no DF carregado
-        if "Ano" not in df_h.columns:
-            df_h["Ano"] = 2025
-
-        # Busca o último diagnóstico do aluno para a trilha visual
+        # ... (Lógica da Trilha Visual) ...
         diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
-        
         ht = '<div class="trilha-container">'
         for i, n_t in enumerate(NIVEIS_ALF):
             atv = (diag is not None and diag["Nivel"] == n_t)
@@ -330,7 +349,6 @@ elif menu == "📖 Turno Estendido":
         nV = st.selectbox("Novo Nível:", NIVEIS_ALF, index=NIVEIS_ALF.index(diag["Nivel"]) if diag is not None else 0)
         
         with st.form("f_alf_dinamico"):
-            # Ajustado para manter o padrão visual: 3ª Avaliação (Final)
             tipo = st.selectbox("Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
             evidencias_atuais = EVIDENCIAS_POR_NIVEL.get(nV, [])
             st.write(f"**Evidências para {nV}:**")
@@ -342,30 +360,16 @@ elif menu == "📖 Turno Estendido":
             obs = st.text_area("Obs:")
             
             if st.form_submit_button("Salvar Diagnóstico"):
-                # CRIANDO A NOVA LINHA COM A COLUNA ANO
-                # IMPORTANTE: A ordem das colunas deve ser IDÊNTICA ao seu CSV original + a nova coluna Ano
-                # Supondo que as colunas sejam: [Aluno, Avaliacao, Nivel, Flag, Evidencias, Obs, Sala, Ano]
                 new_data = {
-                    "Aluno": al,
-                    "Avaliacao": tipo,
-                    "Nivel": nV,
-                    "Flag": False, # ou Data, dependendo do seu CSV
-                    "Evidencias": ", ".join(s_ev),
-                    "Obs": obs,
+                    "Aluno": al, "Avaliacao": tipo, "Nivel": nV,
+                    "Flag": datetime.now().strftime("%d/%m/%Y"), # Exemplo de uso da coluna Flag para Data
+                    "Evidencias": ", ".join(s_ev), "Obs": obs,
                     "Sala": st.session_state.sel_te,
                     "Ano": int(st.session_state.ano_registro_te)
                 }
-                
-                new_row = pd.DataFrame([new_data])
-                
-                # Concatenar e Salvar
-                df_h = pd.concat([df_h, new_row], ignore_index=True)
+                df_h = pd.concat([df_h, pd.DataFrame([new_data])], ignore_index=True)
                 df_h.to_csv(ALF_FILE, index=False)
-                
-                st.success(f"Diagnóstico de {st.session_state.ano_registro_te} salvo com sucesso!")
-                st.rerun()
-    else: 
-        st.info("Sem alunos no Turno.")
+                st.success(f"Diagnóstico de {st.session_state.ano_registro_te} salvo!"); st.rerun()
 # --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO FINAL - TEXTO LIMPO) ---
 elif menu == "📊 Dados - Turno Estendido":
     # CSS Global para Cabeçalhos, Miniaturas e Botões

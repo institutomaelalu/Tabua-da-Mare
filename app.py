@@ -11,6 +11,7 @@ st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 
 C_ROSA, C_VERDE, C_AZUL, C_AMARELO, C_ROXO = "#ff81ba", "#a8cf45", "#5cc6d0", "#ffc713", "#6741d9"
 C_AZUL_MARE = "#8fd9fb" 
+C_ROXO_PASTEL = "#e0d7f7" # Tom pastel para alunos não selecionados
 
 # Configurações para Alfabetização
 CORES_TRILHA = {
@@ -47,11 +48,21 @@ st.markdown(f"""
     }}
     .custom-table thead th {{ padding: 12px 10px; text-align: left; color: white !important; font-weight: 700; border: none; }}
     .custom-table tbody td {{ padding: 8px 10px; border-bottom: 1px solid #fafafa; color: #444 !important; font-weight: 500; }}
+    
+    /* Botão Padrão */
     div.stButton > button {{
         width: 100%; border-radius: 8px !important; font-weight: 700 !important; 
         height: 42px; font-size: 11px !important; border: none !important;
         transition: all 0.3s;
     }}
+
+    /* Estilo específico para o botão Turno Estendido na listagem (Menor) */
+    .btn-estendido-col div.stButton > button {{
+        height: 32px !important;
+        font-size: 10px !important;
+        padding: 0 5px !important;
+    }}
+
     .trilha-container {{ display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 0; }}
     .caixa-trilha {{
         flex: 1; height: 85px; border-radius: 15px; display: flex; align-items: center; justify-content: center;
@@ -165,16 +176,11 @@ if st.sidebar.button("🚪 Sair"):
     st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
     st.rerun()
 
-# --- MENU LATERAL (NOMES ATUALIZADOS) ---
+# --- MENU LATERAL ---
 menu_options = [
-    "👤 Matrícula", 
-    "📝 Alunos matriculados", 
-    "🤝 Gestão de apadrinhamento", 
-    "📊 Avaliação da Tábua da Maré", 
-    "📖 Turno Estendido", 
-    "📈 Indicadores pedagógicos", 
-    "🌊 Canal do Apadrinhamento", 
-    "🌊 Tábua da Maré"
+    "👤 Matrícula", "📝 Alunos matriculados", "🤝 Gestão de apadrinhamento", 
+    "📊 Avaliação da Tábua da Maré", "📖 Turno Estendido", 
+    "📈 Indicadores pedagógicos", "🌊 Canal do Apadrinhamento", "🌊 Tábua da Maré"
 ] if st.session_state.perfil == "admin" else ["🌊 Canal do Apadrinhamento"]
 menu = st.sidebar.radio("Navegação", menu_options)
 
@@ -206,24 +212,26 @@ elif menu == "📝 Alunos matriculados":
     tn, cm = render_filtros(df_g, "mat"); df_f = aplicar_filtros(df_s, df_g, tn, cm)
     
     for i, r in df_f.iterrows():
-        c1, c2, c3, c4 = st.columns([3, 1, 2, 1.5])
+        c1, c2, c3, c4 = st.columns([3, 1, 2, 1.3])
         c1.write(f"**{r['ALUNO']}**")
         c2.write(f"{r['IDADE']} anos")
         c3.write(f"{r['COMUNIDADE']}")
         
-        # Ajuste Visual do Botão
+        # Lógica de Cor e Tamanho do Botão
         está_no_turno = r['ALUNO'] in st.session_state["alunos_turno_estendido"]
-        cor_btn = "#6741d9" if está_no_turno else "#d9cbf9" # Tom pastel se não estiver registrado
+        cor_btn = C_ROXO if está_no_turno else C_ROXO_PASTEL
         
-        st.markdown(f"""<style>div[data-testid="column"]:nth-child(4) button[key*="btn_turno_{i}"] {{ background-color: {cor_btn} !important; color: white !important; }}</style>""", unsafe_allow_html=True)
-        
-        if c4.button("Turno Estendido", key=f"btn_turno_{i}"):
-            if not está_no_turno:
-                st.session_state["alunos_turno_estendido"].append(r['ALUNO'])
-                st.success(f"{r['ALUNO']} enviado!")
-                st.rerun()
-            else:
-                st.info(f"{r['ALUNO']} já está na lista.")
+        with c4:
+            st.markdown(f'<div class="btn-estendido-col">', unsafe_allow_html=True)
+            st.markdown(f"""<style>button[key="btn_te_{i}"] {{ background-color: {cor_btn} !important; color: white !important; }}</style>""", unsafe_allow_html=True)
+            if st.button("Turno Estendido", key=f"btn_te_{i}"):
+                if not está_no_turno:
+                    st.session_state["alunos_turno_estendido"].append(r['ALUNO'])
+                    st.success(f"Adicionado!")
+                    st.rerun()
+                else:
+                    st.info(f"Já na lista.")
+            st.markdown('</div>', unsafe_allow_html=True)
 
 elif menu == "🤝 Gestão de apadrinhamento":
     st.markdown(f"### 🤝 Gestão de Apadrinhamento")
@@ -256,25 +264,21 @@ elif menu == "📊 Avaliação da Tábua da Maré":
 
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
-    
-    # Cadastro Manual (Extra)
     with st.expander("➕ Cadastrar novo aluno"):
         with st.form("cad_extra"):
             nome_ex = st.text_input("Nome do Aluno").strip().upper()
             if st.form_submit_button("Confirmar Cadastro"):
                 if nome_ex and nome_ex not in st.session_state["alunos_turno_estendido"]:
                     st.session_state["alunos_turno_estendido"].append(nome_ex)
-                    st.success(f"{nome_ex} adicionado!")
+                    st.success(f"Cadastrado!")
                     st.rerun()
 
     lista_final = sorted(st.session_state["alunos_turno_estendido"])
-    
     if lista_final:
         al = st.selectbox("Aluno para Diagnóstico:", lista_final)
         df_h = pd.read_csv(ALF_FILE)
         diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
         
-        # Trilha Visual
         html_trilha = '<div class="trilha-container">'
         for i, n_text in enumerate(NIVEIS_ALF):
             ativo = (diag is not None and diag["Nivel"] == n_text)
@@ -297,8 +301,7 @@ elif menu == "📖 Turno Estendido":
                 df_h = df_h[~((df_h["Aluno"] == al) & (df_h["Avaliacao"] == tipo))]
                 pd.concat([df_h, pd.DataFrame([[al, tipo, novo_nv, False, ", ".join(sel_ev), obs, "TURNO ESTENDIDO"]], columns=df_h.columns)], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico Salvo!"); st.rerun()
-    else:
-        st.info("Nenhum aluno na lista. Selecione na aba 'Alunos Matriculados' ou cadastre um novo acima.")
+    else: st.info("Nenhum aluno na lista.")
 
 elif menu == "📈 Indicadores pedagógicos":
     st.markdown(f"### 📈 Indicadores Pedagógicos")
@@ -310,9 +313,22 @@ elif menu == "📈 Indicadores pedagógicos":
 elif menu == "🌊 Canal do Apadrinhamento":
     st.markdown(f"### 🌊 Canal do Apadrinhamento")
     df_av = pd.read_csv(AVAL_FILE)
-    st.write("Evolução para os padrinhos.")
+    df_total = pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
+    
+    # Restauração da Simulação para Admin
+    pad_sel = st.session_state.nome_usuario if st.session_state.perfil == "padrinho" else st.selectbox("Simular Padrinho/Madrinha:", sorted([p for p in df_total["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan"]]))
+    
+    if pad_sel:
+        afilhados = df_total[df_total["PADRINHO/MADRINHA"].astype(str).str.upper() == pad_sel.upper()]
+        al_afil = st.selectbox("Selecione o Afilhado:", sorted(afilhados["ALUNO"].unique()))
+        if al_afil in df_av["Aluno"].unique():
+            df_hist = df_av[df_av["Aluno"] == al_afil]
+            for _, r in df_hist.iterrows():
+                st.markdown(f"**Período:** {r['Periodo']}")
+                st.plotly_chart(criar_grafico_mare(CATEGORIAS, [float(r[c]) for c in CATEGORIAS]), use_container_width=True)
+        else: st.warning("Sem avaliações.")
 
 elif menu == "🌊 Tábua da Maré":
     st.markdown(f"### 🌊 Tábua da Maré (Interno)")
     render_botoes_salas("btn_int", "sel_int")
-    st.write("Análise de progresso interno.")
+    st.write("Análise detalhada por turma.")

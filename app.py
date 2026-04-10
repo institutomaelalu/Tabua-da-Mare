@@ -6,6 +6,28 @@ import os
 import gspread
 from google.oauth2.service_account import Credentials
 
+# --- DEFINIÇÕES GLOBAIS (Margem esquerda total) ---
+MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
+
+CORES_EXCLUSIVAS = {
+    "1. Pré-Silábico": "#FF0000", 
+    "2. Silábico s/ Valor": "#FFCC00", 
+    "3. Silábico c/ Valor": "#FFFF00", 
+    "4. Silábico Alfabético": "#00B0F0", 
+    "5. Alfabético Inicial": "#00B050", 
+    "6. Alfabético Final": "#FF66CC", 
+    "7. Alfabético Ortográfico": "#B1A0C7"
+}
+
+def get_status_mare_html(nv_atual, hist):
+    pct, txt = 85, "maré baixa"
+    if nv_atual == "7. Alfabético Ortográfico": pct, txt = 15, "maré cheia"
+    elif len(hist) >= 2:
+        n_at, n_ant = MAPA_NIVEIS.get(nv_atual, 0), MAPA_NIVEIS.get(hist[-2], 0)
+        if n_at > n_ant: pct, txt = 45, "maré enchente"
+        elif n_at < n_ant: pct, txt = 70, "maré vazante"
+    return f'<div class="mare-box"><div class="mare-mini-tabela" style="background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%); clip-path: path(\'M 0 4 Q 10 0 20 4 T 40 4 L 40 20 L 0 20 Z\');"></div><span class="mare-texto-tabela">{txt}</span></div>'
+
 # 1. Configuração e Estilo
 st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 
@@ -451,173 +473,40 @@ elif menu == "📖 Turno Estendido":
                 st.success(f"Diagnóstico de {st.session_state.ano_registro_te} salvo!"); st.rerun()
 # --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO FINAL - TEXTO LIMPO) ---
 elif menu == "📊 Dados - Turno Estendido":
-    # CSS Global para Cabeçalhos, Miniaturas e Botões
-    st.markdown("""
-        <style>
-            thead tr th, th {
-                color: #000000 !important;
-                -webkit-text-fill-color: #000000 !important;
-                font-weight: bold !important;
-                background-color: #f8f9fa !important;
-                text-align: center !important;
-            }
-            /* Miniatura da Maré na Tabela */
-            .mare-box {
-                display: flex; flex-direction: column; align-items: center; 
-                justify-content: center; gap: 2px; padding: 2px;
-            }
-            .mare-mini-tabela {
-                width: 35px; height: 20px; border: 1px solid #999; border-radius: 3px;
-            }
-            .mare-texto-tabela {
-                font-size: 10px; color: #555; font-weight: bold; line-height: 1;
-                text-transform: lowercase;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
     st.markdown("### 📋 Panorama de Avaliações")
-    
     df_h = pd.read_csv(ALF_FILE).fillna("")
-
-    # Garantir coluna Ano
-    if "Ano" not in df_h.columns:
-        df_h["Ano"] = 2025
-        df_h.to_csv(ALF_FILE, index=False)
-
-    # 1. SELEÇÃO DE ANO (BOTÕES PRÓXIMOS E COLORIDOS)
-    st.write("Selecione o Ano:")
+    
+    # Seletor de Ano
     if "ano_ativo_te" not in st.session_state: st.session_state.ano_ativo_te = 2025
-    
-    col_anos = st.columns([0.15, 0.15, 0.7]) 
-    anos = [2025, 2026]
-    cores = {2025: "#2E86C1", 2026: "#28B463"} 
+    col_anos = st.columns([0.15, 0.15, 0.7])
+    for i, ano in enumerate([2025, 2026]):
+        if col_anos[i].button(f"📅 {ano}", key=f"btn_pan_{ano}"):
+            st.session_state.ano_ativo_te = ano; st.rerun()
 
-    for i, ano in enumerate(anos):
-        is_active = st.session_state.ano_ativo_te == ano
-        cor_btn = cores[ano] if is_active else "#D5DBDB"
-        txt_cor = "white" if is_active else "#566573"
-        
-        if col_anos[i].button(f"📅 {ano}", key=f"btn_ano_{ano}", use_container_width=True):
-            st.session_state.ano_ativo_te = ano
-            st.rerun()
-        
-        st.markdown(f"<style>div[data-testid='stHorizontalBlock'] div:nth-child({i+1}) button {{ background-color: {cor_btn} !important; color: {txt_cor} !important; border: {'2px solid black' if is_active else '1px solid #ccc'} !important; }}</style>", unsafe_allow_html=True)
-
-    ano_sel = st.session_state.ano_ativo_te
-    st.markdown(f"**Exibindo dados de: {ano_sel}**")
-
-    # Mapeamentos
-    MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
-    CORES_EXCLUSIVAS = {
-        "1. Pré-Silábico": "#FF0000", "2. Silábico s/ Valor": "#FFCC00",
-        "3. Silábico c/ Valor": "#FFFF00", "4. Silábico Alfabético": "#00B0F0",
-        "5. Alfabético Inicial": "#00B050", "6. Alfabético Final": "#FF66CC",
-        "7. Alfabético Ortográfico": "#B1A0C7"
-    }
-
-    # Função para gerar a célula de Status (Miniatura + Texto Limpo)
-    def get_status_mare_html(nv_atual, hist):
-        pct, txt = 85, "maré baixa"
-        if nv_atual == "7. Alfabético Ortográfico": pct, txt = 15, "maré cheia"
-        elif len(hist) >= 2:
-            n_at, n_ant = MAPA_NIVEIS.get(nv_atual, 0), MAPA_NIVEIS.get(hist[-2], 0)
-            if n_at > n_ant: pct, txt = 45, "maré enchente"
-            elif n_at < n_ant: pct, txt = 70, "maré vazante"
-        
-        return f'''
-        <div class="mare-box">
-            <div class="mare-mini-tabela" style="background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%); clip-path: path('M 0 4 Q 10 0 20 4 T 40 4 L 40 20 L 0 20 Z');"></div>
-            <span class="mare-texto-tabela">{txt}</span>
-        </div>'''
-
-    # 2. TABELA GERAL (STATUS NA ÚLTIMA COLUNA)
-    cols_header = ["Nome do Aluno", "1ª Sondagem", "2ª Sondagem", "3ª Sondagem", "STATUS MARÉ"]
-    if ano_sel == 2026: cols_header.insert(1, "Diagnóstico Atual")
-
-    html_tab = f"""<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white; border: 1px solid #ddd;">
-        <thead><tr>{"".join([f'<th style="color:black !important; padding:10px; border:1px solid #ddd;">{c}</th>' for c in cols_header])}</tr></thead>
-        <tbody>"""
-    
-    alunos_te = sorted(st.session_state["alunos_te_dict"].keys())
-    
-    for al in alunos_te:
-        dados_ano = df_h[(df_h["Aluno"] == al) & (df_h["Ano"] == ano_sel)]
-        html_tab += f'<tr><td style="font-weight:bold; color:black; padding:8px; border:1px solid #ddd; font-size:12px;">{al}</td>'
-        
-        if ano_sel == 2026:
-            d_ant = df_h[(df_h["Aluno"] == al) & (df_h["Ano"] == 2025) & (df_h["Avaliacao"] == "Avaliação Final")]
-            if not d_ant.empty:
-                nv = d_ant["Nivel"].iloc[0]
-                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv)}; text-align:center; font-weight:bold; font-size:10px;">{nv.split(". ")[1]}</td>'
-            else: html_tab += '<td style="text-align:center;">-</td>'
-
-        for etapa in ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"]:
-            r = dados_ano[dados_ano["Avaliacao"] == etapa]
-            if not r.empty:
-                nv = r["Nivel"].iloc[0]
-                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv)}; text-align:center; font-weight:bold; color:black; border:1px solid #ddd; font-size:11px;">{nv.split(". ")[1]}</td>'
-            else: html_tab += '<td style="border:1px solid #ddd;"></td>'
-
-        status_html = "<td>-</td>"
-        if not dados_ano.empty:
-            status_html = f'<td style="border:1px solid #ddd; background:#fcfcfc;">{get_status_mare_html(dados_ano["Nivel"].iloc[-1], dados_ano["Nivel"].tolist())}</td>'
-        html_tab += status_html + '</tr>'
-    
-    st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)
-    st.markdown("---")
-
-    # 3. FICHA INDIVIDUAL
+    # Filtro por Salas
     salas_ativas = sorted(list(set(st.session_state["alunos_te_dict"].values())))
     if salas_ativas:
-        render_botoes_salas("btn_te_dados", "sel_te_dados", salas_permitidas=salas_ativas)
-        alunos_sala = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te_dados]
-        al_sel = st.selectbox("Selecione o Aluno:", sorted(alunos_sala))
+        render_botoes_salas("btn_dados_filter", "sel_te_dados", salas_permitidas=salas_ativas)
+        alunos_da_sala = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te_dados]
         
-        if al_sel:
-            dados_al = df_h[(df_h["Aluno"] == al_sel) & (df_h["Ano"] == ano_sel)].copy()
-            if not dados_al.empty:
-                u_nv = dados_al['Nivel'].iloc[-1]
-                vols = [MAPA_NIVEIS.get(n, 0) for n in dados_al['Nivel']]
-                
-                s_txt, pct_g = "Maré Baixa", 85
-                if u_nv == "7. Alfabético Ortográfico": s_txt, pct_g = "Maré Cheia", 15
-                elif len(vols) >= 2:
-                    if vols[-1] > vols[-2]: s_txt, pct_g = "Maré Enchente", 45
-                    elif vols[-1] < vols[-2]: s_txt, pct_g = "Maré Vazante", 70
-
-                col_info, col_graf = st.columns([1, 1])
-                with col_info:
-                    evid = dados_al.iloc[-1]['Evidencias']
-                    obs = dados_al.iloc[-1]['Obs']
-                    st.markdown(f"""
-                    <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black;">
-                        <h3 style="margin:0;">{al_sel}</h3>
-                        <p><b>Nível Atual:</b> <span style="background:{CORES_EXCLUSIVAS.get(u_nv)}; padding:3px 8px; border-radius:8px; font-weight:bold;">{u_nv}</span></p>
-                        <p><b>Evidências:</b><br><small>{evid if evid != "" else "<i>Não preenchido</i>"}</small></p>
-                        <p><b>Observações:</b><br><small>{obs if obs != "" else "<i>Sem observações</i>"}</small></p>
-                    </div>""", unsafe_allow_html=True)
-                
-                with col_graf:
-                    st.markdown(f"#### 🌊 Nível da Maré: {s_txt}")
-                    st.markdown(f"""
-                    <div style="width: 240px; height: 120px; margin: auto; background: linear-gradient(to bottom, #f0f0f0 {pct_g}%, #5DADE2 {pct_g}%);
-                                clip-path: path('M 0 30 Q 65 10 130 30 T 260 30 L 260 110 Q 260 140 230 140 L 30 140 Q 0 140 0 110 Z');"></div>
-                    <div style="margin-top:10px; background:white; padding:10px; border-radius:8px; border:1px solid #eee;">
-                        <b style="color:#2E86C1;">📍 Trilha de Evolução:</b>
-                        {"".join([f'<div style="display:flex; justify-content:space-between; font-size:12px; padding:3px 0; border-bottom:1px dashed #eee;"><span>{r["Avaliacao"].replace("Avaliação Final","3ª Avaliação")}/{r["Ano"]}</span><b>{r["Nivel"].split(". ")[1]}</b></div>' for _, r in dados_al.iterrows()])}
-                    </div>""", unsafe_allow_html=True)
-# --- PRÓXIMO MENU (Certifique-se que o elif abaixo está fora do bloco anterior) ---
-elif menu == "📈 Indicadores pedagógicos":
-
-    st.markdown(f"### 📈 Indicadores")
-    render_botoes_salas("btn_ind", "sel_ind")
-    df_h = pd.read_csv(ALF_FILE)
-    if not df_h.empty:
-        df_ult = df_h.sort_values("Avaliacao").groupby("Aluno").last().reset_index()
-        df_ult["Aluno"] = df_ult["Aluno"].str.replace("**", "", regex=False)
-        st.dataframe(df_ult, use_container_width=True)
-    else: st.info("Sem dados.")
+        html_tab = '<table class="custom-table"><thead><tr><th>Nome do Aluno</th><th>1ª Sondagem</th><th>2ª Sondagem</th><th>3ª Sondagem</th><th>STATUS MARÉ</th></tr></thead><tbody>'
+        for al in sorted(alunos_da_sala):
+            d_al = df_h[(df_h["Aluno"] == al) & (df_h["Ano"] == st.session_state.ano_ativo_te)]
+            html_tab += f'<tr><td><b>{al}</b></td>'
+            for etapa in ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"]:
+                r = d_al[d_al["Avaliacao"] == etapa]
+                nv = r["Nivel"].iloc[0] if not r.empty else "-"
+                cor = CORES_EXCLUSIVAS.get(nv, "transparent")
+                txt = nv.split(". ")[1] if "." in nv else nv
+                html_tab += f'<td style="background:{cor}; text-align:center; font-weight:bold;">{txt}</td>'
+            
+            status_html = "<td>-</td>"
+            if not d_al.empty:
+                status_html = f'<td>{get_status_mare_html(d_al["Nivel"].iloc[-1], d_al["Nivel"].tolist())}</td>'
+            html_tab += status_html + '</tr>'
+        st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)
+    else:
+        st.info("Nenhum aluno matriculado no Turno Estendido encontrado.")
 
 elif menu == "🌊 Canal do Apadrinhamento":
     st.markdown(f"### 🤝 Canal do Apadrinhamento")
@@ -677,29 +566,67 @@ elif menu == "🌊 Canal do Apadrinhamento":
                     else: 
                         st.warning("Avaliação comportamental (Tábua da Maré) ainda não realizada para este aluno.")
 
-            elif modo == "📚 Turno Estendido":
-                df_h = pd.read_csv(ALF_FILE)
-                dados_al = df_h[df_h["Aluno"] == al_af].copy()
+elif modo == "📚 Turno Estendido":
+                df_h = pd.read_csv(ALF_FILE).fillna("")
+                # Ordena e remove duplicados (mesma avaliação no mesmo ano)
+                dados_al = df_h[df_h["Aluno"] == al_af].sort_values(["Ano", "Avaliacao"])
+                dados_al = dados_al.drop_duplicates(subset=['Avaliacao', 'Ano'], keep='last')
+                
                 if not dados_al.empty:
                     u_nv = dados_al['Nivel'].iloc[-1]
                     c_inf, c_grf = st.columns([1, 1])
+                    
                     with c_inf:
+                        # Card de Informações
                         st.markdown(f"""
-                        <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black;">
+                        <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black; min-height: 250px;">
                             <h4 style="margin:0;">{al_af}</h4>
-                            <p><b>Nível Atual:</b> <br><span style="background:#d1c4e9; padding:4px 10px; border-radius:8px; font-weight:bold;">{u_nv}</span></p>
+                            <p><b>Nível Atual:</b> <br>
+                               <span style="background:{CORES_EXCLUSIVAS.get(u_nv, '#d1c4e9')}; padding:4px 10px; border-radius:8px; font-weight:bold; color:black;">
+                               {u_nv}</span>
+                            </p>
                             <p><b>Evidências:</b><br><small>{dados_al.iloc[-1]['Evidencias']}</small></p>
                             <p><b>Observações:</b><br><small>{dados_al.iloc[-1]['Obs']}</small></p>
                         </div>""", unsafe_allow_html=True)
+                    
                     with c_grf:
-                        st.markdown("##### 📍 Trilha de Evolução do Turno")
-                        for _, r in dados_al.iterrows():
-                            txt_av = r["Avaliacao"].replace("Avaliação Final", "3ª Avaliação")
-                            st.markdown(f"""<div style="display:flex; justify-content:space-between; font-size:12px; padding:5px; border-bottom:1px dashed #eee; background:white;">
-                                <span>{txt_av}/{r['Ano']}</span>
-                                <b style="color:#6741d9;">{r['Nivel'].split(". ")[1]}</b>
-                            </div>""", unsafe_allow_html=True)
+                        # Lógica da Vasilha da Maré (Status da Alfabetização)
+                        st.markdown("<h5 style='text-align:center;'>🌊 Status da Maré</h5>", unsafe_allow_html=True)
+                        
+                        # Cálculo do nível da água
+                        vols = [MAPA_NIVEIS.get(n, 0) for n in dados_al['Nivel']]
+                        pct_g = 85 # Padrão Maré Baixa
+                        s_txt = "Maré Baixa"
+                        
+                        if u_nv == "7. Alfabético Ortográfico": 
+                            pct_g, s_txt = 15, "Maré Cheia"
+                        elif len(vols) >= 2:
+                            if vols[-1] > vols[-2]: pct_g, s_txt = 45, "Maré Enchente"
+                            elif vols[-1] < vols[-2]: pct_g, s_txt = 70, "Maré Vazante"
+                        
+                        # Desenho da Vasilha
+                        st.markdown(f"""
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <div style="width: 220px; height: 110px; background: linear-gradient(to bottom, #f0f0f0 {pct_g}%, #5DADE2 {pct_g}%); 
+                                     clip-path: path('M 0 30 Q 65 10 130 30 T 260 30 L 260 110 Q 260 140 230 140 L 30 140 Q 0 140 0 110 Z');">
+                                </div>
+                                <b style="color:#1A5276; margin-top:10px;">{s_txt}</b>
+                            </div>
+                        """, unsafe_allow_html=True)
 
+                    st.markdown("---")
+                    st.write("**📍 Histórico de Evolução na Trilha**")
+                    
+                    # Lista de histórico limpa (sem duplicados)
+                    for _, r in dados_al.iterrows():
+                        txt_av = r["Avaliacao"].replace("Avaliação Final", "3ª Avaliação")
+                        st.markdown(f"""
+                        <div style="display:flex; justify-content:space-between; font-size:13px; padding:8px; border-bottom:1px dashed #eee; background:white; color:black;">
+                            <span>📅 {txt_av} / {r['Ano']}</span>
+                            <b style="color:#6741d9;">{r['Nivel'].split(". ")[1] if '.' in r['Nivel'] else r['Nivel']}</b>
+                        </div>""", unsafe_allow_html=True)
+                else:
+                    st.info("Ainda não existem registros de Turno Estendido para este afilhado.")
 elif menu == "🌊 Tábua da Maré":
     # (Mantido original)
     st.markdown(f"### 🌊 Tábua da Maré")

@@ -676,41 +676,44 @@ elif menu == "🌊 Canal do Apadrinhamento":
             st.markdown("---")
 
             # --- VISUALIZAÇÃO 1: Tábua da maré ---
-            if modo == "🌊 Tábua da Maré":
-                df_av = pd.read_csv(AVAL_FILE)
-                dados_mare = df_av[df_av["Aluno"] == al_af]
-                
-                if not dados_mare.empty:
-                    r_mare = dados_mare.iloc[-1]
-                    st.markdown("##### 📋 Desenvolvimento")
-                    
-                    m_cols = st.columns(5)
-                    valores_grafico = []
-                    for i, cat in enumerate(CATEGORIAS):
-                        val = r_mare[cat]
-                        valores_grafico.append(val)
-                        seta = "↑" if val >= 3 else "↓"
-                        cor_seta = "#2ecc71" if val >= 3 else "#e74c3c"
-                        
-                        html_v = render_vasilha_mare(val, cat)
-                        html_v_limpo = html_v.split('<span style="position: absolute;')[0] + '</div></div>'
-                        
-                        m_cols[i % 5].markdown(f"""
-                            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
-                                {html_v_limpo}
-                                <div style="font-size: 28px; font-weight: bold; color: {cor_seta}; margin-left: -5px; margin-top: 20px;">{seta}</div>
-                            </div>
-                        """, unsafe_allow_html=True)
-                    
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
-                    st.plotly_chart(fig_espelho, use_container_width=True)
-                else:
-                    st.warning("Avaliação comportamental ainda não disponível.")
+# --- DENTRO DO CANAL DO APADRINHAMENTO (Linha ~680 em diante) ---
 
- # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (VERSÃO PASTEL ATUALIZADA) ---
-elif modo == "📚 Turno Estendido":
-    df_h = pd.read_csv(ALF_FILE).fillna("")
+    if p_sel:
+        afils = df_total[df_total["PADRINHO/MADRINHA"].astype(str).str.upper() == p_sel.upper()]
+        if not afils.empty:
+            lista_nomes = sorted([str(n).replace("**", "").strip() for n in afils["ALUNO"].unique()])
+            al_af = st.selectbox("Selecione seu afilhado:", lista_nomes)
+            
+            # 1. Definimos o valor padrão para 'modo' antes de qualquer IF
+            modo = "🌊 Tábua da Maré (Geral)"
+            
+            is_turno = al_af in st.session_state.get("alunos_te_dict", {})
+
+            if is_turno:
+                st.markdown(f"""
+                <div style="background-color: #f3e5f5; padding: 20px; border-radius: 12px; border-left: 5px solid #6741d9; margin-bottom: 20px; color: black;">
+                    <span style="font-size: 18px;">✨ <b>O seu afilhado, {al_af}, participa do nosso Turno Estendido!</b></span><br>
+                    <p style="margin-top: 10px; line-height: 1.5; font-size: 14px;">
+                        Essa é uma ação do nosso Projeto <b>"Vamos Dar a Meia Volta e Alfabetizar"</b>.
+                    </p>
+                </div>""", unsafe_allow_html=True)
+                
+                # Aqui o rádio atualiza o valor da variável 'modo'
+                modo = st.radio("O que deseja visualizar?", ["🌊 Tábua da Maré (Geral)", "📖 Turno Estendido"], horizontal=True)
+
+            st.markdown("---")
+
+            # --- VISUALIZAÇÃO 1: GERAL (SOCIOEMOCIONAL) ---
+            # Agora 'modo' sempre existe, então não dará NameError
+            if modo == "🌊 Tábua da Maré (Geral)":
+                df_av = pd.read_csv(AVAL_FILE)
+                # ... restante do seu código da Tábua da Maré ...
+
+            # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO ---
+            # Use exatamente o mesmo emoji 📖 definido no st.radio acima
+            elif modo == "📖 Turno Estendido":
+                df_h = pd.read_csv(ALF_FILE).fillna("")
+                # ... restante do seu código do Turno Estendido ...
     dados_al = df_h[df_h["Aluno"] == al_af].sort_values(["Ano", "Avaliacao"])
     dados_al = dados_al.drop_duplicates(subset=['Avaliacao', 'Ano'], keep='last')
     

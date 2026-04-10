@@ -819,6 +819,16 @@ elif menu == "📈 Indicadores pedagógicos":
 elif menu == "🌊 Canal do Apadrinhamento":
     st.markdown(f"### 🤝 Canal do Apadrinhamento")
     df_total = pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
+   # --- SEGURANÇA R&D: PADRONIZAÇÃO DE COLUNAS ---
+df_total.columns = [str(c).strip().upper() for c in df_total.columns]
+
+# Agora a linha 822 com tratamento de erro (se a coluna não existir, ele não trava)
+if "PADRINHO/MADRINHA" in df_total.columns:
+    padrinhos_lista = sorted([p for p in df_total["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan", "None"]])
+else:
+    padrinhos_lista = ["Nenhum Padrinho Encontrado"]
+
+p_sel = st.session_state.nome_usuario if st.session_state.perfil == "padrinho" else st.selectbox("Simular Padrinho:", padrinhos_lista)
     p_sel = st.session_state.nome_usuario if st.session_state.perfil == "padrinho" else st.selectbox("Simular Padrinho:", sorted([p for p in df_total["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan"]]))
     
     if p_sel:

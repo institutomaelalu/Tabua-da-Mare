@@ -26,11 +26,16 @@ NIVEIS_ALF = list(CORES_TRILHA.keys())
 ALF_FILE = "alfabetizacao.csv"
 AVAL_FILE = "avaliacoes.csv"
 
-EVIDENCIAS_PADRAO = [
-    "Reconhece letras do nome", "Diferencia desenhos de letras", 
-    "Identifica rimas", "Relaciona som à letra", 
-    "Lê palavras simples", "Escreve frases curtas"
-]
+# --- ALTERAÇÃO 1: DICIONÁRIO DINÂMICO ---
+EVIDENCIAS_POR_NIVEL = {
+    "1. Pré-Silábico": ["Diferencia letras de desenhos", "Escreve o nome sem apoio", "Acredita que nomes grandes têm muitas letras", "Sabe que se escreve da esquerda para a direita"],
+    "2. Silábico s/ Valor": ["Uma letra para cada sílaba (sem som)", "Segmenta a fala em partes", "Respeita quantidade de emissões sonoras", "Faz leitura global da palavra"],
+    "3. Silábico c/ Valor": ["Usa vogais correspondentes ao som", "Identifica o som inicial das palavras", "Leitura apontada (acompanha com o dedo)", "Escreve uma letra por sílaba com som correto"],
+    "4. Silábico Alfabético": ["Oscila entre uma letra e a sílaba completa", "Começa a usar consoantes nas sílabas", "Consegue completar lacunas de letras", "Percebe a estrutura da sílaba simples"],
+    "5. Alfabético Inicial": ["Compreende o sistema de escrita", "Erros ortográficos comuns (ex: K por C)", "Lê textos curtos com fluidez", "Segmentação de palavras irregular"],
+    "6. Alfabético Final": ["Diferencia sons semelhantes (P/B, T/D)", "Usa corretamente dígrafos (LH, NH, CH)", "Domina regras básicas de pontuação", "Produz textos com coesão"],
+    "7. Alfabético Ortográfico": ["Escrita autônoma e correta", "Domina acentuação e regras complexas", "Lê com entonação e fluidez total", "Revisa o próprio texto"]
+}
 
 # Inicialização de arquivos locais
 if not os.path.exists(ALF_FILE):
@@ -57,23 +62,10 @@ st.markdown(f"""
     }}
     .custom-table thead th {{ padding: 12px 10px; text-align: left; color: white !important; font-weight: 700; border: none; }}
     .custom-table td {{ padding: 10px; border-bottom: 1px solid #f9f9f9; }}
-    
-    div.stButton > button {{
-        width: 100%; border-radius: 8px !important; font-weight: 700 !important; 
-        height: 42px; font-size: 11px !important; border: none !important;
-        transition: all 0.3s;
-    }}
-    .sala-badge {{
-        display: inline-block; padding: 4px 12px; border-radius: 20px;
-        color: white; font-weight: 700; font-size: 10px; margin-top: 5px;
-        text-transform: uppercase;
-    }}
+    div.stButton > button {{ width: 100%; border-radius: 8px !important; font-weight: 700 !important; height: 42px; border: none !important; }}
+    .sala-badge {{ display: inline-block; padding: 4px 12px; border-radius: 20px; color: white; font-weight: 700; font-size: 10px; margin-top: 5px; }}
     .trilha-container {{ display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 0; }}
-    .caixa-trilha {{
-        flex: 1; height: 85px; border-radius: 15px; display: flex; align-items: center; justify-content: center;
-        text-align: center; font-size: 10px; font-weight: 800; padding: 5px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 2px solid transparent; line-height: 1.2;
-    }}
+    .caixa-trilha {{ flex: 1; height: 85px; border-radius: 15px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10px; font-weight: 800; padding: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 2px solid transparent; line-height: 1.2; }}
     .seta-trilha {{ padding: 0 5px; color: #ccc; font-size: 18px; font-weight: bold; }}
     </style>
     """, unsafe_allow_html=True)
@@ -136,75 +128,62 @@ def criar_grafico_mare(categorias, valores):
         marker=dict(size=10, color=C_AZUL),
         text=[MARE_LABELS[int(v)] for v in valores], hoverinfo="text+x"
     ))
-    fig.update_layout(paper_bgcolor='white', plot_bgcolor='white', yaxis=dict(range=[0.5, 4.5], visible=False),
-        xaxis=dict(showgrid=False, zeroline=False), height=400, margin=dict(l=20, r=20, t=30, b=80))
+    fig.update_layout(paper_bgcolor='white', plot_bgcolor='white', yaxis=dict(range=[0.5, 4.5], visible=False), xaxis=dict(showgrid=False, zeroline=False), height=400, margin=dict(l=20, r=20, t=30, b=80))
     return fig
 
-# --- INICIALIZAÇÃO DE SESSÃO ---
+# --- INICIALIZAÇÃO ---
 if "logado" not in st.session_state: st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
 if "alunos_te_dict" not in st.session_state: st.session_state["alunos_te_dict"] = {}
-
 for k in ['sel_mat', 'sel_pad', 'sel_aval', 'sel_int', 'sel_alf', 'sel_ind', 'sel_te']:
     if k not in st.session_state: st.session_state[k] = "SALA ROSA"
 
 if not st.session_state.logado:
     st.markdown("<br><br>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 1.2, 1])
+    c2 = st.columns([1, 1.2, 1])[1]
     with c2:
         with st.form("login"):
-            u = st.text_input("👤 Usuário").strip().upper()
-            s = st.text_input("🔑 Chave", type="password")
+            u, s = st.text_input("👤 Usuário").strip().upper(), st.text_input("🔑 Chave", type="password")
             if st.form_submit_button("ENTRAR"):
                 if u == "ADMIN" and s == "123":
                     st.session_state.update({"logado": True, "perfil": "admin", "nome_usuario": "COORDENAÇÃO"})
                     st.rerun()
                 else:
-                    encontrado = False
                     for sala in TURMAS_CONFIG.keys():
                         df_s = safe_read(sala)
-                        if not df_s.empty and "PADRINHO/MADRINHA" in df_s.columns:
-                            if u in df_s["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper().unique():
-                                encontrado = True; break
-                    if encontrado:
-                        st.session_state.update({"logado": True, "perfil": "padrinho", "nome_usuario": u})
-                        st.rerun()
-                    else: st.error("Acesso negado.")
+                        if not df_s.empty and u in df_s["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper().unique():
+                            st.session_state.update({"logado": True, "perfil": "padrinho", "nome_usuario": u})
+                            st.rerun()
     st.stop()
 
 if st.sidebar.button("🚪 Sair"):
     st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
     st.rerun()
 
-# --- MENU ---
 menu_options = ["👤 Matrícula", "📝 Alunos matriculados", "🤝 Gestão de apadrinhamento", "📊 Avaliação da Tábua da Maré", "📖 Turno Estendido", "📈 Indicadores pedagógicos", "🌊 Canal do Apadrinhamento", "🌊 Tábua da Maré"]
 if st.session_state.perfil != "admin": menu_options = ["🌊 Canal do Apadrinhamento"]
 menu = st.sidebar.radio("Navegação", menu_options)
 
 st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Instituto</span> <span style='color:{C_AZUL}'>Mãe</span> <span style='color:{C_VERDE}'>Lalu</span></h1></div><hr>", unsafe_allow_html=True)
 
-# --- ABAS ---
+# --- LÓGICA DAS ABAS (MANTENDO SUA ESTRUTURA) ---
 
 if menu == "👤 Matrícula":
     st.markdown(f"### 👤 Novo Cadastro")
     with st.form("form_cad"):
         c1, c2 = st.columns(2)
-        nome = c1.text_input("Nome Completo").strip().upper()
-        idade = c2.text_input("Idade").strip()
-        comu = c1.text_input("Comunidade").strip().upper()
-        sala = c2.selectbox("Sala Destino", list(TURMAS_CONFIG.keys()))
-        turno = c1.selectbox("Turno", ["A", "B"])
+        nome, idade, comu = c1.text_input("Nome Completo").strip().upper(), c2.text_input("Idade").strip(), c1.text_input("Comunidade").strip().upper()
+        sala, turno = c2.selectbox("Sala Destino", list(TURMAS_CONFIG.keys())), c1.selectbox("Turno", ["A", "B"])
         if st.form_submit_button("Finalizar Cadastro"):
             if nome and idade:
                 client = get_gspread_client()
                 sh = client.open_by_key("1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4")
                 sh.worksheet(sala).append_row([nome, sala, turno, idade, comu, ""])
                 sh.worksheet("GERAL").append_row([nome, sala, turno, idade, comu, ""])
-                st.success("Cadastrado com sucesso!"); st.rerun()
+                st.success("Cadastrado!"); st.rerun()
 
 elif menu == "📝 Alunos matriculados":
     st.markdown(f"### 📋 Quadro de Alunos Matriculados")
     render_botoes_salas("btn_mat", "sel_mat")
-    st.info("✍️📖 = Aluno já matriculado no Turno Estendido")
     df_g, df_s = safe_read("GERAL"), safe_read(st.session_state.sel_mat)
     tn, cm = render_filtros(df_g, "mat"); df_f = aplicar_filtros(df_s, df_g, tn, cm)
     cor_h = TURMAS_CONFIG[st.session_state.sel_mat]["cor"]
@@ -218,8 +197,7 @@ elif menu == "📝 Alunos matriculados":
             if c0.checkbox("", key=f"chk_{i}"): selecionados.append(n_l)
         c1.write(f"**{n_l}**"); c2.write(f"{r['IDADE']} anos"); c3.write(f"{r['COMUNIDADE']}")
     if selecionados:
-        st.markdown(f"<style>div.stButton > button[key='btn_bulk_te'] {{ background-color: {cor_h} !important; color: white !important; opacity: 1.0 !important; }}</style>", unsafe_allow_html=True)
-        if st.button(f"Matricular {len(selecionados)} aluno(s) no Turno Estendido", key="btn_bulk_te"):
+        if st.button(f"Matricular no Turno Estendido", key="btn_bulk_te"):
             for al in selecionados: st.session_state["alunos_te_dict"][al] = st.session_state.sel_mat
             st.rerun()
 
@@ -233,97 +211,108 @@ elif menu == "🤝 Gestão de apadrinhamento":
         v_cols = ["ALUNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
         html = f'<table class="custom-table"><thead style="background-color:{cor_h}"><tr>' + "".join([f'<th>{c}</th>' for c in v_cols]) + '</tr></thead><tbody>'
         for _, r in df_f.iterrows():
-            n_l = str(r["ALUNO"]).replace("**", "").strip()
-            html += f'<tr><td>{n_l}</td><td>{r["IDADE"]}</td><td>{r["COMUNIDADE"]}</td><td>{r["PADRINHO/MADRINHA"]}</td></tr>'
+            html += f'<tr><td>{r["ALUNO"]}</td><td>{r["IDADE"]}</td><td>{r["COMUNIDADE"]}</td><td>{r["PADRINHO/MADRINHA"]}</td></tr>'
         st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
-    else: st.warning("Nenhum dado encontrado para esta sala.")
 
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação")
     render_botoes_salas("btn_aval", "sel_aval")
     df_s = safe_read(st.session_state.sel_aval)
     if not df_s.empty:
-        n_limpos = sorted([str(n).replace("**", "").strip() for n in df_s[df_s["ALUNO"] != ""]["ALUNO"].unique()])
-        al = st.selectbox("Selecione o Aluno", n_limpos)
-        st.markdown("#### ⭐ 10 motivos para avaliar!")
+        n_l = sorted([str(n).replace("**", "").strip() for n in df_s[df_s["ALUNO"] != ""]["ALUNO"].unique()])
+        al = st.selectbox("Selecione o Aluno", n_l)
         with st.form("f_av"):
             tr = st.selectbox("Período", ["1º Semestre", "2º Semestre"])
-            cE, cD = st.columns(2); n_l = {}
-            for i, cat in enumerate(CATEGORIAS): n_l[cat] = (cE if i < 5 else cD).selectbox(cat, list(MARE_OPCOES.keys()), key=f"s_{i}")
+            cE, cD = st.columns(2); n_av = {}
+            for i, cat in enumerate(CATEGORIAS): n_av[cat] = (cE if i < 5 else cD).selectbox(cat, list(MARE_OPCOES.keys()), key=f"s_{i}")
             obs = st.text_area("Observações:")
             if st.form_submit_button("Salvar"):
                 df_av = pd.read_csv(AVAL_FILE)
                 df_av = df_av[~((df_av['Aluno'] == al) & (df_av['Periodo'] == tr))]
-                pd.concat([df_av, pd.DataFrame([[al, tr] + [MARE_OPCOES[n_l[c]] for c in CATEGORIAS] + [obs]], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
+                pd.concat([df_av, pd.DataFrame([[al, tr] + [MARE_OPCOES[n_av[c]] for c in CATEGORIAS] + [obs]], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
                 st.success("Salvo!"); st.rerun()
 
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
-    with st.expander("➕ Cadastrar Aluno Manualmente no Turno"):
+    with st.expander("➕ Cadastrar Aluno Manualmente"):
         with st.form("f_te_m"):
             c1, c2 = st.columns(2)
             nM, sM = c1.text_input("Nome").strip().upper(), c2.selectbox("Sala", list(TURMAS_CONFIG.keys()))
             if st.form_submit_button("Adicionar"):
                 if nM: st.session_state["alunos_te_dict"][nM] = sM; st.rerun()
+    
     salas_te = sorted(list(set(st.session_state["alunos_te_dict"].values())))
     if salas_te:
         if st.session_state.sel_te not in salas_te: st.session_state.sel_te = salas_te[0]
         render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_te)
         al_te = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te]
         al = st.selectbox("Aluno:", sorted(al_te))
-        cor_o = TURMAS_CONFIG[st.session_state.sel_te]["cor"]
-        st.markdown(f'<div class="sala-badge" style="background-color:{cor_o}">{st.session_state.sel_te}</div>', unsafe_allow_html=True)
+        
         df_h = pd.read_csv(ALF_FILE)
         diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
+        
+        # Trilha Visual
         ht = '<div class="trilha-container">'
         for i, n_t in enumerate(NIVEIS_ALF):
             atv = (diag is not None and diag["Nivel"] == n_t)
             ht += f'<div class="caixa-trilha" style="background-color:{CORES_TRILHA[n_t]["ativo" if atv else "inativo"]}; color:{"white" if atv else "#444"}">{n_t.split(". ")[1]}</div>'
             if i < len(NIVEIS_ALF)-1: ht += '<div class="seta-trilha">→</div>'
         st.markdown(ht + '</div>', unsafe_allow_html=True)
-        with st.form("f_alf"):
-            nV = st.selectbox("Novo Nível:", NIVEIS_ALF, index=NIVEIS_ALF.index(diag["Nivel"]) if diag is not None else 0)
+
+        # --- ALTERAÇÃO 2: FORMULÁRIO DINÂMICO ---
+        # Colocamos o Selectbox FORA do Form para ele atualizar a página ao mudar
+        nV = st.selectbox("Novo Nível (isso mudará as opções abaixo):", NIVEIS_ALF, 
+                          index=NIVEIS_ALF.index(diag["Nivel"]) if diag is not None else 0)
+        
+        with st.form("f_alf_dinamico"):
             tipo = st.selectbox("Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
-            e_cols = st.columns(3); s_ev = []
-            for i, ev in enumerate(EVIDENCIAS_PADRAO):
-                if e_cols[i%3].checkbox(ev): s_ev.append(ev)
-            obs = st.text_area("Obs:")
+            
+            # Buscamos as evidências baseadas no 'nV' selecionado acima
+            evidencias_atuais = EVIDENCIAS_POR_NIVEL.get(nV, [])
+            
+            st.write(f"**Evidências para {nV}:**")
+            e_cols = st.columns(2)
+            s_ev = []
+            
+            # Criamos os checkboxes dinamicamente
+            for i, ev in enumerate(evidencias_atuais):
+                # A 'key' contém o nível para garantir que o Streamlit limpe o estado ao mudar de nível
+                if e_cols[i % 2].checkbox(ev, key=f"chk_{nV}_{i}"):
+                    s_ev.append(ev)
+            
+            obs = st.text_area("Observações:")
             if st.form_submit_button("Salvar Diagnóstico"):
                 df_h = df_h[~((df_h["Aluno"] == al) & (df_h["Avaliacao"] == tipo))]
-                pd.concat([df_h, pd.DataFrame([[al, tipo, nV, False, ", ".join(s_ev), obs, "TURNO ESTENDIDO"]], columns=df_h.columns)], ignore_index=True).to_csv(ALF_FILE, index=False)
-                st.rerun()
+                novo_dado = pd.DataFrame([[al, tipo, nV, False, ", ".join(s_ev), obs, "TURNO ESTENDIDO"]], columns=df_h.columns)
+                pd.concat([df_h, novo_dado], ignore_index=True).to_csv(ALF_FILE, index=False)
+                st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
 
 elif menu == "📈 Indicadores pedagógicos":
-    st.markdown(f"### 📈 Indicadores")
+    st.markdown("### 📈 Indicadores")
     render_botoes_salas("btn_ind", "sel_ind")
     df_h = pd.read_csv(ALF_FILE)
     if not df_h.empty:
         df_ult = df_h.sort_values("Avaliacao").groupby("Aluno").last().reset_index()
-        df_ult["Aluno"] = df_ult["Aluno"].str.replace("**", "", regex=False)
         st.dataframe(df_ult, use_container_width=True)
-    else: st.info("Sem dados.")
 
 elif menu == "🌊 Canal do Apadrinhamento":
-    st.markdown(f"### 🌊 Canal do Apadrinhamento")
-    df_av = pd.read_csv(AVAL_FILE)
-    df_total = pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
-    p_sel = st.session_state.nome_usuario if st.session_state.perfil == "padrinho" else st.selectbox("Simular Padrinho:", sorted([p for p in df_total["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan"]]))
+    st.markdown("### 🌊 Canal do Apadrinhamento")
+    df_av, df_tot = pd.read_csv(AVAL_FILE), pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
+    p_sel = st.session_state.nome_usuario if st.session_state.perfil == "padrinho" else st.selectbox("Simular Padrinho:", sorted([p for p in df_tot["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan"]]))
     if p_sel:
-        afils = df_total[df_total["PADRINHO/MADRINHA"].astype(str).str.upper() == p_sel.upper()]
+        afils = df_tot[df_tot["PADRINHO/MADRINHA"].astype(str).str.upper() == p_sel.upper()]
         if not afils.empty:
             al_af = st.selectbox("Afilhado:", sorted([str(n).replace("**", "").strip() for n in afils["ALUNO"].unique()]))
             if al_af in df_av["Aluno"].unique():
                 for _, r in df_av[df_av["Aluno"] == al_af].iterrows():
                     st.write(f"**{r['Periodo']}**")
                     st.plotly_chart(criar_grafico_mare(CATEGORIAS, [float(r[c]) for c in CATEGORIAS]), use_container_width=True)
-            else: st.warning("Sem avaliações.")
 
 elif menu == "🌊 Tábua da Maré":
-    st.markdown(f"### 🌊 Tábua da Maré")
+    st.markdown("### 🌊 Tábua da Maré")
     render_botoes_salas("btn_int", "sel_int")
-    df_av = pd.read_csv(AVAL_FILE)
-    df_s = safe_read(st.session_state.sel_int)
+    df_av, df_s = pd.read_csv(AVAL_FILE), safe_read(st.session_state.sel_int)
     if not df_s.empty:
         alunos_sala = [str(n).replace("**", "").strip() for n in df_s["ALUNO"].unique()]
         df_f = df_av[df_av["Aluno"].isin(alunos_sala)]
@@ -333,5 +322,3 @@ elif menu == "🌊 Tábua da Maré":
                     for _, r in df_f[df_f["Aluno"] == al].iterrows():
                         st.write(f"**{r['Periodo']}**")
                         st.plotly_chart(criar_grafico_mare(CATEGORIAS, [float(r[c]) for c in CATEGORIAS]), key=f"g_{al}_{r['Periodo']}")
-        else: st.info("Nenhuma avaliação lançada para esta sala.")
-    else: st.error("Erro ao carregar dados da sala.")

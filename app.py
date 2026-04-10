@@ -9,17 +9,17 @@ from datetime import datetime
 
 # --- 1. DEFINIÇÕES DE DADOS (Mover para o topo para evitar NameError) ---
 NIVEIS_ALF = [
-    "1. Pré-Silábico", "2. Silábico s/ Valor", "3. Silábico c/ Valor", 
-    "4. Silábico Alfabético", "5. Alfabético Inicial", "6. Alfabético Final", 
-    "7. Alfabético Ortográfico"
+    "Pré-Silábico", "Silábico sem Valor", "Silábico com Valor", 
+    "Silábico Alfabético", "Alfabético Inicial", "Alfabético Final", 
+    "Alfabético Ortográfico"
 ]
 MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
 
 CORES_EXCLUSIVAS = {
-    "1. Pré-Silábico": "#FF0000", "2. Silábico s/ Valor": "#FFCC00", 
-    "3. Silábico c/ Valor": "#FFFF00", "4. Silábico Alfabético": "#00B0F0", 
-    "5. Alfabético Inicial": "#00B050", "6. Alfabético Final": "#FF66CC", 
-    "7. Alfabético Ortográfico": "#B1A0C7"
+    "Pré-Silábico": "#FF0000", "Silábico sem Valor": "#FFCC00", 
+    "Silábico com Valor": "#FFFF00", "Silábico Alfabético": "#00B0F0", 
+    "Alfabético Inicial": "#00B050", "Alfabético Final": "#FF66CC", 
+    "Alfabético Ortográfico": "#B1A0C7"
 }
 
 # --- 2. FUNÇÕES DE SUPORTE ---
@@ -678,9 +678,14 @@ elif menu == "🌊 Canal do Apadrinhamento":
             modo = "🌊 Tábua da Maré (Geral)"
 
             if is_turno:
-                st.markdown(f"""<div style="background-color: #f3e5f5; padding: 20px; border-radius: 12px; border-left: 5px solid #6741d9; margin-bottom: 20px; color: black;">
+                # MENSAGEM RESTAURADA NA ÍNTEGRA
+                st.markdown(f"""
+                <div style="background-color: #f3e5f5; padding: 20px; border-radius: 12px; border-left: 5px solid #6741d9; margin-bottom: 20px; color: black;">
                     <span style="font-size: 18px;">✨ <b>O seu afilhado, {al_af}, participa do nosso Turno Estendido!</b></span><br>
-                    <p style="margin-top: 10px; line-height: 1.5;">Essa é uma ação do nosso Projeto <b>"Vamos Dar a Meia Volta e Alfabetizar"</b>...</p>
+                    <p style="margin-top: 10px; line-height: 1.5; font-size: 14px;">
+                        Essa é uma ação do nosso Projeto <b>"Vamos Dar a Meia Volta e Alfabetizar"</b>, 
+                        voltado para a intensificação do processo de desenvolvimento das habilidades de leitura e escrita das nossas crianças.
+                    </p>
                 </div>""", unsafe_allow_html=True)
                 modo = st.radio("O que deseja visualizar?", ["🌊 Tábua da Maré (Geral)", "📚 Turno Estendido"], horizontal=True)
 
@@ -695,26 +700,27 @@ elif menu == "🌊 Canal do Apadrinhamento":
                     r_mare = dados_mare.iloc[-1]
                     st.markdown("##### 📋 Desenvolvimento Socioemocional")
                     
-                    # Vasilhas com setas externas
                     m_cols = st.columns(5)
                     valores_grafico = []
                     for i, cat in enumerate(CATEGORIAS):
                         val = r_mare[cat]
                         valores_grafico.append(val)
-                        # HTML da vasilha com seta ao lado
+                        
                         seta = "↑" if val >= 3 else "↓"
                         cor_seta = "#2ecc71" if val >= 3 else "#e74c3c"
                         
-                        html_v = render_vasilha_mare(val, cat).replace('<span style="position: absolute; right: 2px; top: 5px; font-size: 12px; font-weight: bold; color: #2E86C1;">', '<span style="display:none;">') # Esconde a seta interna se houver
+                        # Correção do erro da tag <span> aparecendo na tela
+                        html_v = render_vasilha_mare(val, cat)
+                        # Removemos a seta interna da função para colocar a externa com layout controlado
+                        html_v_limpo = html_v.split('<span style="position: absolute;')[0] + '</div></div>'
                         
                         m_cols[i % 5].markdown(f"""
-                            <div style="display: flex; align-items: center; justify-content: center;">
-                                {html_v}
-                                <span style="font-size: 24px; font-weight: bold; color: {cor_seta}; margin-left: 5px;">{seta}</span>
+                            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
+                                {html_v_limpo}
+                                <div style="font-size: 28px; font-weight: bold; color: {cor_seta}; margin-left: -5px; margin-top: 20px;">{seta}</div>
                             </div>
                         """, unsafe_allow_html=True)
                     
-                    # Gráfico espelhado abaixo das vasilhas
                     st.markdown("<br>", unsafe_allow_html=True)
                     fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
                     st.plotly_chart(fig_espelho, use_container_width=True)
@@ -730,18 +736,16 @@ elif menu == "🌊 Canal do Apadrinhamento":
                 if not dados_al.empty:
                     u_nv = dados_al['Nivel'].iloc[-1]
                     
-                    # Topo: Card de Info + Vasilha de Status com Legenda
                     c_inf, c_mare = st.columns([1.2, 1])
                     with c_inf:
                         st.markdown(f"""
-                        <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black; height:220px;">
+                        <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black; height:220px; overflow-y: auto;">
                             <h4 style="margin:0;">{al_af}</h4>
                             <p style="margin: 5px 0;"><b>Nível Atual:</b> <span style="background:{CORES_EXCLUSIVAS.get(u_nv, "#ddd")}; padding:4px 8px; border-radius:8px; font-weight:bold;">{u_nv}</span></p>
-                            <p style="font-size: 12px;"><b>Evidências:</b><br>{dados_al.iloc[-1]['Evidencias']}</p>
+                            <p style="font-size: 13px;"><b>Evidências:</b><br>{dados_al.iloc[-1]['Evidencias']}</p>
                         </div>""", unsafe_allow_html=True)
                     
                     with c_mare:
-                        # Cálculo da Maré
                         vols = [MAPA_NIVEIS.get(n, 0) for n in dados_al['Nivel']]
                         pct_g, s_txt = 85, "Maré Baixa"
                         if u_nv == "7. Alfabético Ortográfico": pct_g, s_txt = 15, "Maré Cheia"
@@ -749,13 +753,12 @@ elif menu == "🌊 Canal do Apadrinhamento":
                             if vols[-1] > vols[-2]: pct_g, s_txt = 45, "Maré Enchente"
                             elif vols[-1] < vols[-2]: pct_g, s_txt = 70, "Maré Vazante"
                         
-                        # Vasilha + Legenda Fixa ao lado
                         cl_vas, cl_leg = st.columns([1, 1])
                         with cl_vas:
                             st.markdown(f"""<div style="width:140px; height:75px; background:linear-gradient(to bottom, #f0f0f0 {pct_g}%, #5DADE2 {pct_g}%); clip-path: path('M 0 20 Q 40 5 80 20 T 160 20 L 160 80 Q 160 100 140 100 L 20 100 Q 0 100 0 80 Z'); border:1px solid #ccc; margin-top:20px;"></div>
                             <center><b style="color:#1A5276; font-size:14px;">{s_txt}</b></center>""", unsafe_allow_html=True)
                         with cl_leg:
-                            st.markdown("""<div style="font-size: 10px; color: #555; padding-top: 15px;">
+                            st.markdown("""<div style="font-size: 11px; color: #555; padding-top: 15px; line-height: 1.4;">
                                 <b>Legenda da Maré:</b><br>
                                 🔵 <b>Cheia:</b> Nível Ortográfico<br>
                                 🟢 <b>Enchente:</b> Evoluiu de nível<br>
@@ -763,7 +766,6 @@ elif menu == "🌊 Canal do Apadrinhamento":
                                 ⚪ <b>Baixa:</b> Nível Inicial
                             </div>""", unsafe_allow_html=True)
 
-                    # Trilha Visual ABAIXO do card
                     st.markdown("---")
                     st.markdown("##### 🚀 Jornada de Alfabetização")
                     st.markdown("""<style>.trilha-p { display: flex; align-items: center; gap: 5px; overflow-x: auto; padding: 10px; }
@@ -778,10 +780,10 @@ elif menu == "🌊 Canal do Apadrinhamento":
                         if i < len(NIVEIS_ALF)-1: html_t += '<span style="color:#6741d9;">→</span>'
                     st.markdown(html_t + '</div>', unsafe_allow_html=True)
 
-                    # Histórico Detalhado FIXO (sem expander)
                     st.markdown("##### 📂 Histórico de Avaliações")
                     for _, r in dados_al.iterrows():
-                        t_av = r["Avaliacao"].replace("Avaliação Final", "3ª Aval")
+                        # CORREÇÃO AQUI: De '3ª Aval' para '3ª Avaliação'
+                        t_av = r["Avaliacao"].replace("Avaliação Final", "3ª Avaliação")
                         st.markdown(f"""<div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #eee; font-size:13px; color: black;">
                             <span>📅 <b>{t_av}/{r['Ano']}</b></span>
                             <span>Nível: <b style="color:#6741d9;">{r['Nivel']}</b></span>

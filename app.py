@@ -790,8 +790,7 @@ elif modo == "📚 Turno Estendido":
             <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #eee; font-size:13px; color: black;">
                 <span>📅 <b>{t_av}/{r['Ano']}</b></span>
                 <span>Nível: <b style="color:{cor_label};">{r['Nivel']}</b></span>
-            </div>""", unsafe_allow_html=True)elif menu == "🌊 Tábua da Maré"            
-    # (Mantido original)
+            </div>""", unsafe_allow_html=True)elif menu == "🌊 Tábua da Maré: # (Mantido original)
     st.markdown(f"### 🌊 Tábua da Maré")
     render_botoes_salas("btn_int", "sel_int")
     df_av = pd.read_csv(AVAL_FILE)

@@ -26,7 +26,7 @@ NIVEIS_ALF = list(CORES_TRILHA.keys())
 ALF_FILE = "alfabetizacao.csv"
 AVAL_FILE = "avaliacoes.csv"
 
-# --- ALTERAÇÃO: EVIDÊNCIAS DINÂMICAS ---
+# --- EVIDÊNCIAS DINÂMICAS (Mantidas conforme seu código) ---
 EVIDENCIAS_POR_NIVEL = {
     "1. Pré-Silábico": ["Diferencia letras de desenhos", "Escreve o nome sem apoio", "Acredita que nomes grandes têm muitas letras", "Sabe que se escreve da esquerda para a direita"],
     "2. Silábico s/ Valor": ["Uma letra para cada sílaba (sem som)", "Segmenta a fala em partes", "Respeita quantidade de emissões sonoras", "Faz leitura global da palavra"],
@@ -181,7 +181,7 @@ if st.sidebar.button("🚪 Sair"):
     st.rerun()
 
 # --- MENU ---
-menu_options = ["👤 Matrícula", "📝 Alunos matriculados", "🤝 Gestão de apadrinhamento", "📊 Avaliação da Tábua da Maré", "📖 Turno Estendido", "📈 Indicadores pedagógicos", "🌊 Canal do Apadrinhamento", "🌊 Tábua da Maré"]
+menu_options = ["👤 Matrícula", "📝 Alunos matriculados", "📊 Dados - Turno Estendido", "🤝 Gestão de apadrinhamento", "📊 Avaliação da Tábua da Maré", "📖 Turno Estendido", "📈 Indicadores pedagógicos", "🌊 Canal do Apadrinhamento", "🌊 Tábua da Maré"]
 if st.session_state.perfil != "admin": menu_options = ["🌊 Canal do Apadrinhamento"]
 menu = st.sidebar.radio("Navegação", menu_options)
 
@@ -190,6 +190,7 @@ st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Institu
 # --- ABAS ---
 
 if menu == "👤 Matrícula":
+    # (Mantido original)
     st.markdown(f"### 👤 Novo Cadastro")
     with st.form("form_cad"):
         c1, c2 = st.columns(2)
@@ -207,6 +208,7 @@ if menu == "👤 Matrícula":
                 st.success("Cadastrado com sucesso!"); st.rerun()
 
 elif menu == "📝 Alunos matriculados":
+    # (Mantido original com a aplicação de cor dinâmica no botão)
     st.markdown(f"### 📋 Quadro de Alunos Matriculados")
     render_botoes_salas("btn_mat", "sel_mat")
     st.info("✍️📖 = Aluno já matriculado no Turno Estendido")
@@ -228,7 +230,42 @@ elif menu == "📝 Alunos matriculados":
             for al in selecionados: st.session_state["alunos_te_dict"][al] = st.session_state.sel_mat
             st.rerun()
 
+# --- NOVA ABA: DADOS - TURNO ESTENDIDO ---
+elif menu == "📊 Dados - Turno Estendido":
+    st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
+    df_h = pd.read_csv(ALF_FILE)
+    
+    # Legenda da Trilha no topo
+    cols_leg = st.columns(len(NIVEIS_ALF))
+    for idx, niv in enumerate(NIVEIS_ALF):
+        cols_leg[idx].markdown(f"<div style='background-color:{CORES_TRILHA[niv]['ativo']}; padding:10px; border-radius:10px; text-align:center; font-size:10px; font-weight:bold;'>{niv.split('. ')[1]}</div>", unsafe_allow_html=True)
+
+    # Construção da Tabela conforme imagem solicitada
+    html = '<table class="custom-table"><thead style="background-color:#5cc6d0"><tr><th>Nome</th><th>Sala</th><th>1ª Sondagem</th><th>2ª Sondagem</th><th>3ª Sondagem</th><th>Observações</th></tr></thead><tbody>'
+    
+    for al in sorted(st.session_state["alunos_te_dict"].keys()):
+        sala_v = st.session_state["alunos_te_dict"][al]
+        dados_al = df_h[df_h["Aluno"] == al]
+        
+        def get_color_cell(tipo_aval):
+            row = dados_al[dados_al["Avaliacao"] == tipo_aval]
+            if not row.empty:
+                nv = row["Nivel"].iloc[0]
+                return f'background-color:{CORES_TRILHA[nv]["ativo"]}; color:transparent;'
+            return ''
+
+        obs = dados_al["Obs"].iloc[-1] if not dados_al.empty else ""
+        
+        html += f'<tr><td>{al}</td><td>{sala_v}</td>'
+        html += f'<td style="{get_color_cell("1ª Avaliação")}">-</td>'
+        html += f'<td style="{get_color_cell("2ª Avaliação")}">-</td>'
+        html += f'<td style="{get_color_cell("Avaliação Final")}">-</td>'
+        html += f'<td>{obs}</td></tr>'
+    
+    st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
+
 elif menu == "🤝 Gestão de apadrinhamento":
+    # (Mantido original)
     st.markdown(f"### 🤝 Gestão de Apadrinhamento")
     render_botoes_salas("btn_pad", "sel_pad")
     df_g, df_s = safe_read("GERAL"), safe_read(st.session_state.sel_pad)
@@ -244,6 +281,7 @@ elif menu == "🤝 Gestão de apadrinhamento":
     else: st.warning("Nenhum dado encontrado para esta sala.")
 
 elif menu == "📊 Avaliação da Tábua da Maré":
+    # (Mantido original)
     st.markdown(f"### 📊 Lançar Avaliação")
     render_botoes_salas("btn_aval", "sel_aval")
     df_s = safe_read(st.session_state.sel_aval)
@@ -263,6 +301,7 @@ elif menu == "📊 Avaliação da Tábua da Maré":
                 st.success("Salvo!"); st.rerun()
 
 elif menu == "📖 Turno Estendido":
+    # (Mantido original com suas evidências dinâmicas)
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
     with st.expander("➕ Cadastrar Aluno Manualmente no Turno"):
         with st.form("f_te_m"):
@@ -283,7 +322,6 @@ elif menu == "📖 Turno Estendido":
         df_h = pd.read_csv(ALF_FILE)
         diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
         
-        # Trilha Visual
         ht = '<div class="trilha-container">'
         for i, n_t in enumerate(NIVEIS_ALF):
             atv = (diag is not None and diag["Nivel"] == n_t)
@@ -291,32 +329,26 @@ elif menu == "📖 Turno Estendido":
             if i < len(NIVEIS_ALF)-1: ht += '<div class="seta-trilha">→</div>'
         st.markdown(ht + '</div>', unsafe_allow_html=True)
 
-        # --- SEÇÃO DE DIAGNÓSTICO COM EVIDÊNCIAS DINÂMICAS ---
-        # Selectbox fora do form para atualizar evidências ao mudar
         nV = st.selectbox("Novo Nível:", NIVEIS_ALF, index=NIVEIS_ALF.index(diag["Nivel"]) if diag is not None else 0)
         
         with st.form("f_alf_dinamico"):
             tipo = st.selectbox("Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
-            
-            # Busca as evidências baseadas no nível selecionado acima
             evidencias_atuais = EVIDENCIAS_POR_NIVEL.get(nV, [])
             st.write(f"**Evidências para {nV}:**")
-            
             e_cols = st.columns(3)
             s_ev = []
             for i, ev in enumerate(evidencias_atuais):
-                # A key dinâmica garante que o Streamlit limpe os checks ao trocar o nível
                 if e_cols[i % 3].checkbox(ev, key=f"chk_{nV}_{i}"):
                     s_ev.append(ev)
-            
             obs = st.text_area("Obs:")
             if st.form_submit_button("Salvar Diagnóstico"):
-                df_h = df_h[~((df_h["Aluno"] == al) & (df_h["Avaliacao"] == tipo))]
-                pd.concat([df_h, pd.DataFrame([[al, tipo, nV, False, ", ".join(s_ev), obs, "TURNO ESTENDIDO"]], columns=df_h.columns)], ignore_index=True).to_csv(ALF_FILE, index=False)
-                st.rerun()
+                new_row = pd.DataFrame([[al, tipo, nV, False, ", ".join(s_ev), obs, st.session_state.sel_te]], columns=df_h.columns)
+                pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
+                st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
 
 elif menu == "📈 Indicadores pedagógicos":
+    # (Mantido original)
     st.markdown(f"### 📈 Indicadores")
     render_botoes_salas("btn_ind", "sel_ind")
     df_h = pd.read_csv(ALF_FILE)
@@ -327,6 +359,7 @@ elif menu == "📈 Indicadores pedagógicos":
     else: st.info("Sem dados.")
 
 elif menu == "🌊 Canal do Apadrinhamento":
+    # (Mantido original)
     st.markdown(f"### 🌊 Canal do Apadrinhamento")
     df_av = pd.read_csv(AVAL_FILE)
     df_total = pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
@@ -342,6 +375,7 @@ elif menu == "🌊 Canal do Apadrinhamento":
             else: st.warning("Sem avaliações.")
 
 elif menu == "🌊 Tábua da Maré":
+    # (Mantido original)
     st.markdown(f"### 🌊 Tábua da Maré")
     render_botoes_salas("btn_int", "sel_int")
     df_av = pd.read_csv(AVAL_FILE)

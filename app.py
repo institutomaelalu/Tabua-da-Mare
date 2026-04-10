@@ -488,13 +488,14 @@ elif menu == "📖 Turno Estendido":
         al_te = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te]
         al = st.selectbox("Aluno:", sorted(al_te))
         
-# --- TRILHA VISUAL ULTRA-COMPACTA (ESTILO LEGENDA PASTEL) ---
+# --- TRILHA VISUAL COM ESPAÇAMENTO RECOLHIDO ---
         diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
         
         st.markdown("""<style>
             .trilha-container { 
-                display: flex; align-items: center; justify-content: space-between; 
-                gap: 4px; margin: 5px 0; padding: 5px 0; overflow-x: auto; 
+                display: flex; align-items: center; justify-content: center; 
+                gap: 0px; /* Remove o espaço entre os elementos */
+                margin: 5px 0; padding: 5px 0; overflow-x: auto; 
             }
             .caixa-trilha-compacta { 
                 padding: 4px 2px; 
@@ -502,15 +503,22 @@ elif menu == "📖 Turno Estendido":
                 text-align: center; 
                 font-size: 9px; 
                 font-weight: bold; 
-                min-width: 85px; 
-                height: 40px; /* Altura fixa reduzida */
+                min-width: 95px; /* Mantive o tamanho que você gostou */
+                height: 45px; 
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 line-height: 1.0; 
                 box-shadow: 1px 1px 2px rgba(0,0,0,0.03);
+                flex-shrink: 0;
             }
-            .seta-trilha { font-weight: bold; color: #D5DBDB; font-size: 14px; }
+            .seta-trilha { 
+                font-weight: bold; 
+                color: #D5DBDB; 
+                font-size: 14px; 
+                margin: 0 -4px; /* Margem negativa para "colar" nos quadros */
+                z-index: 1;
+            }
         </style>""", unsafe_allow_html=True)
 
         ht = '<div class="trilha-container">'
@@ -520,7 +528,7 @@ elif menu == "📖 Turno Estendido":
             cor_bg = CORES_EXCLUSIVAS.get(n_t, "#eee")
             cor_txt = get_text_color(n_t)
             
-            # Destaque com borda no nível atual, os outros ficam sutis
+            # Destaque com borda no nível atual
             borda = "2px solid #2C3E50" if is_current else "1px solid rgba(0,0,0,0.05)"
             opacidade = "1.0" if is_current else "0.6"
             

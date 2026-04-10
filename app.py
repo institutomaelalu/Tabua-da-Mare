@@ -16,10 +16,23 @@ NIVEIS_ALF = [
 MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
 
 CORES_EXCLUSIVAS = {
-    "Pré-Silábico": "#FF0000", "Silábico sem Valor": "#FFCC00", 
-    "Silábico com Valor": "#FFFF00", "Silábico Alfabético": "#00B0F0", 
-    "Alfabético Inicial": "#00B050", "Alfabético Final": "#FF66CC", 
-    "Alfabético Ortográfico": "#B1A0C7"
+    "1. Pré-Silábico": "#E74C3C",        # Vermelho
+    "2. Silábico s/ Valor": "#E67E22",   # Laranja
+    "3. Silábico c/ Valor": "#F1C40F",   # Amarelo
+    "4. Silábico Alfabético": "#2ECC71", # Verde Claro
+    "5. Alfabético Inicial": "#27AE60",  # Verde Escuro
+    "6. Alfabético Final": "#3498DB",    # Azul
+    "7. Alfabético Ortográfico": "#9B59B6" # Roxo/Lilás
+}
+
+CORES_TRILHA = {
+    "1. Pré-Silábico": {"ativo": "#E74C3C", "inativo": "#FDEDEC"},
+    "2. Silábico s/ Valor": {"ativo": "#E67E22", "inativo": "#FEF5E7"},
+    "3. Silábico c/ Valor": {"ativo": "#F1C40F", "inativo": "#FEF9E7"},
+    "4. Silábico Alfabético": {"ativo": "#2ECC71", "inativo": "#EAFAF1"},
+    "5. Alfabético Inicial": {"ativo": "#27AE60", "inativo": "#E9F7EF"},
+    "6. Alfabético Final": {"ativo": "#3498DB", "inativo": "#EBF5FB"},
+    "7. Alfabético Ortográfico": {"ativo": "#9B59B6", "inativo": "#F5EEF8"}
 }
 
 # --- 2. FUNÇÕES DE SUPORTE ---

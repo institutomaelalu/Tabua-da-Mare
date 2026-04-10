@@ -5,40 +5,57 @@ import numpy as np
 import os
 from datetime import datetime
 
-# --- 1. DEFINIÇÕES DE DADOS (Ajustado para bater com os dicionários de cores) ---
+# --- 1. DEFINIÇÕES DE NÍVEIS E CORES PASTÉIS ---
 NIVEIS_ALF = [
-    "1. Pré-Silábico", 
-    "2. Silábico s/ Valor", 
-    "3. Silábico c/ Valor", 
-    "4. Silábico Alfabético", 
-    "5. Alfabético Inicial", 
-    "6. Alfabético Final", 
+    "1. Pré-Silábico", "2. Silábico s/ Valor", "3. Silábico c/ Valor", 
+    "4. Silábico Alfabético", "5. Alfabético Inicial", "6. Alfabético Final", 
     "7. Alfabético Ortográfico"
 ]
 
 MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
 
+# Cores Pastéis solicitadas (Versão Suave)
 CORES_EXCLUSIVAS = {
-    "1. Pré-Silábico": "#E74C3C",        # Vermelho
-    "2. Silábico s/ Valor": "#E67E22",   # Laranja
-    "3. Silábico c/ Valor": "#F1C40F",   # Amarelo
-    "4. Silábico Alfabético": "#2ECC71", # Verde Claro
-    "5. Alfabético Inicial": "#27AE60",  # Verde Escuro
-    "6. Alfabético Final": "#3498DB",    # Azul
-    "7. Alfabético Ortográfico": "#9B59B6" # Roxo/Lilás
+    "1. Pré-Silábico": "#FADBD8", "2. Silábico s/ Valor": "#FDEBD0", 
+    "3. Silábico c/ Valor": "#FCF3CF", "4. Silábico Alfabético": "#D5F5E3", 
+    "5. Alfabético Inicial": "#A9DFBF", "6. Alfabético Final": "#D6EAF8", 
+    "7. Alfabético Ortográfico": "#EBDEF0"
 }
 
-CORES_TRILHA = {
-    "1. Pré-Silábico": {"ativo": "#E74C3C", "inativo": "#FDEDEC"},
-    "2. Silábico s/ Valor": {"ativo": "#E67E22", "inativo": "#FEF5E7"},
-    "3. Silábico c/ Valor": {"ativo": "#F1C40F", "inativo": "#FEF9E7"},
-    "4. Silábico Alfabético": {"ativo": "#2ECC71", "inativo": "#EAFAF1"},
-    "5. Alfabético Inicial": {"ativo": "#27AE60", "inativo": "#E9F7EF"},
-    "6. Alfabético Final": {"ativo": "#3498DB", "inativo": "#EBF5FB"},
-    "7. Alfabético Ortográfico": {"ativo": "#9B59B6", "inativo": "#F5EEF8"}
-}
+# Função de cor de texto automática para contraste
+def get_text_color(nivel=None):
+    return "#2C3E50" # Texto escuro para melhor leitura nos tons pastéis
 
-# --- 2. FUNÇÕES DE SUPORTE ---
+# --- 2. COMPONENTES VISUAIS PADRONIZADOS ---
+
+def render_legenda_niveis():
+    st.markdown("##### 📝 Legenda de Níveis")
+    cols_leg = st.columns(len(NIVEIS_ALF))
+    for i, nv in enumerate(NIVEIS_ALF):
+        cor_fundo = CORES_EXCLUSIVAS.get(nv, "#eee")
+        cor_txt = get_text_color(nv)
+        cols_leg[i].markdown(f"""
+            <div style="background-color:{cor_fundo}; color:{cor_txt}; padding:8px 2px; border-radius:10px; 
+            text-align:center; font-size:10px; font-weight:bold; min-height:50px; display:flex; align-items:center; justify-content:center; line-height:1.1; border: 1px solid rgba(0,0,0,0.05);">
+                {nv.split(". ")[1]}
+            </div>
+        """, unsafe_allow_html=True)
+
+def get_status_mare_html(nv_atual, hist):
+    pct, txt = 85, "maré baixa"
+    if nv_atual == "7. Alfabético Ortográfico": pct, txt = 15, "maré cheia"
+    elif len(hist) >= 2:
+        n_at, n_ant = MAPA_NIVEIS.get(nv_atual, 0), MAPA_NIVEIS.get(hist[-2], 0)
+        if n_at > n_ant: pct, txt = 45, "maré enchente"
+        elif n_at < n_ant: pct, txt = 70, "maré vazante"
+    return f'''
+    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <div style="background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%); clip-path: path('M 0 4 Q 10 0 20 4 T 40 4 L 40 20 L 0 20 Z'); width:40px; height:20px; border:1px solid #eee;"></div>
+        <span style="font-size:9px; font-weight:bold; color:#5DADE2; text-transform:uppercase; margin-top:2px;">{txt}</span>
+    </div>'''
+
+ALF_FILE, AVAL_FILE = "alfabetizacao.csv", "avaliacoes.csv"
+# --- 3. FUNÇÕES DE SUPORTE ---
 
 def render_vasilha_mare(nivel_num, titulo):
     config = {
@@ -408,7 +425,8 @@ elif menu == "📊 Avaliação da Tábua da Maré":
 # --- ABA: TURNO ESTENDIDO (REGISTRO ATUALIZADO COM NOVA PALETA) ---
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
-    
+    # Exibe a legenda idêntica
+    render_legenda_niveis()
     # --- LÓGICA DE ANOS DINÂMICOS ---
     df_h = pd.read_csv(ALF_FILE).fillna("")
     if "Ano" not in df_h.columns:

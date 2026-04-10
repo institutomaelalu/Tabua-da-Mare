@@ -736,37 +736,56 @@ elif menu == "🌊 Canal do Apadrinhamento":
 
             st.markdown("---")
 
-# --- VISUALIZAÇÃO 1: GERAL (SOCIOEMOCIONAL COM FICHA COLORIDA E GRÁFICO AMPLO) ---
+# --- VISUALIZAÇÃO 1: GERAL (SOCIOEMOCIONAL - AJUSTE FINAL DE LAYOUT) ---
             if modo == "🌊 Tábua da Maré (Geral)":
-                # Identificando a linha e a sala correta do afilhado
+                # 1. Identificação da Sala e Cor (Melhorado para busca parcial)
                 info_row = afils[afils["ALUNO"].astype(str).str.contains(al_af, na=False)].iloc[0]
-                
                 nome_sala = "Não informada"
                 cor_sala_bg = "#ffffff" 
                 
-                # Identifica a sala e define a cor de fundo da ficha
-                for nome_aba, config in TURMAS_CONFIG.items():
+                for nome_aba in TURMAS_CONFIG.keys():
                     df_temp = safe_read(nome_aba)
                     if not df_temp.empty and al_af in df_temp["ALUNO"].astype(str).values:
                         nome_sala = nome_aba
-                        if "Azul" in nome_aba: cor_sala_bg = "#e3f2fd"
-                        elif "Rosa" in nome_aba: cor_sala_bg = "#fce4ec"
-                        elif "Verde" in nome_aba: cor_sala_bg = "#e8f5e9"
-                        elif "Amarela" in nome_aba: cor_sala_bg = "#fffde7"
-                        elif "Laranja" in nome_aba: cor_sala_bg = "#fff3e0"
+                        aba_upper = nome_aba.upper()
+                        if "AZUL" in aba_upper: cor_sala_bg = "#E3F2FD"
+                        elif "ROSA" in aba_upper: cor_sala_bg = "#FCE4EC"
+                        elif "VERDE" in aba_upper: cor_sala_bg = "#E8F5E9"
+                        elif "AMARELA" in aba_upper: cor_sala_bg = "#FFFDE7"
+                        elif "LARANJA" in aba_upper: cor_sala_bg = "#FFF3E0"
                         break
 
-                # Colunas: Ficha menor (0.8) e Gráfico bem largo (3.2)
-                col_ficha, col_grafico = st.columns([0.8, 3.2])
+                # 2. CSS para remover recuos do Streamlit e alinhar legendas
+                st.markdown("""
+                    <style>
+                    [data-testid="column"] { padding: 0 5px !important; }
+                    .legenda-mare {
+                        font-size: 10px !important;
+                        font-weight: bold;
+                        color: #5D6D7E;
+                        margin-top: 2px;
+                        text-transform: uppercase;
+                        line-height: 1;
+                        text-align: center;
+                        min-height: 25px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+                    </style>
+                """, unsafe_allow_html=True)
+
+                # 3. Colunas: Ficha (25%) | Gráfico (75%)
+                col_ficha, col_grafico = st.columns([1, 3])
                 
                 with col_ficha:
                     st.markdown(f"""
-                        <div style="background-color: {cor_sala_bg}; padding: 15px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); color: #2c3e50; min-height: 350px;">
-                            <h4 style="margin-top: 0; color: #1A5276; border-bottom: 2px solid rgba(0,0,0,0.1); padding-bottom: 5px;">📋 Ficha</h4>
-                            <p style="margin: 8px 0; font-size: 13px;"><b>👤 Nome:</b><br>{al_af}</p>
-                            <p style="margin: 8px 0; font-size: 13px;"><b>🏫 Sala:</b><br>{nome_sala}</p>
-                            <p style="margin: 8px 0; font-size: 13px;"><b>🎂 Idade:</b><br>{info_row.get('IDADE', '---')} anos</p>
-                            <p style="margin: 8px 0; font-size: 13px;"><b>🏡 Comunidade:</b><br>{info_row.get('COMUNIDADE', 'Não informada')}</p>
+                        <div style="background-color: {cor_sala_bg}; padding: 20px; border-radius: 15px; border: 1px solid rgba(0,0,0,0.1); color: #2c3e50; height: 100%;">
+                            <h4 style="margin-top: 0; color: #1A5276; border-bottom: 2px solid rgba(0,0,0,0.1); padding-bottom: 8px;">📋 Ficha</h4>
+                            <p style="margin: 12px 0;"><b>👤 Nome:</b><br>{al_af}</p>
+                            <p style="margin: 12px 0;"><b>🏫 Sala:</b><br>{nome_sala}</p>
+                            <p style="margin: 12px 0;"><b>🎂 Idade:</b><br>{info_row.get('IDADE', '---')} anos</p>
+                            <p style="margin: 12px 0;"><b>🏡 Comunidade:</b><br>{info_row.get('COMUNIDADE', 'Não informada')}</p>
                         </div>
                     """, unsafe_allow_html=True)
 
@@ -777,9 +796,8 @@ elif menu == "🌊 Canal do Apadrinhamento":
                     if not dados_mare.empty:
                         r_mare = dados_mare.iloc[-1]
                         
-                        # Exibição das Vasilhas (Limpas e com nome abaixo)
-                        n_cols_v = 5
-                        m_cols = st.columns(n_cols_v)
+                        # Vasilhas: n_cols fixo em 5 para garantir alinhamento
+                        m_cols = st.columns(5)
                         valores_grafico = []
                         
                         for i, cat in enumerate(CATEGORIAS):
@@ -787,28 +805,27 @@ elif menu == "🌊 Canal do Apadrinhamento":
                             valores_grafico.append(val)
                             
                             html_v = render_vasilha_mare(val, cat)
+                            # Limpa setas e IDs da função original
                             html_v_limpo = html_v.split('<span style="position: absolute;')[0] + '</div></div>'
                             
-                            with m_cols[i % n_cols_v]:
+                            with m_cols[i % 5]:
                                 st.markdown(f"""
                                     <div style="text-align: center;">
                                         {html_v_limpo}
-                                        <div style="font-size: 9px; font-weight: bold; color: #5D6D7E; margin-top: 5px; text-transform: uppercase;">
-                                            {cat}
-                                        </div>
+                                        <div class="legenda-mare">{cat}</div>
                                     </div>
                                 """, unsafe_allow_html=True)
                         
-                        # Gráfico Otimizado para ocupar o espaço lateral
+                        # Gráfico Plotly: Forçando expansão máxima
                         fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
                         fig_espelho.update_layout(
-                            height=320, 
-                            margin=dict(l=10, r=10, t=30, b=10),
+                            height=350,
+                            margin=dict(l=0, r=0, t=30, b=0),
+                            autosize=True,
                             paper_bgcolor='rgba(0,0,0,0)',
                             plot_bgcolor='rgba(0,0,0,0)'
                         )
-                        st.plotly_chart(fig_espelho, use_container_width=True)
-                    
+                        st.plotly_chart(fig_espelho, use_container_width=True, config={'displayModeBar': False})
                     else:
                         st.warning("Avaliação comportamental ainda não disponível.")
 

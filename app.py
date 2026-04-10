@@ -146,6 +146,21 @@ def criar_grafico_mare(categorias, valores):
     return fig
 
 # --- INICIALIZAÇÃO DE SESSÃO ---
+chaves_necessarias = [
+    'sel_mat', 'sel_pad', 'sel_aval', 'sel_int', 
+    'sel_alf', 'sel_ind', 'sel_te', 'sel_te_dados'
+]
+
+for k in chaves_necessarias:
+    if k not in st.session_state:
+        st.session_state[k] = "SALA ROSA"
+
+if "alunos_te_dict" not in st.session_state:
+    st.session_state["alunos_te_dict"] = {}
+
+if "logado" not in st.session_state:
+    st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
+# --------------------------------------------------------------------
 if "logado" not in st.session_state: st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
 if "alunos_te_dict" not in st.session_state: st.session_state["alunos_te_dict"] = {}
 

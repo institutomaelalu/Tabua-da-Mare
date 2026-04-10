@@ -312,9 +312,9 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
-# --- ABA: DADOS - TURNO ESTENDIDO (REGISTRO DE ANO + FILTRO EM BOTÕES) ---
+# --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO FINAL CONSOLIDADA) ---
 elif menu == "📊 Dados - Turno Estendido":
-    # CSS para garantir cabeçalhos pretos e botões de ano
+    # CSS Global para Cabeçalhos, Miniaturas e Botões
     st.markdown("""
         <style>
             thead tr th, th {
@@ -322,48 +322,55 @@ elif menu == "📊 Dados - Turno Estendido":
                 -webkit-text-fill-color: #000000 !important;
                 font-weight: bold !important;
                 background-color: #f8f9fa !important;
+                text-align: center !important;
             }
-            .mare-mini {
-                width: 40px; height: 25px; margin: auto;
-                border: 1px solid #ccc;
-                border-radius: 4px;
+            /* Miniatura da Maré na Tabela */
+            .mare-box {
+                display: flex; flex-direction: column; align-items: center; 
+                justify-content: center; gap: 2px; padding: 2px;
+            }
+            .mare-mini-tabela {
+                width: 35px; height: 20px; border: 1px solid #999; border-radius: 3px;
+            }
+            .mare-texto-tabela {
+                font-size: 9px; color: #555; font-weight: bold; line-height: 1;
             }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
+    st.markdown("### 📋 Panorama Geral e Linha do Tempo")
     
-    # Carregamento e Tratamento Inicial
-    df_h = pd.read_csv(ALF_FILE)
-    df_h = df_h.fillna("")
+    df_h = pd.read_csv(ALF_FILE).fillna("")
 
-    # 1. TRATAMENTO DA COLUNA ANO (Cria se não existir)
+    # Garantir coluna Ano
     if "Ano" not in df_h.columns:
-        df_h["Ano"] = 2025 # Define 2025 como base para dados antigos
-        df_h.to_csv(ALF_FILE, index=False) # Salva a estrutura nova
+        df_h["Ano"] = 2025
+        df_h.to_csv(ALF_FILE, index=False)
 
-    # 2. SELEÇÃO DE ANO COM BOTÕES COLORIDOS
-    st.write("**Selecione o Ano Letivo:**")
-    anos_disponiveis = [2025, 2026]
+    # 1. SELEÇÃO DE ANO (BOTÕES PRÓXIMOS E COLORIDOS)
+    st.write("Selecione o Ano:")
+    if "ano_ativo_te" not in st.session_state: st.session_state.ano_ativo_te = 2025
     
-    if "ano_ativo_te" not in st.session_state:
-        st.session_state.ano_ativo_te = 2025
+    col_anos = st.columns([0.15, 0.15, 0.7]) # Colunas estreitas para aproximar os botões
+    anos = [2025, 2026]
+    cores = {2025: "#2E86C1", 2026: "#28B463"} # Azul e Verde
 
-    cols_anos = st.columns(len(anos_disponiveis))
-    cores_anos = {2025: "#5DADE2", 2026: "#00B050"} # Azul e Verde da sua identidade
-
-    for i, ano in enumerate(anos_disponiveis):
-        estilo = f"background-color: {cores_anos[ano]}; color: white; font-weight: bold; border-radius: 10px;"
-        if st.session_state.ano_ativo_te == ano:
-            estilo += "border: 3px solid black;"
+    for i, ano in enumerate(anos):
+        is_active = st.session_state.ano_ativo_te == ano
+        cor_btn = cores[ano] if is_active else "#D5DBDB"
+        txt_cor = "white" if is_active else "#566573"
         
-        if cols_anos[i].button(f"📅 {ano}", key=f"btn_ano_{ano}"):
+        if col_anos[i].button(f"📅 {ano}", key=f"btn_ano_{ano}", use_container_width=True):
             st.session_state.ano_ativo_te = ano
             st.rerun()
+        
+        # Estilização do botão via CSS injetado para o ID específico
+        st.markdown(f"<style>div[data-testid='stHorizontalBlock'] div:nth-child({i+1}) button {{ background-color: {cor_btn} !important; color: {txt_cor} !important; border: {'2px solid black' if is_active else '1px solid #ccc'} !important; }}</style>", unsafe_allow_html=True)
 
     ano_sel = st.session_state.ano_ativo_te
+    st.markdown(f"**Exibindo dados de: {ano_sel}**")
 
-    # Configurações de Cores e Níveis
+    # Mapeamentos
     MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
     CORES_EXCLUSIVAS = {
         "1. Pré-Silábico": "#FF0000", "2. Silábico s/ Valor": "#FFCC00",
@@ -372,97 +379,98 @@ elif menu == "📊 Dados - Turno Estendido":
         "7. Alfabético Ortográfico": "#B1A0C7"
     }
 
-    # Função para Miniatura da Maré
-    def get_mini_mare_html(nivel_atual, hist):
-        pct = 85
-        if nivel_atual == "7. Alfabético Ortográfico": pct = 15
+    # Função para gerar a célula de Status (Miniatura + Texto)
+    def get_status_mare_html(nv_atual, hist):
+        pct, txt = 85, "maré baixa"
+        if nv_atual == "7. Alfabético Ortográfico": pct, txt = 15, "maré cheia"
         elif len(hist) >= 2:
-            n_at = MAPA_NIVEIS.get(nivel_atual, 0)
-            n_ant = MAPA_NIVEIS.get(hist[-2], 0)
-            if n_at > n_ant: pct = 45
-            elif n_at < n_ant: pct = 70
-        return f'<div class="mare-mini" style="background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%); clip-path: path(\'M 0 5 Q 10 0 20 5 T 40 5 L 40 25 L 0 25 Z\');"></div>'
+            n_at, n_ant = MAPA_NIVEIS.get(nv_atual, 0), MAPA_NIVEIS.get(hist[-2], 0)
+            if n_at > n_ant: pct, txt = 45, "maré enchente"
+            elif n_at < n_ant: pct, txt = 70, "maré vazante"
+        
+        return f'''
+        <div class="mare-box">
+            <div class="mare-mini-tabela" style="background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%); clip-path: path('M 0 4 Q 10 0 20 4 T 40 4 L 40 20 L 0 20 Z');"></div>
+            <span class="mare-texto-tabela">status: {txt}</span>
+        </div>'''
 
-    # 3. TABELA PANORAMA GERAL
-    st.markdown(f"#### 📈 Panorama de Avaliações - {ano_sel}")
-    
-    cols_tab = ["Nome do Aluno", "Status Maré", "1ª Sondagem", "2ª Sondagem", "3ª Sondagem"]
-    if ano_sel == 2026:
-        cols_tab.insert(1, "Diagnóstico Inicial (2025)")
+    # 2. TABELA GERAL (STATUS NA ÚLTIMA COLUNA)
+    cols_header = ["Nome do Aluno", "1ª Sondagem", "2ª Sondagem", "3ª Sondagem", "STATUS MARÉ"]
+    if ano_sel == 2026: cols_header.insert(1, "Diagnóstico Inicial (2025)")
 
-    html_tab = f"""<table class="custom-table" style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: white; border: 1px solid #ddd;">
-        <thead><tr>{"".join([f'<th style="color:black !important; padding:12px; border:1px solid #ddd;">{c}</th>' for c in cols_tab])}</tr></thead>
+    html_tab = f"""<table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: white; border: 1px solid #ddd;">
+        <thead><tr>{"".join([f'<th style="color:black !important; padding:10px; border:1px solid #ddd;">{c}</th>' for c in cols_header])}</tr></thead>
         <tbody>"""
     
     alunos_te = sorted(st.session_state["alunos_te_dict"].keys())
     
     for al in alunos_te:
         dados_ano = df_h[(df_h["Aluno"] == al) & (df_h["Ano"] == ano_sel)]
+        html_tab += f'<tr><td style="font-weight:bold; color:black; padding:8px; border:1px solid #ddd; font-size:12px;">{al}</td>'
         
-        # Diagnóstico Inicial para 2026
-        diag_html = ""
+        # Coluna Diagnóstico (apenas 2026)
         if ano_sel == 2026:
             d_ant = df_h[(df_h["Aluno"] == al) & (df_h["Ano"] == 2025) & (df_h["Avaliacao"] == "Avaliação Final")]
             if not d_ant.empty:
                 nv = d_ant["Nivel"].iloc[0]
-                diag_html = f'<td style="background:{CORES_EXCLUSIVAS.get(nv, "#eee")}; text-align:center; font-size:10px; font-weight:bold; color:black;">{nv.split(". ")[1]}</td>'
-            else: diag_html = '<td>-</td>'
+                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv)}; text-align:center; font-weight:bold; font-size:10px;">{nv.split(". ")[1]}</td>'
+            else: html_tab += '<td style="text-align:center;">-</td>'
 
-        # Miniatura da Maré
-        mini_html = "<td>-</td>"
-        if not dados_ano.empty:
-            nv_at = dados_ano["Nivel"].iloc[-1]
-            mini_html = f'<td style="text-align:center;">{get_mini_mare_html(nv_at, dados_ano["Nivel"].tolist())}</td>'
-
-        html_tab += f'<tr><td style="font-weight:bold; color:black; padding:10px; border:1px solid #ddd;">{al}</td>'
-        if ano_sel == 2026: html_tab += diag_html
-        html_tab += mini_html
-
+        # Colunas de Sondagem
         for etapa in ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"]:
             r = dados_ano[dados_ano["Avaliacao"] == etapa]
             if not r.empty:
                 nv = r["Nivel"].iloc[0]
                 html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv)}; text-align:center; font-weight:bold; color:black; border:1px solid #ddd; font-size:11px;">{nv.split(". ")[1]}</td>'
             else: html_tab += '<td style="border:1px solid #ddd;"></td>'
-        html_tab += '</tr>'
+
+        # Coluna Final: STATUS MARÉ
+        status_html = "<td>-</td>"
+        if not dados_ano.empty:
+            status_html = f'<td style="border:1px solid #ddd; background:#fcfcfc;">{get_status_mare_html(dados_ano["Nivel"].iloc[-1], dados_ano["Nivel"].tolist())}</td>'
+        html_tab += status_html + '</tr>'
     
     st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)
     st.markdown("---")
 
-    # 4. FICHA INDIVIDUAL (RESTAURADA)
+    # 3. FICHA INDIVIDUAL (GRÁFICO GRANDE MANTIDO)
     salas_ativas = sorted(list(set(st.session_state["alunos_te_dict"].values())))
     if salas_ativas:
         render_botoes_salas("btn_te_dados", "sel_te_dados", salas_permitidas=salas_ativas)
         alunos_sala = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te_dados]
-        al_sel = st.selectbox("Ficha Pedagógica:", sorted(alunos_sala), key="detalhe_aluno")
+        al_sel = st.selectbox("Selecione o Aluno:", sorted(alunos_sala))
         
         if al_sel:
-            dados_h = df_h[(df_h["Aluno"] == al_sel) & (df_h["Ano"] == ano_sel)].copy()
-            if not dados_h.empty:
-                ultimo_nv = dados_h['Nivel'].iloc[-1]
-                col_card, col_visual = st.columns([1, 1])
+            dados_al = df_h[(df_h["Aluno"] == al_sel) & (df_h["Ano"] == ano_sel)].copy()
+            if not dados_al.empty:
+                u_nv = dados_al['Nivel'].iloc[-1]
+                vols = [MAPA_NIVEIS.get(n, 0) for n in dados_al['Nivel']]
                 
-                with col_card:
-                    evid = dados_h.iloc[-1]['Evidencias']
-                    obs = dados_h.iloc[-1]['Obs']
-                    st.markdown(f"""
-                    <div style="border:1px solid #ddd; padding:20px; border-radius:15px; background:#f9f9f9; color:black;">
-                        <h4 style="margin-top:0;">{al_sel}</h4>
-                        <p><b>Nível Atual:</b><br>
-                        <span style="background:{CORES_EXCLUSIVAS.get(ultimo_nv)}; padding:6px 12px; border-radius:10px; border:1px solid #bbb; font-weight:bold;">{ultimo_nv}</span></p>
-                        <p><b>Evidências:</b><br><small>{evid if evid != "" else ""}</small></p>
-                        <p><b>Observações:</b><br><small>{obs if obs != "" else ""}</small></p>
-                    </div>""", unsafe_allow_html=True)
+                # Cálculo Maré Grande
+                s_txt, pct_g = "Maré Baixa", 85
+                if u_nv == "7. Alfabético Ortográfico": s_txt, pct_g = "Maré Cheia", 15
+                elif len(vols) >= 2:
+                    if vols[-1] > vols[-2]: s_txt, pct_g = "Maré Enchente", 45
+                    elif vols[-1] < vols[-2]: s_txt, pct_g = "Maré Vazante", 70
 
-                with col_visual:
-                    trilha_html = ""
-                    for _, row in dados_h.iterrows():
-                        nome_aval = row["Avaliacao"].replace("Avaliação Final", "3ª Avaliação")
-                        trilha_html += f'<div style="display:flex; justify-content:space-between; padding:5px; border-bottom:1px dashed #eee;"><span>{nome_aval}/{row["Ano"]}</span><b>{row["Nivel"].split(". ")[1]}</b></div>'
-                    
+                col_info, col_graf = st.columns([1, 1])
+                with col_info:
                     st.markdown(f"""
-                    <div style="background:#fff; padding:15px; border-radius:10px; border:1px solid #eee;">
-                        <b style="color:#2E86C1;">📍 Trilha de Evolução:</b><br>{trilha_html}
+                    <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black;">
+                        <h3 style="margin:0;">{al_sel}</h3>
+                        <p><b>Nível Atual:</b> <span style="background:{CORES_EXCLUSIVAS.get(u_nv)}; padding:3px 8px; border-radius:8px; font-weight:bold;">{u_nv}</span></p>
+                        <p><b>Evidências:</b><br><small>{dados_al.iloc[-1]['Evidencias']}</small></p>
+                        <p><b>Observações:</b><br><small>{dados_al.iloc[-1]['Obs']}</small></p>
+                    </div>""", unsafe_allow_html=True)
+                
+                with col_graf:
+                    st.markdown(f"#### 🌊 Nível da Maré: {s_txt}")
+                    st.markdown(f"""
+                    <div style="width: 240px; height: 120px; margin: auto; background: linear-gradient(to bottom, #f0f0f0 {pct_g}%, #5DADE2 {pct_g}%);
+                                clip-path: path('M 0 30 Q 65 10 130 30 T 260 30 L 260 110 Q 260 140 230 140 L 30 140 Q 0 140 0 110 Z');"></div>
+                    <div style="margin-top:10px; background:white; padding:10px; border-radius:8px; border:1px solid #eee;">
+                        <b style="color:#2E86C1;">📍 Trilha de Evolução:</b>
+                        {"".join([f'<div style="display:flex; justify-content:space-between; font-size:12px; padding:3px 0; border-bottom:1px dashed #eee;"><span>{r["Avaliacao"].replace("Avaliação Final","3ª Avaliação")}/{r["Ano"]}</span><b>{r["Nivel"].split(". ")[1]}</b></div>' for _, r in dados_al.iterrows()])}
                     </div>""", unsafe_allow_html=True)
 # --- PRÓXIMO MENU (Certifique-se que o elif abaixo está fora do bloco anterior) ---
 elif menu == "📈 Indicadores pedagógicos":

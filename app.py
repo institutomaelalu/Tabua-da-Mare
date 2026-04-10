@@ -415,9 +415,9 @@ elif menu == "📊 Avaliação da Tábua da Maré":
                 st.success("Salvo!"); st.rerun()
 # --- ABA: TURNO ESTENDIDO (REGISTRO ATUALIZADO COM NOVA PALETA) ---
 elif menu == "📖 Turno Estendido":
-    st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color:#6741d9'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
     
-    # --- LÓGICA DE ANOS DINÂMICOS ---
+    # 1. LÓGICA DE ANOS DINÂMICOS
     df_h = pd.read_csv(ALF_FILE).fillna("")
     if "Ano" not in df_h.columns:
         df_h["Ano"] = 2025
@@ -430,11 +430,10 @@ elif menu == "📖 Turno Estendido":
     if "ano_registro_te" not in st.session_state: 
         st.session_state.ano_registro_te = st.session_state.lista_anos_te[-1]
 
-    st.write("**Ano da Avaliação:**")
+    st.write("**Selecione o Ano Letivo:**")
+    cols_anos = st.columns([0.15] * len(st.session_state.lista_anos_te) + [0.1, 0.6])
     
-    cols_anos_all = st.columns([0.15] * len(st.session_state.lista_anos_te) + [0.1, 0.6])
-    
-    # Cores para os botões de seleção de ano
+    # Cores fixas para os botões de ano para facilitar identificação
     cores_interface_anos = {2025: "#2E86C1", 2026: "#28B463", 2027: "#E67E22", 2028: "#8E44AD"}
 
     for i, ano in enumerate(st.session_state.lista_anos_te):
@@ -443,105 +442,78 @@ elif menu == "📖 Turno Estendido":
         cor_btn = cor_base if is_active else "#D5DBDB"
         txt_cor = "white" if is_active else "#566573"
         
-        if cols_anos_all[i].button(f"📅 {ano}", key=f"btn_reg_ano_{ano}", use_container_width=True):
+        if cols_anos[i].button(f"📅 {ano}", key=f"btn_reg_ano_{ano}", use_container_width=True):
             st.session_state.ano_registro_te = ano
             st.rerun()
         
         st.markdown(f"<style>div[data-testid='stHorizontalBlock'] div:nth-child({i+1}) button {{ background-color: {cor_btn} !important; color: {txt_cor} !important; border: {'2px solid black' if is_active else '1px solid #ccc'} !important; }}</style>", unsafe_allow_html=True)
 
-    with cols_anos_all[len(st.session_state.lista_anos_te)].popover("➕"):
-        novo_ano_input = st.number_input("Digite o novo ano:", min_value=2024, max_value=2100, value=st.session_state.lista_anos_te[-1] + 1)
-        if st.button("Confirmar Novo Ano"):
+    # Botão para adicionar novo ano
+    with cols_anos[len(st.session_state.lista_anos_te)].popover("➕"):
+        novo_ano_input = st.number_input("Novo ano:", min_value=2024, max_value=2100, value=st.session_state.lista_anos_te[-1] + 1)
+        if st.button("Confirmar"):
             if novo_ano_input not in st.session_state.lista_anos_te:
                 st.session_state.lista_anos_te.append(novo_ano_input)
                 st.session_state.lista_anos_te.sort()
                 st.session_state.ano_registro_te = novo_ano_input
-                st.success(f"Ano {novo_ano_input} adicionado!")
                 st.rerun()
-            else:
-                st.warning("Este ano já existe!")
 
-    st.write(f"Registrando para o ano letivo: **{st.session_state.ano_registro_te}**")
-    st.markdown("---")
+    st.info(f"📍 Registrando dados para: **{st.session_state.ano_registro_te}**")
 
-    # --- CADASTRO MANUAL ---
-    with st.expander("➕ Cadastrar Aluno Manualmente no Turno"):
-        with st.form("f_te_m"):
-            c1, c2 = st.columns(2)
-            nM, sM = c1.text_input("Nome").strip().upper(), c2.selectbox("Sala", list(TURMAS_CONFIG.keys()))
-            if st.form_submit_button("Adicionar"):
-                if nM: st.session_state["alunos_te_dict"][nM] = sM; st.rerun()
-    
-    # --- SELEÇÃO DE ALUNO E TRILHA VISUAL ---
+    # 2. SELEÇÃO DE ALUNO E TRILHA
+    # Filtra alunos que pertencem ao turno estendido (baseado no dicionário que você já tem no código)
     salas_te = sorted(list(set(st.session_state["alunos_te_dict"].values())))
+    
     if salas_te:
         if st.session_state.sel_te not in salas_te: st.session_state.sel_te = salas_te[0]
         render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_te)
+        
         al_te = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te]
-        al = st.selectbox("Aluno:", sorted(al_te))
+        al = st.selectbox("Selecione o Aluno:", sorted(al_te))
         
-        # --- LÓGICA DA TRILHA VISUAL COM NOVAS CORES ---
-        # Busca o diagnóstico mais recente do aluno para marcar na trilha
-        diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
+        # Busca diagnóstico mais recente no ano selecionado
+        dados_aluno = df_h[(df_h["Aluno"] == al) & (df_h["Ano"] == st.session_state.ano_registro_te)]
+        diag = dados_aluno.iloc[-1] if not dados_aluno.empty else None
         
+        # RENDERIZAÇÃO DA TRILHA (Estilo Visual)
         st.markdown("""<style>
-            .trilha-container { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 20px 0; overflow-x: auto; padding: 10px; }
-            .caixa-trilha { padding: 15px 10px; border-radius: 12px; text-align: center; font-size: 11px; font-weight: bold; min-width: 100px; line-height: 1.2; box-shadow: 1px 1px 4px rgba(0,0,0,0.1); }
-            .seta-trilha { font-weight: bold; color: #ccc; }
+            .trilha-container { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 20px 0; overflow-x: auto; padding: 10px; }
+            .caixa-trilha { padding: 12px 8px; border-radius: 10px; text-align: center; font-size: 10px; font-weight: bold; min-width: 90px; line-height: 1.2; }
+            .seta { color: #ccc; font-weight: bold; }
         </style>""", unsafe_allow_html=True)
 
         ht = '<div class="trilha-container">'
         for i, n_t in enumerate(NIVEIS_ALF):
             is_current = (diag is not None and diag["Nivel"] == n_t)
             
-            # Cores baseadas na imagem (Ativo = cor real, Inativo = versão clara/pastel)
+            # Puxa as cores do dicionário CORES_TRILHA definido no topo
             cor_bg = CORES_TRILHA[n_t]["ativo"] if is_current else CORES_TRILHA[n_t]["inativo"]
-            
-            # Texto branco para níveis com cores escuras na paleta
-            if is_current:
-                cor_txt = "white" if n_t in ["1. Pré-Silábico", "5. Alfabético Inicial", "6. Alfabético Final", "7. Alfabético Ortográfico"] else "black"
-                borda = "3px solid #333"
-            else:
-                cor_txt = "#999"
-                borda = "1px solid #eee"
+            cor_txt = "white" if (is_current and n_t in ["1. Pré-Silábico", "5. Alfabético Inicial", "6. Alfabético Final", "7. Alfabético Ortográfico"]) else ("black" if is_current else "#999")
+            borda = "2.5px solid #333" if is_current else "1px solid #eee"
 
             ht += f'<div class="caixa-trilha" style="background-color:{cor_bg}; color:{cor_txt}; border:{borda};">{n_t.split(". ")[1]}</div>'
-            if i < len(NIVEIS_ALF)-1: 
-                ht += '<div class="seta-trilha">→</div>'
+            if i < len(NIVEIS_ALF)-1: ht += '<div class="seta">→</div>'
         st.markdown(ht + '</div>', unsafe_allow_html=True)
 
-        # Seleção do Novo Nível
+        # 3. FORMULÁRIO DE SALVAMENTO
         idx_inicial = NIVEIS_ALF.index(diag["Nivel"]) if diag is not None else 0
-        nV = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_inicial)
+        nV = st.selectbox("Nível Identificado:", NIVEIS_ALF, index=idx_inicial)
         
-        # FORMULÁRIO DE SALVAMENTO
-        with st.form("f_alf_dinamico"):
-            tipo = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
-            evidencias_atuais = EVIDENCIAS_POR_NIVEL.get(nV, [])
+        with st.form("f_alf_save"):
+            c1, c2 = st.columns(2)
+            tipo = c1.selectbox("Etapa:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
+            obs = st.text_area("Observações:")
             
-            st.write(f"**Evidências para {nV}:**")
-            e_cols = st.columns(3)
-            s_ev = []
-            for i, ev in enumerate(evidencias_atuais):
-                if e_cols[i % 3].checkbox(ev, key=f"chk_{nV}_{i}"):
-                    s_ev.append(ev)
-            
-            obs = st.text_area("Observações Adicionais:")
-            
-            if st.form_submit_button("Salvar Diagnóstico"):
-                new_data = {
-                    "Aluno": al, 
-                    "Avaliacao": tipo, 
-                    "Nivel": nV,
+            if st.form_submit_button("💾 Salvar Registro"):
+                new_row = {
+                    "Aluno": al, "Avaliacao": tipo, "Nivel": nV,
                     "Flag": datetime.now().strftime("%d/%m/%Y"), 
-                    "Evidencias": ", ".join(s_ev), 
-                    "Obs": obs,
-                    "Sala": st.session_state.sel_te,
+                    "Obs": obs, "Sala": st.session_state.sel_te,
                     "Ano": int(st.session_state.ano_registro_te)
                 }
-                df_h = pd.concat([df_h, pd.DataFrame([new_data])], ignore_index=True)
+                df_h = pd.concat([df_h, pd.DataFrame([new_row])], ignore_index=True)
                 df_h.to_csv(ALF_FILE, index=False)
-                st.success(f"Diagnóstico de {al} para {st.session_state.ano_registro_te} salvo com sucesso!"); 
+                st.success(f"Registro de {al} salvo!")
                 st.rerun()
 # --- ABA: DADOS - TURNO ESTENDIDO (ATUALIZADO COM CORES E LEGENDA) ---
 elif menu == "📊 Dados - Turno Estendido":

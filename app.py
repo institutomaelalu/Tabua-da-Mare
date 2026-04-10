@@ -230,40 +230,6 @@ elif menu == "📝 Alunos matriculados":
             for al in selecionados: st.session_state["alunos_te_dict"][al] = st.session_state.sel_mat
             st.rerun()
 
-# --- NOVA ABA: DADOS - TURNO ESTENDIDO ---
-elif menu == "📊 Dados - Turno Estendido":
-    st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
-    df_h = pd.read_csv(ALF_FILE)
-    
-    # Legenda da Trilha no topo
-    cols_leg = st.columns(len(NIVEIS_ALF))
-    for idx, niv in enumerate(NIVEIS_ALF):
-        cols_leg[idx].markdown(f"<div style='background-color:{CORES_TRILHA[niv]['ativo']}; padding:10px; border-radius:10px; text-align:center; font-size:10px; font-weight:bold;'>{niv.split('. ')[1]}</div>", unsafe_allow_html=True)
-
-    # Construção da Tabela conforme imagem solicitada
-    html = '<table class="custom-table"><thead style="background-color:#5cc6d0"><tr><th>Nome</th><th>Sala</th><th>1ª Sondagem</th><th>2ª Sondagem</th><th>3ª Sondagem</th><th>Observações</th></tr></thead><tbody>'
-    
-    for al in sorted(st.session_state["alunos_te_dict"].keys()):
-        sala_v = st.session_state["alunos_te_dict"][al]
-        dados_al = df_h[df_h["Aluno"] == al]
-        
-        def get_color_cell(tipo_aval):
-            row = dados_al[dados_al["Avaliacao"] == tipo_aval]
-            if not row.empty:
-                nv = row["Nivel"].iloc[0]
-                return f'background-color:{CORES_TRILHA[nv]["ativo"]}; color:transparent;'
-            return ''
-
-        obs = dados_al["Obs"].iloc[-1] if not dados_al.empty else ""
-        
-        html += f'<tr><td>{al}</td><td>{sala_v}</td>'
-        html += f'<td style="{get_color_cell("1ª Avaliação")}">-</td>'
-        html += f'<td style="{get_color_cell("2ª Avaliação")}">-</td>'
-        html += f'<td style="{get_color_cell("Avaliação Final")}">-</td>'
-        html += f'<td>{obs}</td></tr>'
-    
-    st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
-
 elif menu == "🤝 Gestão de apadrinhamento":
     # (Mantido original)
     st.markdown(f"### 🤝 Gestão de Apadrinhamento")
@@ -346,7 +312,78 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
+# --- NOVA ABA: DADOS - TURNO ESTENDIDO (ATUALIZADA) ---
+elif menu == "📊 Dados - Turno Estendido":
+    st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
+    df_h = pd.read_csv(ALF_FILE)
+    
+    # Cores suaves/pastéis baseadas no seu sistema original para o fundo das células
+    CORES_PASTEL = {
+        "1. Pré-Silábico": "#b3cde3",
+        "2. Silábico s/ Valor": "#8dd3c7",
+        "3. Silábico c/ Valor": "#ccebc5",
+        "4. Silábico Alfabético": "#fef9b1",
+        "5. Alfabético Inicial": "#fbb4ae",
+        "6. Alfabético Final": "#b3cde3",
+        "7. Alfabético Ortográfico": "#fbb4ae"
+    }
 
+    # Legenda da Trilha no topo com tons suaves
+    cols_leg = st.columns(len(NIVEIS_ALF))
+    for idx, niv in enumerate(NIVEIS_ALF):
+        cols_leg[idx].markdown(f"<div style='background-color:{CORES_PASTEL[niv]}; padding:10px; border-radius:10px; text-align:center; font-size:10px; font-weight:bold; color:#444;'>{niv.split('. ')[1]}</div>", unsafe_allow_html=True)
+
+    # Construção da Tabela Estilizada
+    html = """
+    <style>
+        .cell-diag {
+            text-align: center;
+            font-weight: bold;
+            font-size: 11px;
+            color: white;
+            border-radius: 4px;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+        }
+    </style>
+    <table class="custom-table">
+        <thead style="background-color:#5cc6d0">
+            <tr>
+                <th>Nome</th>
+                <th>Sala</th>
+                <th>1ª Sondagem</th>
+                <th>2ª Sondagem</th>
+                <th>3ª Sondagem</th>
+                <th>Observações</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    for al in sorted(st.session_state["alunos_te_dict"].keys()):
+        sala_v = st.session_state["alunos_te_dict"][al]
+        dados_al = df_h[df_h["Aluno"] == al]
+        
+        def render_sondagem_cell(tipo_aval):
+            row = dados_al[dados_al["Avaliacao"] == tipo_aval]
+            if not row.empty:
+                nv = row["Nivel"].iloc[0]
+                label = nv.split(". ")[1] # Pega apenas o texto, ex: "Alfabético Final"
+                cor = CORES_PASTEL.get(nv, "#eee")
+                return f'background-color:{cor};' , f'<div class="cell-diag">{label}</div>'
+            return '', ''
+
+        obs = dados_al["Obs"].iloc[-1] if not dados_al.empty else ""
+        
+        html += f'<tr><td>{al}</td><td>{sala_v}</td>'
+        
+        # Gerando as 3 colunas de sondagem
+        for etapa in ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"]:
+            estilo, conteudo = render_sondagem_cell(etapa)
+            html += f'<td style="{estilo}">{conteudo}</td>'
+            
+        html += f'<td>{obs}</td></tr>'
+    
+    st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 elif menu == "📈 Indicadores pedagógicos":
     # (Mantido original)
     st.markdown(f"### 📈 Indicadores")

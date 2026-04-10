@@ -266,9 +266,35 @@ elif menu == "📊 Avaliação da Tábua da Maré":
                 pd.concat([df_av, pd.DataFrame([[al, tr] + [MARE_OPCOES[n_l[c]] for c in CATEGORIAS] + [obs]], columns=df_av.columns)], ignore_index=True).to_csv(AVAL_FILE, index=False)
                 st.success("Salvo!"); st.rerun()
 
+# --- ABA: TURNO ESTENDIDO (REGISTRO COM ANO) ---
 elif menu == "📖 Turno Estendido":
-    # (Mantido original com suas evidências dinâmicas)
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
+    
+    # --- NOVO: SELEÇÃO DE ANO PARA REGISTRO ---
+    st.write("**Ano da Avaliação:**")
+    if "ano_registro_te" not in st.session_state: 
+        st.session_state.ano_registro_te = 2026
+
+    col_anos_reg = st.columns([0.15, 0.15, 0.7])
+    anos_opcoes = [2025, 2026]
+    cores_opcoes = {2025: "#2E86C1", 2026: "#28B463"}
+
+    for i, ano in enumerate(anos_opcoes):
+        is_active = st.session_state.ano_registro_te == ano
+        cor_btn = cores_opcoes[ano] if is_active else "#D5DBDB"
+        txt_cor = "white" if is_active else "#566573"
+        
+        if col_anos_reg[i].button(f"📅 {ano}", key=f"btn_reg_ano_{ano}", use_container_width=True):
+            st.session_state.ano_registro_te = ano
+            st.rerun()
+        
+        # CSS para aproximar botões e colorir
+        st.markdown(f"<style>div[data-testid='stHorizontalBlock'] div:nth-child({i+1}) button {{ background-color: {cor_btn} !important; color: {txt_cor} !important; border: {'2px solid black' if is_active else '1px solid #ccc'} !important; }}</style>", unsafe_allow_html=True)
+    
+    st.write(f"Registrando para o ano letivo: **{st.session_state.ano_registro_te}**")
+    st.markdown("---")
+
+    # (Mantido original: Cadastro Manual)
     with st.expander("➕ Cadastrar Aluno Manualmente no Turno"):
         with st.form("f_te_m"):
             c1, c2 = st.columns(2)
@@ -286,6 +312,12 @@ elif menu == "📖 Turno Estendido":
         st.markdown(f'<div class="sala-badge" style="background-color:{cor_o}">{st.session_state.sel_te}</div>', unsafe_allow_html=True)
         
         df_h = pd.read_csv(ALF_FILE)
+        
+        # Garantir que a coluna Ano existe no DF carregado
+        if "Ano" not in df_h.columns:
+            df_h["Ano"] = 2025
+
+        # Busca o último diagnóstico do aluno para a trilha visual
         diag = df_h[df_h["Aluno"] == al].iloc[-1] if not df_h[df_h["Aluno"] == al].empty else None
         
         ht = '<div class="trilha-container">'
@@ -298,6 +330,7 @@ elif menu == "📖 Turno Estendido":
         nV = st.selectbox("Novo Nível:", NIVEIS_ALF, index=NIVEIS_ALF.index(diag["Nivel"]) if diag is not None else 0)
         
         with st.form("f_alf_dinamico"):
+            # Ajustado para manter o padrão visual: 3ª Avaliação (Final)
             tipo = st.selectbox("Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
             evidencias_atuais = EVIDENCIAS_POR_NIVEL.get(nV, [])
             st.write(f"**Evidências para {nV}:**")
@@ -307,11 +340,32 @@ elif menu == "📖 Turno Estendido":
                 if e_cols[i % 3].checkbox(ev, key=f"chk_{nV}_{i}"):
                     s_ev.append(ev)
             obs = st.text_area("Obs:")
+            
             if st.form_submit_button("Salvar Diagnóstico"):
-                new_row = pd.DataFrame([[al, tipo, nV, False, ", ".join(s_ev), obs, st.session_state.sel_te]], columns=df_h.columns)
-                pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
-                st.success("Diagnóstico salvo!"); st.rerun()
-    else: st.info("Sem alunos no Turno.")
+                # CRIANDO A NOVA LINHA COM A COLUNA ANO
+                # IMPORTANTE: A ordem das colunas deve ser IDÊNTICA ao seu CSV original + a nova coluna Ano
+                # Supondo que as colunas sejam: [Aluno, Avaliacao, Nivel, Flag, Evidencias, Obs, Sala, Ano]
+                new_data = {
+                    "Aluno": al,
+                    "Avaliacao": tipo,
+                    "Nivel": nV,
+                    "Flag": False, # ou Data, dependendo do seu CSV
+                    "Evidencias": ", ".join(s_ev),
+                    "Obs": obs,
+                    "Sala": st.session_state.sel_te,
+                    "Ano": int(st.session_state.ano_registro_te)
+                }
+                
+                new_row = pd.DataFrame([new_data])
+                
+                # Concatenar e Salvar
+                df_h = pd.concat([df_h, new_row], ignore_index=True)
+                df_h.to_csv(ALF_FILE, index=False)
+                
+                st.success(f"Diagnóstico de {st.session_state.ano_registro_te} salvo com sucesso!")
+                st.rerun()
+    else: 
+        st.info("Sem alunos no Turno.")
 # --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO FINAL - TEXTO LIMPO) ---
 elif menu == "📊 Dados - Turno Estendido":
     # CSS Global para Cabeçalhos, Miniaturas e Botões

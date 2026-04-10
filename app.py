@@ -5,64 +5,15 @@ import numpy as np
 import os
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
-from urllib.parse import quote # Importação necessária
 
-# --- NOVO: CONEXÃO COM GOOGLE SHEETS ---
+# 1. CONFIGURAÇÃO E ESTILO (Sempre o primeiro comando Streamlit)
+st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
+
+# --- CONEXÃO ÚNICA COM GOOGLE SHEETS ---
+# No Streamlit Cloud, ele usará as credenciais do menu 'Secrets'
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-def registrar_turno_estendido(aluno, nivel, evidencias, sala):
-    """Adiciona registro na aba 'Turno estendido'"""
-    try:
-        df_atual = conn.read(worksheet="Turno estendido")
-        nova_linha = pd.DataFrame([{
-            "Data": datetime.now().strftime("%d/%m/%Y"),
-            "Ano": 2026,
-            "Tipo de Avaliação": "Avaliação Contínua",
-            "ALUNO": aluno,
-            "Nível de Escrita": nivel,
-            "Evidências": evidencias,
-            "Sala": sala
-        }])
-        df_final = pd.concat([df_atual, nova_linha], ignore_index=True)
-        conn.update(worksheet="Turno estendido", data=df_final)
-        st.cache_data.clear()
-        return True
-    except Exception as e:
-        st.error(f"Erro ao salvar Turno Estendido: {e}")
-        return False
-
-def registrar_tabua_mare(aluno, sala, semestre, notas_dict, obs):
-    try:
-        # 1. Lê a aba completa
-        df_atual = conn.read(worksheet="TÁBUA DA MARÉ")
-        
-        # 2. Verifica se o aluno já existe para aquele semestre
-        # Isso evita duplicar o nome se ele já estiver pré-cadastrado
-        mask = (df_atual["Aluno"] == aluno) & (df_atual["Semeste"] == semestre)
-        
-        if mask.any():
-            # ATUALIZAÇÃO: Se o aluno existe, preenche as notas na linha dele
-            idx = df_atual.index[mask][0]
-            for col, valor in notas_dict.items():
-                df_atual.at[idx, col] = valor
-            df_atual.at[idx, "Observações pedagógicas"] = obs
-            df_atual.at[idx, "Sala"] = sala # Garante que a sala esteja certa
-        else:
-            # INSERÇÃO: Se não existir (ex: novo semestre), cria nova linha
-            registro = {"Aluno": aluno, "Sala": sala, "Semeste": semestre, "Observações pedagógicas": obs}
-            registro.update(notas_dict)
-            df_final_row = pd.DataFrame([registro])
-            df_atual = pd.concat([df_atual, df_final_row], ignore_index=True)
-        
-        # 3. Envia a planilha atualizada de volta
-        conn.update(worksheet="TÁBUA DA MARÉ", data=df_atual)
-        st.cache_data.clear()
-        return True
-    except Exception as e:
-        st.error(f"Erro ao sincronizar Tábua da Maré: {e}")
-        return False
-
-# --- 1. DEFINIÇÕES DE NÍVEIS E CORES PASTÉIS ---
+# --- DEFINIÇÕES DE NÍVEIS E CORES (MATRIZES) ---
 NIVEIS_ALF = [
     "1. Pré-Silábico", "2. Silábico s/ Valor", "3. Silábico c/ Valor", 
     "4. Silábico Alfabético", "5. Alfabético Inicial", "6. Alfabético Final", 
@@ -71,7 +22,6 @@ NIVEIS_ALF = [
 
 MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
 
-# Cores Pastéis solicitadas (Versão Suave)
 CORES_EXCLUSIVAS = {
     "1. Pré-Silábico": "#FADBD8", "2. Silábico s/ Valor": "#FDEBD0", 
     "3. Silábico c/ Valor": "#FCF3CF", "4. Silábico Alfabético": "#D5F5E3", 
@@ -79,32 +29,34 @@ CORES_EXCLUSIVAS = {
     "7. Alfabético Ortográfico": "#EBDEF0"
 }
 
-# Função de cor de texto automática para contraste
-def get_text_color(nivel=None):
-    return "#2C3E50" # Texto escuro para melhor leitura nos tons pastéis
-    # --- 2. CONEXÃO E FUNÇÕES DE ESCRITA ---
-conn = st.connection("gsheets", type=GSheetsConnection)
+# Cores de Identidade Visual
+C_ROSA, C_VERDE, C_AZUL, C_AMARELO, C_ROXO = "#ff81ba", "#a8cf45", "#5cc6d0", "#ffc713", "#6741d9"
+C_AZUL_MARE = "#8fd9fb" 
+
+# --- FUNÇÕES DE REGISTRO (ESCRITA NA NUVEM) ---
 
 def registrar_turno_estendido(aluno, sala, avaliacao_tipo, nivel, evidencias_list, obs, ano=2026):
+    """Salva dados na aba TURNO_ESTENDIDO"""
     try:
-        df_atual = conn.read(worksheet="TURNO ESTENDIDO")
-        evidencias_str = "; ".join(evidencias_list)
+        # Lê a aba atual
+        df_atual = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
+        evidencias_str = "; ".join(evidencias_list) if isinstance(evidencias_list, list) else evidencias_list
         
-        # Cria o dicionário garantindo que as chaves batam com as colunas da sua planilha
         novo_registro = {
-            "Aluno": aluno,
-            "Sala": sala,
-            "1 Avaliação": nivel if avaliacao_tipo == "1 Avaliação" else "",
-            "2 Avaliação": nivel if avaliacao_tipo == "2 Avaliação" else "",
-            "3 Avaliação": nivel if avaliacao_tipo == "3 Avaliação" else "",
-            "Ano": ano,
-            "Diagnóstico": nivel,
-            "Evidências": evidencias_str,
-            "Observações pedagócias": obs
+            "DATA": datetime.now().strftime("%d/%m/%Y"),
+            "ALUNO": aluno,
+            "SALA": sala,
+            "1 AVALIAÇÃO": nivel if avaliacao_tipo == "1ª Avaliação" else "",
+            "2 AVALIAÇÃO": nivel if avaliacao_tipo == "2ª Avaliação" else "",
+            "3 AVALIAÇÃO": nivel if avaliacao_tipo == "3ª Avaliação" else "",
+            "ANO": ano,
+            "DIAGNÓSTICO": nivel,
+            "EVIDÊNCIAS": evidencias_str,
+            "OBSERVAÇÕES PEDAGÓGICAS": obs
         }
         
         df_final = pd.concat([df_atual, pd.DataFrame([novo_registro])], ignore_index=True)
-        conn.update(worksheet="TURNO ESTENDIDO", data=df_final)
+        conn.update(worksheet="TURNO_ESTENDIDO", data=df_final)
         st.cache_data.clear()
         return True
     except Exception as e:
@@ -112,25 +64,35 @@ def registrar_turno_estendido(aluno, sala, avaliacao_tipo, nivel, evidencias_lis
         return False
 
 def registrar_tabua_mare(aluno, sala, semestre, notas_dict, obs):
+    """Salva ou atualiza dados na aba TABUA_MARE"""
     try:
-        df_atual = conn.read(worksheet="TÁBUA DA MARÉ")
-        registro = {
-            "Aluno": aluno,
-            "Sala": sala,
-            "Semeste": semestre,
-            "Observações pedagógicas": obs
-        }
-        registro.update(notas_dict)
+        df_atual = conn.read(worksheet="TABUA_MARE").fillna("")
         
-        df_final = pd.concat([df_atual, pd.DataFrame([registro])], ignore_index=True)
-        conn.update(worksheet="TÁBUA DA MARÉ", data=df_final)
+        # Lógica de Update ou Insert
+        mask = (df_atual["ALUNO"] == aluno) & (df_atual["SEMESTRE"] == semestre)
+        
+        if mask.any():
+            idx = df_atual.index[mask][0]
+            for col, valor in notas_dict.items():
+                df_atual.at[idx, col] = valor
+            df_atual.at[idx, "OBSERVAÇÕES PEDAGÓGICAS"] = obs
+            df_atual.at[idx, "SALA"] = sala
+        else:
+            registro = {"ALUNO": aluno, "SALA": sala, "SEMESTRE": semestre, "OBSERVAÇÕES PEDAGÓGICAS": obs}
+            registro.update(notas_dict)
+            df_atual = pd.concat([df_atual, pd.DataFrame([registro])], ignore_index=True)
+        
+        conn.update(worksheet="TABUA_MARE", data=df_atual)
         st.cache_data.clear()
         return True
     except Exception as e:
-        st.error(f"Erro ao salvar Tábua da Maré: {e}")
+        st.error(f"Erro ao sincronizar Tábua da Maré: {e}")
         return False
-        
-# --- 2. COMPONENTES VISUAIS PADRONIZADOS ---
+
+# --- COMPONENTES VISUAIS E SUPORTE ---
+
+def get_text_color(nivel=None):
+    return "#2C3E50"
 
 def render_legenda_niveis():
     st.markdown("##### 📝 Legenda de Níveis")
@@ -145,22 +107,6 @@ def render_legenda_niveis():
             </div>
         """, unsafe_allow_html=True)
 
-def get_status_mare_html(nv_atual, hist):
-    pct, txt = 85, "maré baixa"
-    if nv_atual == "7. Alfabético Ortográfico": pct, txt = 15, "maré cheia"
-    elif len(hist) >= 2:
-        n_at, n_ant = MAPA_NIVEIS.get(nv_atual, 0), MAPA_NIVEIS.get(hist[-2], 0)
-        if n_at > n_ant: pct, txt = 45, "maré enchente"
-        elif n_at < n_ant: pct, txt = 70, "maré vazante"
-    return f'''
-    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
-        <div style="background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%); clip-path: path('M 0 4 Q 10 0 20 4 T 40 4 L 40 20 L 0 20 Z'); width:40px; height:20px; border:1px solid #eee;"></div>
-        <span style="font-size:9px; font-weight:bold; color:#5DADE2; text-transform:uppercase; margin-top:2px;">{txt}</span>
-    </div>'''
-
-ALF_FILE, AVAL_FILE = "alfabetizacao.csv", "avaliacoes.csv"
-# --- 3. FUNÇÕES DE SUPORTE ---
-
 def render_vasilha_mare(nivel_num, titulo):
     config = {
         1: {"pct": 85, "txt": "Maré Baixa", "seta": ""},
@@ -170,8 +116,7 @@ def render_vasilha_mare(nivel_num, titulo):
     }
     try:
         n = int(float(nivel_num))
-        if n < 1: n = 1
-        if n > 4: n = 4
+        n = max(1, min(4, n))
     except: n = 1
     c = config[n]
     return f'''
@@ -188,7 +133,7 @@ def render_grafico_alfabetizacao_individual(df_aluno):
     if df_aluno.empty: 
         st.info("Sem dados de evolução.")
         return
-    # Removido NameError: MAPA_NIVEIS agora é global e definido no topo
+    
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=df_aluno["Avaliacao"].str.replace("Avaliação Final", "3ª Aval") + "/" + df_aluno["Ano"].astype(str),
@@ -201,26 +146,6 @@ def render_grafico_alfabetizacao_individual(df_aluno):
         yaxis=dict(range=[0.5, 7.5], tickmode='array', tickvals=list(range(1, 8)), ticktext=[n.split(". ")[1] for n in NIVEIS_ALF]),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(size=10))
     st.plotly_chart(fig, use_container_width=True)
-
-# 1. Configuração e Estilo
-st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
-
-C_ROSA, C_VERDE, C_AZUL, C_AMARELO, C_ROXO = "#ff81ba", "#a8cf45", "#5cc6d0", "#ffc713", "#6741d9"
-C_AZUL_MARE = "#8fd9fb" 
-
-# Configurações para Alfabetização
-CORES_TRILHA = {
-    "1. Pré-Silábico": {"ativo": "#d9e6f2", "inativo": "#f1f6fb"},
-    "2. Silábico s/ Valor": {"ativo": "#5cc6d0", "inativo": "#d2eff2"},
-    "3. Silábico c/ Valor": {"ativo": "#a8cf45", "inativo": "#e5f0cc"},
-    "4. Silábico Alfabético": {"ativo": "#ffc713", "inativo": "#fff1c2"},
-    "5. Alfabético Inicial": {"ativo": "#ff81ba", "inativo": "#ffd9ea"},
-    "6. Alfabético Final": {"ativo": "#5cc6d0", "inativo": "#d2eff2"},
-    "7. Alfabético Ortográfico": {"ativo": "#ff81ba", "inativo": "#ffd9ea"}
-}
-NIVEIS_ALF = list(CORES_TRILHA.keys())
-ALF_FILE = "alfabetizacao.csv"
-AVAL_FILE = "avaliacoes.csv"
 
 # --- EVIDÊNCIAS DINÂMICAS (Mantidas conforme seu código) ---
 EVIDENCIAS_POR_NIVEL = {
@@ -307,17 +232,41 @@ def safe_read(worksheet_name):
 
 def render_filtros(df_geral, key_suffix):
     f1, f2 = st.columns(2)
-    tn = f1.selectbox("Filtrar Turno", ["Todos", "A", "B"], key=f"tn_{key_suffix}")
+    
+    # 1. Garante que 'TURNO' exista para evitar erro no selectbox
+    turno_opcoes = ["Todos", "A", "B"]
+    tn = f1.selectbox("Filtrar Turno", turno_opcoes, key=f"tn_{key_suffix}")
+    
+    # 2. Busca Comunidades (Usando o nome padronizado pela limpeza que fizemos)
     comu_list = ["Todas"] + sorted([c for c in df_geral["COMUNIDADE"].unique() if str(c).strip()])
     cm = f2.selectbox("Filtrar Comunidade", comu_list, key=f"cm_{key_suffix}")
+    
     return tn, cm
 
 def aplicar_filtros(df_alvo, df_geral, tn, cm):
+    # Fazemos uma cópia para não alterar o dataframe original (Boa prática de R&D)
     df_f = df_alvo.copy()
+    
+    # Padroniza as colunas do df_alvo também, caso ele venha de outra aba
+    df_f.columns = [str(c).strip().upper() for c in df_f.columns]
+    
+    # 1. Filtro de Turno
     if tn != "Todos":
-        alunos_turno = df_geral[df_geral["TURNO"].astype(str).str.contains(tn)]["ALUNO"].unique()
-        df_f = df_f[df_f["ALUNO"].isin(alunos_turno)]
-    if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
+        # Filtra no df_geral quem é do turno selecionado e pega os nomes dos alunos
+        alunos_no_turno = df_geral[df_geral["TURNO"].astype(str).str.contains(tn, na=False)]["ALUNO"].unique()
+        # Filtra o dataframe alvo apenas com esses alunos
+        df_f = df_f[df_f["ALUNO"].isin(alunos_no_turno)]
+    
+    # 2. Filtro de Comunidade
+    if cm != "Todas":
+        # Verifica se a coluna COMUNIDADE existe no df_f antes de filtrar
+        if "COMUNIDADE" in df_f.columns:
+            df_f = df_f[df_f["COMUNIDADE"] == cm]
+        else:
+            # Se não existir no alvo, buscamos os alunos daquela comunidade no geral
+            alunos_na_comu = df_geral[df_geral["COMUNIDADE"] == cm]["ALUNO"].unique()
+            df_f = df_f[df_f["ALUNO"].isin(alunos_na_comu)]
+            
     return df_f
 
 def render_botoes_salas(key_prefix, session_key, salas_permitidas=None):

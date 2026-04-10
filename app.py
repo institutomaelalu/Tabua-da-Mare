@@ -312,119 +312,56 @@ elif menu == "📖 Turno Estendido":
                 pd.concat([df_h, new_row], ignore_index=True).to_csv(ALF_FILE, index=False)
                 st.success("Diagnóstico salvo!"); st.rerun()
     else: st.info("Sem alunos no Turno.")
-# --- ABA: DADOS - TURNO ESTENDIDO (VERSÃO FINAL AJUSTADA) ---
-elif menu == "📊 Dados - Turno Estendido":
-    st.markdown("### 📋 Acompanhamento Geral - Turno Estendido")
-    df_h = pd.read_csv(ALF_FILE)
-    
-    MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
-    CORES_EXCLUSIVAS = {
-        "1. Pré-Silábico": "#E8E8E8", "2. Silábico s/ Valor": "#D1F2EB",
-        "3. Silábico c/ Valor": "#FCF3CF", "4. Silábico Alfabético": "#D5F5E3",
-        "5. Alfabético Inicial": "#FADBD8", "6. Alfabético Final": "#E8DAEF",
-        "7. Alfabético Ortográfico": "#D6EAF8"
-    }
-
-    # Legenda Superior
-    cols_leg = st.columns(len(NIVEIS_ALF))
-    for idx, niv in enumerate(NIVEIS_ALF):
-        cols_leg[idx].markdown(f"<div style='background-color:{CORES_EXCLUSIVAS[niv]}; padding:10px; border-radius:10px; text-align:center; font-size:9px; font-weight:bold; color:black; border: 1px solid #ccc;'>{niv.split('. ')[1]}</div>", unsafe_allow_html=True)
-
-    # Tabela Principal
-    html_tab = """
-    <style>
-        .cell-diag { text-align: center; font-weight: bold; font-size: 11px; color: black !important; }
-        .custom-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        .custom-table th { background-color: #5cc6d0; color: white; padding: 12px; border: 1px solid #ddd; text-align: center; }
-        .custom-table td { padding: 10px; border: 1px solid #ddd; color: black; }
-    </style>
-    <table class="custom-table">
-        <thead><tr><th>Nome</th><th>Sala</th><th>1ª Sondagem</th><th>2ª Sondagem</th><th>3ª Sondagem</th></tr></thead>
-        <tbody>"""
-    
-    for al in sorted(st.session_state["alunos_te_dict"].keys()):
-        sala_v = st.session_state["alunos_te_dict"][al]
-        dados_al = df_h[df_h["Aluno"] == al]
-        html_tab += f'<tr><td>{al}</td><td>{sala_v}</td>'
-        for etapa in ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"]:
-            row = dados_al[dados_al["Avaliacao"] == etapa]
-            if not row.empty:
-                nv = row["Nivel"].iloc[0]
-                cor = CORES_EXCLUSIVAS.get(nv, "#eee")
-                html_tab += f'<td style="background-color:{cor};"><div class="cell-diag">{nv.split(". ")[1]}</div></td>'
-            else: html_tab += '<td></td>'
-        html_tab += f'</tr>'
-    st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)
-
-    st.markdown("---")
-    
-    # --- SEÇÃO DETALHES AJUSTADA ---
-    salas_ativas = sorted(list(set(st.session_state["alunos_te_dict"].values())))
-    if salas_ativas:
-        if "sel_te_dados" not in st.session_state: st.session_state.sel_te_dados = salas_ativas[0]
-        render_botoes_salas("btn_te_dados", "sel_te_dados", salas_permitidas=salas_ativas)
-        
-        alunos_da_sala = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te_dados]
-        al_sel = st.selectbox("Selecione o aluno:", sorted(alunos_da_sala), key="detalhe_aluno")
-        
-        if al_sel:
-            dados_h = df_h[df_h["Aluno"] == al_sel].copy()
-            if not dados_h.empty:
-                valores = [MAPA_NIVEIS.get(n, 0) for n in dados_h['Nivel']]
-                ultimo_nv = dados_h['Nivel'].iloc[-1]
-                
-                # Definição de Nível e Altura
-                status_mare, altura = "Maré Baixa", "25%"
-                if ultimo_nv == "7. Alfabético Ortográfico":
-                    status_mare, altura = "Maré Cheia", "92%"
-                elif len(valores) >= 2:
-                    if valores[-1] > valores[-2]: status_mare, altura = "Maré Enchente", "65%"
-                    elif valores[-1] < valores[-2]: status_mare, altura = "Maré Vazante", "40%"
-                elif valores[-1] <= 2: status_mare, altura = "Maré Baixa", "25%"
-
+# --- SEÇÃO DETALHES AJUSTADA (NOME LIMPO E MARÉ 100%) ---
                 col_card, col_visual = st.columns([1, 1])
                 
                 with col_card:
                     st.markdown(f"""
                     <div style="border:1px solid #ddd; padding:20px; border-radius:15px; background:#f9f9f9; color:black;">
-                        <h4 style="margin-top:0">{al_sel}</h4>
-                        <p><b>Nível Atual:</b><br>
-                        <span style="background:{CORES_EXCLUSIVAS.get(ultimo_nv)}; padding:6px 12px; border-radius:12px; border:1px solid #bbb; display:inline-block; margin-top:5px; font-weight:bold;">
+                        <h4 style="margin-top:0; line-height:1.2;">{al_sel}</h4>
+                        <p style="margin-bottom:5px;"><b>Nível Atual:</b></p>
+                        <span style="background:{CORES_EXCLUSIVAS.get(ultimo_nv)}; padding:6px 12px; border-radius:12px; border:1px solid #bbb; display:inline-block; font-weight:bold;">
                             {ultimo_nv}
-                        </span></p>
-                        <p><b>Evidências:</b><br><small>{dados_h.iloc[-1]['Evidencias'] or 'Nenhum registro'}</small></p>
-                        <p><b>Observações:</b><br><i>{dados_h.iloc[-1]['Obs'] or 'Sem observações.'}</i></p>
+                        </span>
+                        <p style="margin-top:15px; margin-bottom:5px;"><b>Evidências:</b></p>
+                        <small style="color:#555;">{dados_h.iloc[-1]['Evidencias'] or 'Nenhum registro'}</small>
+                        <p style="margin-top:15px; margin-bottom:5px;"><b>Observações:</b></p>
+                        <i style="color:#555; font-size:13px;">{dados_h.iloc[-1]['Obs'] or 'Sem observações.'}</i>
                     </div>""", unsafe_allow_html=True)
 
                 with col_visual:
                     st.markdown(f"#### 🌊 Nível da Maré: {status_mare}")
                     st.markdown(f"""
                     <style>
-                        .container-mare {{ position: relative; width: 220px; height: 120px; margin: auto; }}
+                        .container-mare {{ position: relative; width: 240px; height: 130px; margin: auto; }}
+                        /* Recipiente com fundo cinza claro */
                         .vasilha-ondulada {{ 
                             width: 100%; height: 100%; background: #f0f0f0;
-                            clip-path: path('M 0 20 Q 55 0 110 20 T 220 20 L 220 100 Q 220 120 200 120 L 20 120 Q 0 120 0 100 Z');
+                            clip-path: path('M 0 20 Q 60 0 120 20 T 240 20 L 240 110 Q 240 130 220 130 L 20 130 Q 0 130 0 110 Z');
                             position: relative;
                         }}
-                        .agua-preenchida {{
+                        /* Água preenchendo 100% da largura com onda ajustada */
+                        .agua-preenchida-total {{
                             position: absolute; bottom: 0; left: 0; width: 100%; height: {altura};
                             background: #5DADE2;
-                            clip-path: path('M 0 10 Q 30 0 60 10 T 120 10 T 180 10 T 220 10 L 220 150 L 0 150 Z');
-                            opacity: 0.9;
+                            /* O path da água agora encosta exatamente nas bordas 0 e 240 */
+                            clip-path: path('M 0 10 Q 30 0 60 10 T 120 10 T 180 10 T 240 10 L 240 150 L 0 150 Z');
+                            opacity: 1;
                         }}
-                        .trilha-box {{ margin-top: 15px; font-size: 13px; color: black; }}
-                        .trilha-item {{ padding: 6px; border-bottom: 1px dashed #ccc; }}
+                        .trilha-box {{ margin-top: 20px; font-size: 13px; color: black; border-top: 1px solid #eee; padding-top: 10px; }}
+                        .trilha-item {{ padding: 6px 0; border-bottom: 1px dashed #eee; display: flex; justify-content: space-between; }}
+                    </small>
                     </style>
                     <div class="container-mare">
-                        <div class="vasilha-ondulada"><div class="agua-preenchida"></div></div>
+                        <div class="vasilha-ondulada">
+                            <div class="agua-preenchida-total"></div>
+                        </div>
                     </div>
                     <div class="trilha-box">
-                        <b>📍 Trilha de Evolução:</b><br>
-                        {"".join([f'<div class="trilha-item"><b>{row["Avaliacao"]}:</b> {row["Nivel"].split(". ")[1]}</div>' for _, row in dados_h.iterrows()])}
+                        <b style="color:#2E86C1;">📍 Trilha de Evolução:</b>
+                        {"".join([f'<div class="trilha-item"><span>{row["Avaliacao"]}</span><b style="color:#555;">{row["Nivel"].split(". ")[1]}</b></div>' for _, row in dados_h.iterrows()])}
                     </div>
                     """, unsafe_allow_html=True)
-            else:
-                st.info("Aguardando registros.")
 
 # --- PRÓXIMO MENU (Certifique-se que o elif abaixo está fora do bloco anterior) ---
 elif menu == "📈 Indicadores pedagógicos":

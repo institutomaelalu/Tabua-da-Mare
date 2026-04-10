@@ -391,7 +391,7 @@ elif menu == "📊 Dados - Turno Estendido":
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                st.info("Este aluno ainda não possui diagnósticos registrados.")elif menu == "📈 Indicadores pedagógicos":
+                st.info("Este aluno ainda não possui diagnósticos registrados.")elif menu == "📈 Indicadores pedagógicos"
     # (Mantido original)
     st.markdown(f"### 📈 Indicadores")
     render_botoes_salas("btn_ind", "sel_ind")

@@ -769,7 +769,7 @@ elif menu == "🌊 Canal do Apadrinhamento":
                 else:
                     st.warning("Avaliação comportamental ainda não disponível.")
 
-            # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ALFABETIZAÇÃO COM NOVAS CORES) ---
+            # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO) ---
             elif modo == "📚 Turno Estendido":
                 df_h = pd.read_csv(ALF_FILE).fillna("")
                 dados_al = df_h[df_h["Aluno"] == al_af].sort_values(["Ano", "Avaliacao"])
@@ -780,14 +780,14 @@ elif menu == "🌊 Canal do Apadrinhamento":
                     
                     c_inf, c_mare = st.columns([1.2, 1])
                     with c_inf:
-                        # Cor de texto dinâmica para o card
                         cor_bg_nivel = CORES_EXCLUSIVAS.get(u_nv, "#ddd")
-                        cor_txt_nivel = "white" if u_nv in ["1. Pré-Silábico", "5. Alfabético Inicial", "6. Alfabético Final", "7. Alfabético Ortográfico"] else "black"
+                        # Texto sempre escuro para contraste no pastel
+                        cor_txt_nivel = "#2C3E50" 
                         
                         st.markdown(f"""
                         <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black; height:220px; overflow-y: auto;">
                             <h4 style="margin:0;">{al_af}</h4>
-                            <p style="margin: 5px 0;"><b>Nível Atual:</b> <span style="background:{cor_bg_nivel}; color:{cor_txt_nivel}; padding:4px 8px; border-radius:8px; font-weight:bold;">{u_nv}</span></p>
+                            <p style="margin: 10px 0;"><b>Nível Atual:</b> <span style="background:{cor_bg_nivel}; color:{cor_txt_nivel}; padding:6px 12px; border-radius:20px; font-weight:bold; border: 1px solid rgba(0,0,0,0.1);">{u_nv}</span></p>
                             <p style="font-size: 13px;"><b>Evidências:</b><br>{dados_al.iloc[-1]['Evidencias']}</p>
                         </div>""", unsafe_allow_html=True)
                     
@@ -814,30 +814,45 @@ elif menu == "🌊 Canal do Apadrinhamento":
 
                     st.markdown("---")
                     st.markdown("##### 🚀 Jornada de Alfabetização")
-                    st.markdown("""<style>.trilha-p { display: flex; align-items: center; gap: 5px; overflow-x: auto; padding: 10px; }
-                                   .n-box { min-width: 95px; padding: 12px 5px; border-radius: 10px; text-align: center; font-size: 9px; font-weight: bold; line-height: 1.2; }</style>""", unsafe_allow_html=True)
                     
-                    html_t = '<div class="trilha-p">'
+                    # CSS da Trilha Idêntica ao Turno Estendido
+                    st.markdown("""<style>
+                        .trilha-ap-container { 
+                            display: flex; align-items: center; justify-content: center; 
+                            gap: 0px; margin: 10px 0; padding: 5px 0; overflow-x: auto; 
+                        }
+                        .caixa-trilha-ap { 
+                            padding: 6px 4px; border-radius: 10px; text-align: center; 
+                            font-size: 11px; font-weight: bold; min-width: 110px; height: 55px; 
+                            display: flex; align-items: center; justify-content: center;
+                            line-height: 1.1; flex-shrink: 0; box-shadow: 1px 1px 3px rgba(0,0,0,0.05);
+                        }
+                        .seta-ap { font-weight: bold; color: #D5DBDB; font-size: 16px; margin: 0 -5px; z-index: 1; }
+                    </style>""", unsafe_allow_html=True)
+
+                    html_t = '<div class="trilha-ap-container">'
                     for i, nv_ref in enumerate(NIVEIS_ALF):
-                        alc = any(MAPA_NIVEIS.get(r['Nivel'], 0) >= MAPA_NIVEIS.get(nv_ref, 0) for _, r in dados_al.iterrows())
-                        cor_fundo = CORES_TRILHA[nv_ref]["ativo"] if alc else "#f0f0f0"
+                        is_current = (u_nv == nv_ref)
+                        cor_bg = CORES_EXCLUSIVAS.get(nv_ref, "#eee")
                         
-                        # Texto branco para cores escuras da nova paleta
-                        cor_texto = "white" if alc and nv_ref in ["1. Pré-Silábico", "5. Alfabético Inicial", "6. Alfabético Final", "7. Alfabético Ortográfico"] else ("black" if alc else "#999")
+                        borda = "3px solid #2C3E50" if is_current else "1px solid rgba(0,0,0,0.1)"
+                        opacidade = "1.0" if is_current else "0.65"
                         
-                        # Destaque com borda preta no nível atual
-                        borda = "3px solid #333" if u_nv == nv_ref else "none"
-                        
-                        html_t += f'<div class="n-box" style="background:{cor_fundo}; border:{borda}; color:{cor_texto}; opacity:1;">{nv_ref.split(". ")[1]}</div>'
-                        if i < len(NIVEIS_ALF)-1: html_t += '<span style="color:#ccc; font-weight:bold;">→</span>'
+                        html_t += f'<div class="caixa-trilha-ap" style="background-color:{cor_bg}; border:{borda}; opacity:{opacidade}; color:#2C3E50;">{nv_ref.split(". ")[1]}</div>'
+                        if i < len(NIVEIS_ALF)-1: 
+                            html_t += '<div class="seta-ap">→</div>'
                     st.markdown(html_t + '</div>', unsafe_allow_html=True)
 
                     st.markdown("##### 📂 Histórico de Avaliações")
                     for _, r in dados_al.iterrows():
                         t_av = r["Avaliacao"].replace("Avaliação Final", "3ª Avaliação")
-                        st.markdown(f"""<div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #eee; font-size:13px; color: black;">
+                        cor_hist = CORES_EXCLUSIVAS.get(r['Nivel'], "#ddd")
+                        st.markdown(f"""
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #eee; font-size:13px; color: black;">
                             <span>📅 <b>{t_av}/{r['Ano']}</b></span>
-                            <span>Nível: <b style="color:{CORES_EXCLUSIVAS.get(r['Nivel'])};">{r['Nivel']}</b></span>
+                            <span style="background:{cor_hist}; padding:4px 10px; border-radius:12px; font-weight:bold; border:1px solid rgba(0,0,0,0.05);">
+                                {r['Nivel']}
+                            </span>
                         </div>""", unsafe_allow_html=True)
 elif menu == "🌊 Tábua da Maré":
     # (Mantido original)

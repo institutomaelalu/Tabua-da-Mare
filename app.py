@@ -427,168 +427,121 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
     st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     
-    # Cores da Identidade Visual
-    cores = {
-        "ROSA": "#F783AC",
-        "AMARELO": "#FFE066",
-        "VERDE": "#A9E34B",
-        "AZUL": "#99E9F2",
-        "LAVANDA": "#D0BFFF"
-    }
+    # Configuração de Cores (Identidade Visual)
+    # Certifique-se de que essas cores batem com o seu dicionário TURMAS_CONFIG
+    cor_rosa = "#F783AC"
+    cor_amarela = "#FFE066"
+    cor_verde = "#A9E34B"
+    cor_azul = "#99E9F2"
+    cor_lavanda = "#D0BFFF"
 
-    # --- CSS CUSTOMIZADO ---
+    # --- CSS PARA INVERSÃO DE CORES ---
     st.markdown(f"""
         <style>
-        /* 1. BOTÕES DE GESTÃO (POPOVERS SUPERIORES) - FUNDO BRANCO, TEXTO COLORIDO */
+        /* 1. BOTÕES DE GESTÃO (Popovers Superiores) - FUNDO BRANCO, TEXTO COLORIDO */
         div[data-testid="stPopover"] > button {{
             background-color: white !important;
             font-weight: bold !important;
             border-radius: 8px;
             transition: 0.3s;
         }}
+        /* Cores específicas para bordas e textos dos popovers de gestão */
+        div[key="mat_popover"] > button {{ color: {cor_rosa} !important; border: 2px solid {cor_rosa} !important; }}
+        div[key="pad_popover"] > button {{ color: {cor_amarela} !important; border: 2px solid {cor_amarela} !important; }}
+        div[key="est_popover"] > button {{ color: {cor_verde} !important; border: 2px solid {cor_verde} !important; }}
+        div[key="del_popover"] > button {{ color: {cor_azul} !important; border: 2px solid {cor_azul} !important; }}
 
-        /* Cores específicas para as bordas e textos dos popovers */
-        div[key="mat_popover"] > button {{ color: {cores['ROSA']} !important; border: 2px solid {cores['ROSA']} !important; }}
-        div[key="pad_popover"] > button {{ color: {cores['AMARELO']} !important; border: 2px solid {cores['AMARELO']} !important; }}
-        div[key="est_popover"] > button {{ color: {cores['VERDE']} !important; border: 2px solid {cores['VERDE']} !important; }}
-        div[key="del_popover"] > button {{ color: {cores['AZUL']} !important; border: 2px solid {cores['AZUL']} !important; }}
-
-        /* 2. BOTÕES DE SELEÇÃO DE SALAS (INFERIORES) - COLORIDOS, TEXTO BRANCO */
-        div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button {{
-            color: white !important;
-            font-weight: bold !important;
-            border: none !important;
-            border-radius: 8px;
-            text-transform: uppercase;
-        }}
+        /* 2. BOTÕES DE SELEÇÃO DE SALA (Inferiores) - TOTALMENTE COLORIDOS, TEXTO BRANCO */
+        /* Nota: Como o render_botoes_salas é uma função, o CSS abaixo mira as chaves que ele costuma usar */
+        div[key="btn_rosa"] > button {{ background-color: {cor_rosa} !important; color: white !important; font-weight: bold !important; border: none !important; }}
+        div[key="btn_amarela"] > button {{ background-color: {cor_amarela} !important; color: white !important; font-weight: bold !important; border: none !important; }}
+        div[key="btn_verde"] > button {{ background-color: {cor_verde} !important; color: white !important; font-weight: bold !important; border: none !important; }}
+        div[key="btn_azul"] > button {{ background-color: {cor_azul} !important; color: white !important; font-weight: bold !important; border: none !important; }}
+        div[key="btn_lavanda"] > button {{ background-color: {cor_lavanda} !important; color: white !important; font-weight: bold !important; border: none !important; }}
         
-        /* Aplicando as cores de fundo para os botões das salas */
-        div[key="btn_rosa"] > button {{ background-color: {cores['ROSA']} !important; }}
-        div[key="btn_amarela"] > button {{ background-color: {cores['AMARELO']} !important; }}
-        div[key="btn_verde"] > button {{ background-color: {cores['VERDE']} !important; }}
-        div[key="btn_azul"] > button {{ background-color: {cores['AZUL']} !important; }}
-        div[key="btn_lavanda"] > button {{ background-color: {cores['LAVANDA']} !important; }}
-        
+        div[data-testid="stPopover"] p {{ font-weight: bold !important; }}
         </style>
     """, unsafe_allow_html=True)
 
-    # --- BLOCO DE GESTÃO (SUPERIOR) ---
-    col_gestao = st.columns([1, 1.8, 1.2, 0.8])
+    # --- BLOCO DE GESTÃO (Aqui definimos as variáveis que causaram o erro) ---
+    gestao_col1, gestao_col2, gestao_col3, gestao_col4 = st.columns([1, 2, 1.2, 0.8])
 
-    with col_gestao[0]:
-        with st.popover("➕ Matrícula", key="mat_popover", use_container_width=True):
-            st.write("Conteúdo Matrícula")
-
-    with col_gestao[1]:
-        with st.popover("🤝 Registro de Padrinho/Madrinha", key="pad_popover", use_container_width=True):
-            st.write("Conteúdo Padrinho")
-
-    with col_gestao[2]:
-        with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
-            st.write("Conteúdo Turno Estendido")
-
-    with col_gestao[3]:
-        with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
-            st.write("Conteúdo Remover")
-
-    st.divider()
-
-    # --- BOTÕES DAS SALAS (INFERIOR - FORMATO COLORIDO) ---
-    col_salas = st.columns(5)
-    
-    with col_salas[0]: st.button("SALA ROSA", key="btn_rosa", use_container_width=True)
-    with col_salas[1]: st.button("SALA AMARELA", key="btn_amarela", use_container_width=True)
-    with col_salas[2]: st.button("SALA VERDE", key="btn_verde", use_container_width=True)
-    with col_salas[3]: st.button("SALA AZUL", key="btn_azul", use_container_width=True)
-    with col_salas[4]: st.button("CIRAND. MUNDO", key="btn_lavanda", use_container_width=True)
-
-    # 1. MATRÍCULA REGULAR (SALA ROSA - Cor Rosa)
+    # 1. MATRÍCULA REGULAR
     with gestao_col1:
-        # Usamos uma 'key' única para aplicar o CSS específico
-        with st.popover("➕ Matrícula", key="mat_popover"):
-            st.markdown(f"##### 📝 Nova Matrícula (<span style='color:{cor_rosa}'>Sala Rosa</span>)", unsafe_allow_html=True)
+        with st.popover("➕ Matrícula", key="mat_popover", use_container_width=True):
+            st.markdown("##### 📝 Nova Matrícula")
             n_nome = st.text_input("Nome do Aluno")
             n_nasc = st.date_input("Nascimento", format="DD/MM/YYYY")
-            n_turno = st.selectbox("Turno", ["A", "B"])
+            n_sala = st.selectbox("Sala", list(TURMAS_CONFIG.keys()), key="reg_sala")
+            n_turno = st.selectbox("Turno", ["A", "B"], key="reg_turno")
             n_comu = st.text_input("Comunidade")
             
+            # Cálculo de idade
             idade_calc = datetime.now().year - n_nasc.year - ((datetime.now().month, datetime.now().day) < (n_nasc.month, n_nasc.day))
             txt_idade = f"{idade_calc} ANOS"
             
             if st.button("Confirmar Matrícula", use_container_width=True):
-                if n_nome:
-                    nasc_str = n_nasc.strftime("%d/%m/%Y")
-                    # Ordem: ALUNO - TURMA - IDADE - NASC. - COMUNIDADE - PADRINHO
-                    nova_linha = [n_nome.upper(), n_turno, txt_idade, nasc_str, n_comu.upper(), ""]
-                    conn.append_row(worksheet="SALA ROSA", data=nova_linha)
-                    st.success("Matriculado na Sala Rosa!"); st.cache_data.clear()
-                else:
-                    st.warning("O nome do aluno é obrigatório.")
+                nova_linha = [n_nome.upper(), n_turno, txt_idade, n_nasc.strftime("%d/%m/%Y"), n_comu.upper(), ""]
+                conn.append_row(worksheet=n_sala, data=nova_linha)
+                st.success("Matriculado!"); st.cache_data.clear()
 
-    # 2. REGISTRO DE PADRINHO/MADRINHA (SALA AMARELA - Cor Amarela - ALINHADO)
+    # 2. REGISTRO DE PADRINHO/MADRINHA
     with gestao_col2:
-        # Usamos uma 'key' única para aplicar o CSS específico
-        with st.popover("🤝 Registro de Padrinho/Madrinha", key="pad_popover"):
-            st.markdown(f"##### 🤝 Novo Apadrinhamento (<span style='color:{cor_amarela}'>Sala Amarela</span>)", unsafe_allow_html=True)
-            # Filtra apenas quem não tem padrinho na Sala Amarela
-            df_b = conn.read(worksheet="SALA AMARELA").fillna("")
+        with st.popover("🤝 Registro de Padrinho/Madrinha", key="pad_popover", use_container_width=True):
+            st.markdown("##### 🤝 Novo Apadrinhamento")
+            s_busca = st.selectbox("Sala:", list(TURMAS_CONFIG.keys()), key="pad_sala")
+            df_b = conn.read(worksheet=s_busca).fillna("")
             df_b.columns = [str(c).strip().upper() for c in df_b.columns]
             
+            # Filtro: Só aparece aluno sem padrinho
             lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].isin(["", "-", "nan", "0"])]["ALUNO"].unique())
             
             nome_p = st.text_input("Nome do Padrinho/Madrinha")
-            al_sel = st.selectbox("Afilhado(a) (Apenas sem padrinho):", lista_lib)
+            al_sel = st.selectbox("Afilhado:", lista_lib)
             
             if st.button("Confirmar Apadrinhamento", use_container_width=True):
-                if nome_p and al_sel:
-                    idx = df_b[df_b["ALUNO"] == al_sel].index[0] + 2
-                    conn.update_cell(worksheet="SALA AMARELA", row=idx, col=6, value=nome_p.upper())
-                    st.success("Padrinho Registrado na Sala Amarela!"); st.cache_data.clear()
-                else:
-                    st.warning("Preencha o nome do padrinho e selecione o afilhado.")
+                idx = df_b[df_b["ALUNO"] == al_sel].index[0] + 2
+                conn.update_cell(worksheet=s_busca, row=idx, col=6, value=nome_p.upper())
+                st.success("Padrinho Registrado!"); st.cache_data.clear()
 
-    # 3. TURNO ESTENDIDO (SALA VERDE - Cor Verde)
+    # 3. TURNO ESTENDIDO
     with gestao_col3:
-        # Usamos uma 'key' única para aplicar o CSS específico
-        with st.popover("⏳ Turno Estendido", key="est_popover"):
-            st.markdown(f"##### ⏳ Matrícula Estendida (<span style='color:{cor_verde}'>Sala Verde</span>)", unsafe_allow_html=True)
-            df_est = conn.read(worksheet="SALA VERDE").fillna("")
+        with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
+            st.markdown("##### ⏳ Matrícula Estendida")
+            s_est = st.selectbox("Buscar alunos da Sala:", list(TURMAS_CONFIG.keys()))
+            df_est = conn.read(worksheet=s_est).fillna("")
             lista_est = sorted(df_est["ALUNO"].unique())
-            
-            selecionados = st.multiselect("Selecione os alunos da Sala Verde:", lista_est)
+            selecionados = st.multiselect("Selecione os alunos:", lista_est)
             
             if st.button("Matricular no Estendido", use_container_width=True):
                 for aluno in selecionados:
-                    # Salva Nome e a Sala de Origem na aba TURNO_ESTENDIDO
-                    conn.append_row(worksheet="TURNO_ESTENDIDO", data=[aluno.upper(), "SALA VERDE"])
-                st.success(f"{len(selecionados)} alunos adicionados ao Turno Estendido!"); st.cache_data.clear()
+                    conn.append_row(worksheet="TURNO_ESTENDIDO", data=[aluno.upper(), s_est])
+                st.success(f"{len(selecionados)} alunos adicionados!"); st.cache_data.clear()
 
-    # 4. REMOVER REGISTROS (SALA AZUL - Cor Azul)
+    # 4. REMOVER REGISTROS
     with gestao_col4:
-        # Usamos uma 'key' única para aplicar o CSS específico
-        with st.popover("🗑️ Remover", key="del_popover"):
-            st.markdown(f"##### ⚠️ Zona de Exclusão (<span style='color:{cor_azul}'>Sala Azul</span>)", unsafe_allow_html=True)
-            tipo_del = st.radio("O que deseja remover?", ["Aluno (Matrícula)", "Padrinho"])
-            
-            # Busca dados apenas da Sala Azul para este exemplo
-            df_del = conn.read(worksheet="SALA AZUL").fillna("")
+        with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
+            st.markdown("##### ⚠️ Zona de Exclusão")
+            tipo_del = st.radio("O que remover?", ["Aluno (Matrícula)", "Padrinho"])
+            s_del = st.selectbox("Aba:", list(TURMAS_CONFIG.keys()) + ["TURNO_ESTENDIDO"])
+            df_del = conn.read(worksheet=s_del).fillna("")
             df_del.columns = [str(c).strip().upper() for c in df_del.columns]
-            al_del = st.selectbox("Selecionar Aluno da Sala Azul:", sorted(df_del["ALUNO"].unique()) if not df_del.empty else [])
+            al_del = st.selectbox("Aluno:", sorted(df_del["ALUNO"].unique()) if not df_del.empty else [])
             
-            if st.button("🚨 EXCLUIR REGISTRO", use_container_width=True):
-                if al_del:
-                    idx_del = df_del[df_del["ALUNO"] == al_del].index[0] + 2
-                    if tipo_del == "Padrinho":
-                        conn.update_cell(worksheet="SALA AZUL", row=idx_del, col=6, value="")
-                        st.warning(f"Padrinho removido do aluno {al_del} na Sala Azul.")
-                    else:
-                        conn.delete_rows(worksheet="SALA AZUL", indices=[idx_del])
-                        st.error(f"Matrícula do aluno {al_del} apagada da Sala Azul.")
-                    st.cache_data.clear()
+            if st.button("🚨 EXCLUIR", use_container_width=True):
+                idx_del = df_del[df_del["ALUNO"] == al_del].index[0] + 2
+                if tipo_del == "Padrinho":
+                    conn.update_cell(worksheet=s_del, row=idx_del, col=6, value="")
                 else:
-                    st.warning("Selecione um aluno para remover.")
+                    conn.delete_rows(worksheet=s_del, indices=[idx_del])
+                st.success("Removido!"); st.cache_data.clear()
 
     st.divider()
+
+    # --- BOTÕES DAS SALAS (COLORIDOS COM TEXTO BRANCO) ---
+    # Aqui chamamos a função que você já tem ou usamos colunas manuais
+    # Se usar a função 'render_botoes_salas', o CSS lá no topo cuidará das cores
+    render_botoes_salas("btn_pad", "sel_pad")
 
     # --- RESTANTE DO CÓDIGO DE VISUALIZAÇÃO (BOTÕES DE SALA E TABELA) ---
     render_botoes_salas("btn_pad", "sel_pad")

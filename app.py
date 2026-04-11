@@ -447,89 +447,98 @@ elif menu == "📝 Alunos matriculados":
     sala_atual = st.session_state.sel_mat
     cor_h = TURMAS_CONFIG[sala_atual]["cor"]
     
-    # --- 1. CARREGAMENTO E FILTRAGEM ---
+    # --- 1. CARREGAMENTO E FILTRAGEM (Restaurado) ---
+    df_g = conn.read(worksheet="GERAL").fillna("")
+    df_g.columns = [str(c).strip().upper() for c in df_g.columns]
     df_s = conn.read(worksheet=sala_atual).fillna("")
     df_s.columns = [str(c).strip().upper() for c in df_s.columns]
     
-    # Identificar quem já está matriculado no Turno Estendido
-    matriculados_te = st.session_state.get("alunos_te_dict", {}).keys()
+    tn, cm = render_filtros(df_g, "mat")
     
-    # --- 2. ARTIFÍCIO DE ENVIO (Multiselect) ---
-    st.markdown(f"##### 🚀 Enviar para Turno Estendido")
-    # Apenas alunos da sala atual que ainda não foram enviados
-    alunos_disponiveis = [nome for nome in df_s["ALUNO"].unique() if nome not in matriculados_te]
+    df_f = df_s.copy()
+    if tn != "Todos":
+        df_f = df_f[df_f["TURMA"] == tn]
+    if cm != "Todas":
+        df_f = df_f[df_f["COMUNIDADE"] == cm]
+
+    # --- 2. CSS PARA PADRONIZAR FONTE E REMOVER ERRO DO CHECKBOX ---
+    st.markdown(f"""
+        <style>
+            /* Força a fonte idêntica à Gestão de Apadrinhamento */
+            [data-testid="stMarkdownContainer"] p {{
+                font-family: 'Source Sans Pro', sans-serif !important;
+                font-size: 14px !important;
+                color: #31333F !important;
+                margin: 0px !important;
+                line-height: 1.2 !important;
+            }}
+            /* Remove o label do checkbox que causa o erro de texto sobrando */
+            div[data-testid="stCheckbox"] label span {{
+                display: none !important;
+            }}
+            div[data-testid="stCheckbox"] {{
+                margin-top: -10px !important;
+            }}
+            hr {{
+                margin: 5px 0px !important;
+                border-bottom: 1px solid #f0f0f0 !important;
+            }}
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- 3. ESTATÍSTICAS ---
+    st.markdown(f"""
+        <div style="background-color: #f8f9fa; padding: 10px; border-radius: 8px; border-left: 5px solid {cor_h}; margin-bottom: 15px;">
+            <span style="font-family: 'Source Sans Pro', sans-serif; font-size: 14px; color: #31333F;">
+                👥 Total na <b>{sala_atual}</b>: {len(df_s)} alunos | 🔍 Filtro: <b>{len(df_f)}</b> alunos
+            </span>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # --- 4. CABEÇALHO DA TABELA ---
+    st.markdown(f"""
+        <div style="background-color:{cor_h}; color: white; padding: 12px; border-radius: 5px 5px 0 0; display: flex; font-family: 'Source Sans Pro', sans-serif; font-weight: bold; font-size: 14px; text-transform: uppercase;">
+            <div style="flex: 0.8; text-align: center;">SEL.</div>
+            <div style="flex: 3;">ALUNO</div>
+            <div style="flex: 1;">IDADE</div>
+            <div style="flex: 2;">COMUNIDADE</div>
+        </div>
+    """, unsafe_allow_html=True)
     
-    selecionados = st.multiselect(
-        "Selecione os alunos abaixo para matricular em massa:",
-        options=sorted(alunos_disponiveis),
-        help="Busque pelo nome e selecione todos que deseja enviar."
-    )
-    
-    if selecionados:
-        st.markdown(f"""<style>div.stButton > button {{ background-color: {cor_h} !important; color: white !important; font-weight: bold; width: 100%; border-radius: 8px; }}</style>""", unsafe_allow_html=True)
-        if st.button(f"Confirmar Matrícula de {len(selecionados)} aluno(s)"):
-            if "alunos_te_dict" not in st.session_state: st.session_state["alunos_te_dict"] = {}
-            for al in selecionados: st.session_state["alunos_te_dict"][al] = sala_atual
-            st.success("Alunos enviados com sucesso!")
-            st.rerun()
+    selecionados = []
 
-    st.write("---")
-
-    # --- 3. TABELA COM FORMATAÇÃO IDÊNTICA À GESTÃO ---
-    # Construímos a tabela como uma string única de HTML
-    tabela_html = f"""
-    <style>
-        .tabela-suave {{
-            width: 100%;
-            border-collapse: collapse;
-            font-family: 'Source Sans Pro', sans-serif;
-            color: #31333F;
-        }}
-        .tabela-suave thead th {{
-            background-color: {cor_h};
-            color: white;
-            padding: 12px;
-            text-align: left;
-            font-size: 14px;
-            text-transform: uppercase;
-        }}
-        .tabela-suave td {{
-            padding: 10px 12px;
-            border-bottom: 1px solid #eee;
-            font-size: 14px;
-        }}
-    </style>
-    <table class="tabela-suave">
-        <thead>
-            <tr>
-                <th style="width: 10%; text-align: center;">STATUS</th>
-                <th style="width: 50%;">ALUNO</th>
-                <th style="width: 15%;">IDADE</th>
-                <th style="width: 25%;">COMUNIDADE</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-
-    for _, r in df_s.iterrows():
-        nome = str(r.get("ALUNO", "")).replace("**", "").strip()
-        status = "✍️📖" if nome in matriculados_te else ""
-        idade = r.get("IDADE", "")
-        comunidade = r.get("COMUNIDADE", "")
+    # --- 5. LISTAGEM COM FUNCIONALIDADES E FONTE SUAVE ---
+    for i, r in df_f.iterrows():
+        c0, c1, c2, c3 = st.columns([0.8, 3, 1, 2])
         
-        tabela_html += f"""
-            <tr>
-                <td style="text-align: center;">{status}</td>
-                <td>{nome}</td>
-                <td>{idade}</td>
-                <td>{comunidade}</td>
-            </tr>
-        """
+        nome_aluno = str(r.get("ALUNO", "")).replace("**", "").strip()
+        idade = str(r.get("IDADE", ""))
+        comunidade = str(r.get("COMUNIDADE", ""))
+        
+        with c0:
+            if nome_aluno in st.session_state.get("alunos_te_dict", {}): 
+                st.markdown('<p style="text-align:center;">✍️📖</p>', unsafe_allow_html=True)
+            else:
+                # O checkbox agora está "limpo" pelo CSS
+                if st.checkbox("", key=f"ch_mat_{sala_atual}_{i}"): 
+                    selecionados.append(nome_aluno)
+        
+        with c1: st.markdown(f'<p>{nome_aluno}</p>', unsafe_allow_html=True)
+        with c2: st.markdown(f'<p>{idade}</p>', unsafe_allow_html=True)
+        with c3: st.markdown(f'<p>{comunidade}</p>', unsafe_allow_html=True)
+        
+        st.markdown('<hr>', unsafe_allow_html=True)
 
-    tabela_html += "</tbody></table>"
-    
-    # Renderiza a tabela de uma vez só (Garante a fonte bonita)
-    st.markdown(tabela_html, unsafe_allow_html=True)
+    # --- 6. AÇÃO EM MASSA ---
+    if selecionados:
+        st.markdown(f"""<style> div.stButton > button {{ background-color: {cor_h} !important; color: white !important; font-weight: bold; width: 100%; border-radius: 8px; }} </style>""", unsafe_allow_html=True)
+        if st.button(f"🚀 Matricular {len(selecionados)} aluno(s) no Turno Estendido"):
+            if "alunos_te_dict" not in st.session_state:
+                st.session_state["alunos_te_dict"] = {}
+            for al in selecionados:
+                st.session_state["alunos_te_dict"][al] = sala_atual
+            st.success(f"✅ Sucesso!")
+            st.rerun()
 elif menu == "🤝 Gestão de apadrinhamento":
     st.markdown(f"### 🤝 Gestão de Apadrinhamento")
     render_botoes_salas("btn_pad", "sel_pad")

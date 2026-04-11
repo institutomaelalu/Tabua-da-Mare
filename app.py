@@ -257,11 +257,11 @@ st.markdown(f"""
 
 # 2. Funções de Dados
 TURMAS_CONFIG = {
-    "SALA ROSA": {"cor": C_ROSA, "key": "sala_rosa"},
-    "SALA AMARELA": {"cor": C_AMARELO, "key": "sala_amarela"},
-    "SALA VERDE": {"cor": C_VERDE, "key": "sala_verde"},
-    "SALA AZUL": {"cor": C_AZUL, "key": "sala_azul"},
-    "CIRAND. MUNDO": {"cor": C_ROXO, "key": "cirand_mundo"},
+    "ROSA": {"cor": C_ROSA, "icon": "🌸"},
+    "AMARELA": {"cor": C_AMARELO, "icon": "⭐"},
+    "VERDE": {"cor": C_VERDE, "icon": "🌿"},
+    "AZUL": {"cor": C_AZUL, "icon": "💧"},
+    "CIRAND. MUNDO": {"cor": C_ROXO, "icon": "🌍"}
 }
 
 def get_gspread_client():
@@ -319,14 +319,37 @@ def aplicar_filtros(df_alvo, df_geral, tn, cm):
     return df_f
 
 def render_botoes_salas(key_prefix, session_key, salas_permitidas=None):
+    # Define as salas (usa as do dicionário se não vier nenhuma permitida)
     salas = salas_permitidas if salas_permitidas else list(TURMAS_CONFIG.keys())
+    
     cols = st.columns(len(salas))
+    
     for i, sala in enumerate(salas):
-        cfg = TURMAS_CONFIG[sala]
-        op = "1.0" if st.session_state[session_key] == sala else "0.3"
-        st.markdown(f'<style>div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button {{ background-color: {cfg["cor"]} !important; color: white !important; opacity: {op}; }}</style>', unsafe_allow_html=True)
-        if cols[i].button(sala, key=f"{key_prefix}_{sala}"):
-            st.session_state[session_key] = sala; st.rerun()
+        # --- O SEGREDO ESTÁ AQUI ---
+        # .strip() remove espaços vazios. .upper() garante que tudo seja maiúsculo.
+        nome_limpo = str(sala).strip().upper()
+        
+        # Se não encontrar a sala no TURMAS_CONFIG, usa uma cor cinza padrão (#566573)
+        cfg = TURMAS_CONFIG.get(nome_limpo, {"cor": "#566573", "icon": "🏫"})
+        
+        # Lógica de estilo para o botão selecionado
+        is_active = st.session_state.get(session_key) == sala
+        op = "1.0" if is_active else "0.35"
+        
+        st.markdown(f'''
+            <style>
+                div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button {{
+                    background-color: {cfg["cor"]} !important;
+                    color: white !important;
+                    opacity: {op};
+                    border: {"2px solid black" if is_active else "1px solid #ccc"} !important;
+                }}
+            </style>
+        ''', unsafe_allow_html=True)
+        
+        if cols[i].button(f"{cfg.get('icon', '')} {sala}", key=f"{key_prefix}_{nome_limpo}"):
+            st.session_state[session_key] = sala
+            st.rerun()
 
 def criar_grafico_mare(categorias, valores):
     fig = go.Figure(go.Scatter(

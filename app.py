@@ -414,7 +414,7 @@ def render_grafico_alfabetizacao_individual(df_aluno):
     st.plotly_chart(fig, use_container_width=True)
     
 # --- MENU ---
-menu_options = ["👤 Matrícula", "📝 Alunos matriculados", "📊 Dados - Turno Estendido", "🤝 Gestão de apadrinhamento", "📊 Avaliação da Tábua da Maré", "📖 Turno Estendido", "📈 Indicadores pedagógicos", "🌊 Canal do Apadrinhamento", "🌊 Tábua da Maré"]
+menu_options = ["👤 Matrícula", "📝 Controle de Matrícula e Apadrinhamento", "📊 Dados - Turno Estendido", "📊 Avaliação da Tábua da Maré", "📖 Turno Estendido", "📈 Indicadores pedagógicos", "🌊 Canal do Apadrinhamento", "🌊 Tábua da Maré"]
 if st.session_state.perfil != "admin": menu_options = ["🌊 Canal do Apadrinhamento"]
 menu = st.sidebar.radio("Navegação", menu_options)
 
@@ -440,110 +440,102 @@ if menu == "👤 Matrícula":
                 sh.worksheet("GERAL").append_row([nome, sala, turno, idade, comu, ""])
                 st.success("Cadastrado com sucesso!"); st.rerun()
 
-elif menu == "📝 Alunos matriculados":
-    st.markdown(f"### 📋 Quadro de Alunos Matriculados")
+elif menu == "🤝 Controle de Matrícula e Apadrinhamento":
+    st.markdown("### 🤝 Controle de Matrícula e Apadrinhamento")
+    st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     
-    # 1. BOTÕES E FILTROS
-    render_botoes_salas("btn_mat", "sel_mat")
-    sala_atual = st.session_state.sel_mat
-    cor_h = TURMAS_CONFIG[sala_atual]["cor"]
-    
-    df_s = conn.read(worksheet=sala_atual).fillna("")
-    df_s.columns = [str(c).strip().upper() for c in df_s.columns]
-    
-    df_g_aux = conn.read(worksheet="GERAL").fillna("")
-    df_g_aux.columns = [str(c).strip().upper() for c in df_g_aux.columns]
-    tn, cm = render_filtros(df_g_aux, "mat")
-    
-    df_f = df_s.copy()
-    if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
-    if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
-
-    # 2. CABEÇALHO (Fonte 13px para combinar com os dados menores)
-    st.markdown(f"""
-        <div style="background-color:{cor_h}; color: white; padding: 8px 0; border-radius: 5px 5px 0 0; 
-                    display: flex; font-weight: bold; font-size: 13px; text-transform: uppercase; align-items: center;">
-            <div style="flex: 0.5; text-align: center; border-right: 1px solid rgba(255,255,255,0.2);">ST</div>
-            <div style="flex: 3; padding-left: 10px; border-right: 1px solid rgba(255,255,255,0.2);">ALUNO</div>
-            <div style="flex: 1; text-align: center; border-right: 1px solid rgba(255,255,255,0.2);">IDADE</div>
-            <div style="flex: 2; padding-left: 10px;">COMUNIDADE</div>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # 3. LISTAGEM COM FONTE REDUZIDA (Estilo Segunda Imagem)
-    matriculados_te = st.session_state.get("alunos_te_dict", {}).keys()
-
-    if not df_f.empty:
-        for i, r in df_f.iterrows():
-            nome_aluno = str(r.get("ALUNO", "")).replace("**", "").strip()
-            idade = str(r.get("IDADE", ""))
-            comunidade = str(r.get("COMUNIDADE", ""))
-            status = "✍️📖" if nome_aluno in matriculados_te else ""
-            
-            # Fonte alterada para 13px e padding reduzido para maior densidade
-            st.markdown(f"""
-                <div style="display: flex; font-size: 13px; color: #31333F; padding: 6px 0; align-items: center; border-bottom: 1px solid #f0f0f0;">
-                    <div style="flex: 0.5; text-align: center; border-right: 1px solid #f0f0f0; min-height: 20px;">{status}</div>
-                    <div style="flex: 3; padding-left: 10px; border-right: 1px solid #f0f0f0; min-height: 20px;">{nome_aluno}</div>
-                    <div style="flex: 1; text-align: center; border-right: 1px solid #f0f0f0; min-height: 20px;">{idade}</div>
-                    <div style="flex: 2; padding-left: 10px; min-height: 20px;">{comunidade}</div>
-                </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.info("Nenhum aluno encontrado.")
-elif menu == "🤝 Gestão de apadrinhamento":
-    st.markdown(f"### 🤝 Gestão de Apadrinhamento")
+    # 1. BOTÕES DE SELEÇÃO E CONTADOR
     render_botoes_salas("btn_pad", "sel_pad")
+    sala_atual = st.session_state.sel_pad
+    cor_h = TURMAS_CONFIG[sala_atual]["cor"]
 
     # --- CONEXÃO COM GOOGLE SHEETS ---
-    # 1. Busca a base geral para os filtros (Turno/Comunidade)
     df_g = conn.read(worksheet="GERAL").fillna("")
     df_g.columns = [str(c).strip().upper() for c in df_g.columns]
 
-    # 2. Busca a aba específica da sala selecionada (ex: "SALA ROSA")
-    # O st.session_state.sel_pad contém o nome da sala vindo do botão
-    df_s = conn.read(worksheet=st.session_state.sel_pad).fillna("")
+    df_s = conn.read(worksheet=sala_atual).fillna("")
     df_s.columns = [str(c).strip().upper() for c in df_s.columns]
 
+    # Exibição da quantidade de alunos logo abaixo dos botões
+    st.markdown(f"""
+        <div style="background-color: #f8f9fa; padding: 5px 15px; border-radius: 5px; border-left: 4px solid {cor_h}; margin: 10px 0 20px 0;">
+            <span style="font-size: 14px; color: #555;">📍 Atualmente existem <b>{len(df_s)}</b> alunos matriculados na <b>{sala_atual}</b></span>
+        </div>
+    """, unsafe_allow_html=True)
+
     if not df_s.empty:
-        # Renderiza os filtros usando a base geral
+        # 2. RENDERIZAÇÃO DOS FILTROS
         tn, cm = render_filtros(df_g, "pad")
         
-        # Filtra os dados da sala selecionada
-        # Note: No arquivo da sala a coluna de turno chama-se "TURMA"
         df_f = df_s.copy()
         if tn != "Todos":
             df_f = df_f[df_f["TURMA"] == tn]
         if cm != "Todas":
             df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-        cor_h = TURMAS_CONFIG[st.session_state.sel_pad]["cor"]
-        
-        # Colunas conforme a estrutura do seu arquivo CSV
-        v_cols = ["ALUNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
-        
-        # Montagem da Tabela HTML
-        html = f'<table class="custom-table"><thead style="background-color:{cor_h}"><tr>' + "".join([f'<th>{c}</th>' for c in v_cols]) + '</tr></thead><tbody>'
+        # 3. MONTAGEM DA TABELA ESTILIZADA (Fonte 13px e Divisórias Suaves)
+        # Aplicando o ID exclusivo para garantir que o estilo não vaze para o resto do app
+        html = f"""
+        <style>
+            .tabela-mestra {{
+                width: 100%;
+                border-collapse: collapse;
+                font-family: 'Source Sans Pro', sans-serif;
+                color: #31333F;
+                margin-top: 15px;
+            }}
+            .tabela-mestra thead th {{
+                background-color: {cor_h};
+                color: white !important;
+                padding: 10px;
+                text-align: left;
+                font-size: 13px;
+                text-transform: uppercase;
+                border-right: 1px solid rgba(255,255,255,0.2);
+            }}
+            .tabela-mestra td {{
+                padding: 8px 10px;
+                border-bottom: 1px solid #f0f0f0;
+                border-right: 1px solid #f0f0f0;
+                font-size: 13px;
+            }}
+            .tabela-mestra tr:hover {{
+                background-color: #fcfcfc;
+            }}
+        </style>
+        <table class="tabela-mestra">
+            <thead>
+                <tr>
+                    <th style="width: 45%;">ALUNO</th>
+                    <th style="width: 10%; text-align: center;">IDADE</th>
+                    <th style="width: 20%;">COMUNIDADE</th>
+                    <th style="width: 25%;">PADRINHO/MADRINHA</th>
+                </tr>
+            </thead>
+            <tbody>
+        """
         
         for _, r in df_f.iterrows():
-            # Limpeza do nome do aluno
-            n_l = str(r.get("ALUNO", "")).replace("**", "").strip()
+            nome = str(r.get("ALUNO", "")).replace("**", "").strip()
             idade = str(r.get("IDADE", ""))
             comunidade = str(r.get("COMUNIDADE", ""))
             padrinho = str(r.get("PADRINHO/MADRINHA", ""))
+            padrinho_texto = padrinho if padrinho.lower() not in ["nan", "", "none", "0"] else "-"
             
-            # Se o padrinho estiver vazio ou for "nan", mostramos vazio para ficar limpo
-            padrinho_texto = padrinho if padrinho.lower() not in ["nan", "", "none", "0"] else ""
-            
-            html += f'<tr><td>{n_l}</td><td>{idade}</td><td>{comunidade}</td><td>{padrinho_texto}</td></tr>'
+            html += f"""
+                <tr>
+                    <td>{nome}</td>
+                    <td style="text-align: center;">{idade}</td>
+                    <td>{comunidade}</td>
+                    <td>{padrinho_texto}</td>
+                </tr>
+            """
         
         st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
-        
-        # Rodapé com contagem (estilo R&D)
-        st.caption(f"Total exibido: {len(df_f)} alunos na {st.session_state.sel_pad}")
+        st.caption(f"Exibindo {len(df_f)} alunos conforme filtros aplicados.")
         
     else: 
-        st.warning(f"A aba '{st.session_state.sel_pad}' parece estar vazia na Google Sheet.")
+        st.warning(f"A aba '{sala_atual}' parece estar vazia na Google Sheet.")
 
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")

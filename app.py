@@ -750,126 +750,125 @@ elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
 
     try:
-        # 1. Leitura da aba Turno Estendido
         df_h = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
-        # Padroniza nomes das colunas para evitar erro de maiúsculas/minúsculas
         df_h.columns = [str(c).strip().upper() for c in df_h.columns]
     except Exception as e:
         st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()
 
-    # --- LÓGICA DE RECONHECIMENTO DE ALUNOS E SALAS ---
+    # --- LÓGICA DE RECONHECIMENTO DE ALUNOS ---
     if not df_h.empty and "ALUNO" in df_h.columns and "SALA" in df_h.columns:
-        # Cria um dicionário {Nome: Sala} apenas com quem está matriculado no TE
         dict_alunos_te = pd.Series(df_h.SALA.values, index=df_h.ALUNO.values).to_dict()
         salas_te_disponiveis = sorted(list(set(dict_alunos_te.values())))
     else:
-        st.warning("Nenhum aluno matriculado no Turno Estendido ainda.")
+        st.warning("Nenhum aluno matriculado no Turno Estendido.")
         st.stop()
 
-    # --- LÓGICA DE ANOS DINÂMICOS ---
-    if "ANO" not in df_h.columns:
-        df_h["ANO"] = 2026
-
+    # --- LÓGICA DE ANOS E ESTILIZAÇÃO DOS BOTÕES ---
+    if "ANO" not in df_h.columns: df_h["ANO"] = 2026
     df_h["ANO"] = pd.to_numeric(df_h["ANO"], errors='coerce').fillna(2026).astype(int)
     anos_na_planilha = sorted(df_h["ANO"].unique().tolist())
     
     if "lista_anos_te" not in st.session_state:
         st.session_state.lista_anos_te = anos_na_planilha if anos_na_planilha else [2025, 2026]
-    
     if "ano_registro_te" not in st.session_state: 
         st.session_state.ano_registro_te = st.session_state.lista_anos_te[-1]
 
-    # --- INTERFACE DE ANOS ---
     st.write("**Ano da Avaliação:**")
-    cols_anos_all = st.columns([0.15] * len(st.session_state.lista_anos_te) + [0.1, 0.6])
-    cores_interface_anos = {2025: "#2E86C1", 2026: "#28B463", 2027: "#E67E22"}
+    cols_anos_all = st.columns([0.12] * len(st.session_state.lista_anos_te) + [0.08, 0.6])
+    
+    cores_anos = {2025: "#2E86C1", 2026: "#28B463", 2027: "#E67E22"}
 
+    # Reaplicando o CSS para os botões de ano ficarem coloridos e redondos
     for i, ano in enumerate(st.session_state.lista_anos_te):
         is_active = st.session_state.ano_registro_te == ano
-        cor_btn = cores_interface_anos.get(ano, "#34495E") if is_active else "#D5DBDB"
-        if cols_anos_all[i].button(f"📅 {ano}", key=f"btn_reg_ano_{ano}", use_container_width=True):
+        cor_base = cores_anos.get(ano, "#34495E")
+        cor_bg = cor_base if is_active else "#f0f2f6"
+        cor_txt = "white" if is_active else "#566573"
+        borda = f"2px solid {cor_base}" if is_active else "1px solid #d3d3d3"
+
+        if cols_anos_all[i].button(f"{ano}", key=f"btn_te_ano_{ano}", use_container_width=True):
             st.session_state.ano_registro_te = ano
             st.rerun()
+        
+        # Injeção de CSS específica para cada botão de ano
+        st.markdown(f"""
+            <style>
+            div[data-testid="stHorizontalBlock"] div:nth-child({i+1}) button {{
+                background-color: {cor_bg} !important;
+                color: {cor_txt} !important;
+                border: {borda} !important;
+                border-radius: 20px !important;
+                font-weight: bold !important;
+                height: 35px !important;
+            }}
+            </style>
+        """, unsafe_allow_html=True)
 
-    st.write(f"Registrando para o ano letivo: **{st.session_state.ano_registro_te}**")
-    st.markdown("---")
+    with cols_anos_all[len(st.session_state.lista_anos_te)].popover("➕"):
+        novo = st.number_input("Ano:", 2024, 2100, st.session_state.lista_anos_te[-1]+1)
+        if st.button("Adicionar"):
+            st.session_state.lista_anos_te.append(novo)
+            st.session_state.lista_anos_te.sort()
+            st.rerun()
+
+    st.markdown(f"Registrando para: <b style='color:#28B463'>{st.session_state.ano_registro_te}</b>", unsafe_allow_html=True)
+    st.divider()
 
     # --- SELEÇÃO DE ALUNO POR SALA ---
     if salas_te_disponiveis:
-        # Renderiza botões apenas das salas que possuem alunos no TE
-        render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_te_disponiveis)
-        sala_selecionada = st.session_state.get("sel_te", salas_te_disponiveis[0])
+        render_botoes_salas("btn_te_aba", "sel_te_aba", salas_permitidas=salas_te_disponiveis)
+        # Garantindo que a sala existe no estado
+        sala_v = st.session_state.get("sel_te_aba", salas_te_disponiveis[0])
         
-        # Filtra alunos da sala selecionada
-        alunos_da_sala = [nome for nome, sala in dict_alunos_te.items() if sala == sala_selecionada]
-        al_selecionado = st.selectbox("Selecione o Aluno para Avaliação:", sorted(alunos_da_sala))
+        alunos_filtro = [n for n, s in dict_alunos_te.items() if s == sala_v]
+        al_sel = st.selectbox("Selecione o Aluno:", sorted(alunos_filtro))
         
-        # Puxa o histórico do aluno selecionado
-        dados_aluno = df_h[df_h["ALUNO"] == al_selecionado]
-        # Pegamos o registro mais recente (última linha)
-        diag_recente = dados_aluno.iloc[-1] if not dados_aluno.empty else None
-        
-        # --- TRILHA VISUAL (Diagnóstico Atual) ---
-        nivel_atual = diag_recente["DIAGNÓSTICO"] if diag_recente is not None else ""
-        
+        # Histórico
+        dados_al = df_h[df_h["ALUNO"] == al_sel]
+        diag_rec = dados_al.iloc[-1] if not dados_al.empty else None
+        nivel_atual = diag_rec["DIAGNÓSTICO"] if diag_rec is not None else ""
+
+        # --- TRILHA VISUAL COLORIDA ---
         st.markdown("""<style>
-            .trilha-container { display: flex; align-items: center; justify-content: center; gap: 0px; margin: 10px 0; overflow-x: auto; }
-            .caixa-trilha { padding: 6px; border-radius: 10px; text-align: center; font-size: 11px; font-weight: bold; min-width: 110px; height: 50px; display: flex; align-items: center; justify-content: center; }
-            .seta { color: #D5DBDB; margin: 0 2px; }
+            .trilha-te { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 15px 0; }
+            .box-te { padding: 8px; border-radius: 12px; text-align: center; font-size: 10px; font-weight: bold; width: 100px; height: 45px; display: flex; align-items: center; justify-content: center; line-height: 1; }
         </style>""", unsafe_allow_html=True)
 
-        ht = '<div class="trilha-container">'
+        ht = '<div class="trilha-te">'
         for i, n_t in enumerate(NIVEIS_ALF):
-            is_current = (nivel_atual == n_t)
+            is_active = (nivel_atual == n_t)
             bg = CORES_EXCLUSIVAS.get(n_t, "#eee")
-            borda = "3px solid #2C3E50" if is_current else "1px solid rgba(0,0,0,0.1)"
-            ht += f'<div class="caixa-trilha" style="background-color:{bg}; border:{borda}; opacity:{"1.0" if is_current else "0.5"};">{n_t.split(". ")[1]}</div>'
-            if i < len(NIVEIS_ALF)-1: ht += '<div class="seta">→</div>'
+            txt = "#fff" if is_active else "#666"
+            borda = "3px solid #333" if is_active else "1px solid #ddd"
+            ht += f'<div class="box-te" style="background-color:{bg}; color:{txt}; border:{borda}; opacity:{"1" if is_active else "0.4"}">{n_t.split(". ")[1]}</div>'
+            if i < len(NIVEIS_ALF)-1: ht += '<span style="color:#ccc">→</span>'
         st.markdown(ht + '</div>', unsafe_allow_html=True)
 
-        # --- FORMULÁRIO DE SALVAMENTO ---
-        # Tenta pré-selecionar o nível atual no selectbox
-        try:
-            idx_in = NIVEIS_ALF.index(nivel_atual) if nivel_atual in NIVEIS_ALF else 0
-        except:
-            idx_in = 0
+        # --- FORMULÁRIO ---
+        try: idx_in = NIVEIS_ALF.index(nivel_atual) if nivel_atual in NIVEIS_ALF else 0
+        except: idx_in = 0
             
         novo_nivel = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_in)
 
-        with st.form("f_avaliacao_te"):
-            tipo_etapa = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
-            
-            st.write(f"**Evidências observadas:**")
-            evidencias_opcoes = EVIDENCIAS_POR_NIVEL.get(novo_nivel, [])
+        with st.form("form_te_save"):
+            etapa = st.selectbox("Etapa:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
+            evidencias = EVIDENCIAS_POR_NIVEL.get(novo_nivel, [])
             e_cols = st.columns(3)
-            selecionadas_ev = []
-            for i, ev in enumerate(evidencias_opcoes):
-                if e_cols[i % 3].checkbox(ev, key=f"ev_{al_selecionado}_{i}"):
-                    selecionadas_ev.append(ev)
+            selecionados = [ev for i, ev in enumerate(evidencias) if e_cols[i%3].checkbox(ev, key=f"ev_{i}")]
             
-            obs_pedag = st.text_area("Observações Pedagógicas:")
+            obs = st.text_area("Observações Pedagógicas:")
             
-            if st.form_submit_button("🚀 Salvar Avaliação"):
-                # Mapeamento exato para as colunas da Google Sheet
-                tipo_map = {
-                    "1ª Avaliação": "1 AVALIAÇÃO",
-                    "2ª Avaliação": "2 AVALIAÇÃO",
-                    "Avaliação Final": "3 AVALIAÇÃO"
-                }
+            if st.form_submit_button("🚀 Salvar na Planilha"):
+                tipo_map = {"1ª Avaliação": "1 AVALIAÇÃO", "2ª Avaliação": "2 AVALIAÇÃO", "Avaliação Final": "3 AVALIAÇÃO"}
                 
                 sucesso = registrar_turno_estendido(
-                    aluno=al_selecionado,
-                    sala=sala_selecionada,
-                    avaliacao_tipo=tipo_map.get(tipo_etapa),
-                    nivel=novo_nivel,
-                    evidencias_list=selecionadas_ev,
-                    obs=obs_pedag,
+                    aluno=al_sel, sala=sala_v, avaliacao_tipo=tipo_map.get(etapa),
+                    nivel=novo_nivel, evidencias_list=selecionados, obs=obs,
                     ano=int(st.session_state.ano_registro_te)
                 )
-                
                 if sucesso:
-                    st.success(f"Avaliação de {al_selecionado} salva com sucesso!")
+                    st.success("Salvo!")
                     st.cache_data.clear()
                     st.rerun()
 # --- ABA: DADOS - TURNO ESTENDIDO (ATUALIZADO COM CORES E LEGENDA) ---

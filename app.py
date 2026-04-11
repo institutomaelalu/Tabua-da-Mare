@@ -532,39 +532,36 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
         if st.button("Confirmar Matrícula no Turno Estendido"):
             if selecionados:
                 try:
+                    # 1. Conexão Direta (Evita erro 200)
                     import gspread
                     from google.oauth2.service_account import Credentials
-                    
-                    # 1. Autenticação Direta e Limpa
-                    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-                    creds = Credentials.from_service_account_info(st.secrets["connections"]["gsheets"], scopes=scope)
+                    creds = Credentials.from_service_account_info(st.secrets["connections"]["gsheets"])
                     client = gspread.authorize(creds)
-                    
-                    # 2. Abrir pelo ID (Substitua pela sua chave real se o nome continuar dando erro)
-                    # sh = client.open_by_key("1Zj8u67oAWKgYRd2uOkGssdaxXnwdsKsZBDxeLChnBr4") 
-                    sh = client.open("APP_IMLA") # Se o nome estiver 100% correto
+                    sh = client.open_by_key("1Zj8u67oAWKgYRd2uOkGssdaxXnwdsKsZBDxeLChnBr4")
                     ws = sh.worksheet("TURNO_ESTENDIDO")
                     
-                    ano_atual = datetime.now().strftime("%Y")
-                    
-                    # 3. Montar a lista de linhas (Apenas Aluno e Sala, o resto vazio)
+                    # 2. Verificar quem realmente precisa de nova linha
+                    alunos_existentes = df_alf["ALUNO"].tolist()
                     novas_linhas = []
+                    ano_atual = str(datetime.now().year)
+        
                     for aluno in selecionados:
-                        # [ALUNO, SALA, 1 AVAL, 2 AVAL, 3 AVAL, ANO, DIAGNÓSTICO, EVIDÊNCIAS, OBS]
-                        linha = [aluno.upper(), s_est, "", "", "", ano_atual, "", "", ""]
-                        novas_linhas.append(linha)
+                        aluno_up = aluno.upper()
+                        # Só adiciona se o aluno não estiver na planilha OU se você quiser criar um novo ano
+                        if aluno_up not in alunos_existentes:
+                            linha = [aluno_up, s_est, "", "", "", ano_atual, "", "", ""]
+                            novas_linhas.append(linha)
                     
-                    # 4. Gravação em lote (Single Hit)
-                    # O plural 'append_rows' evita o erro de Response 200 do gspread
-                    ws.append_rows(novas_linhas, value_input_option='RAW')
+                    if novas_linhas:
+                        ws.append_rows(novas_linhas, value_input_option='RAW')
+                        st.success(f"✅ {len(novas_linhas)} novos alunos matriculados!")
+                    else:
+                        st.info("Estes alunos já constam no Turno Estendido.")
                     
-                    st.success(f"✅ {len(selecionados)} aluno(s) registrados!")
                     st.cache_data.clear()
                     st.rerun()
-        
                 except Exception as e:
-                    # Captura o erro e mostra de forma limpa
-                    st.error(f"Não foi possível gravar. Detalhe: {str(e)}")
+                    st.error(f"Erro ao acessar Google Sheets: {e}")
 
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):

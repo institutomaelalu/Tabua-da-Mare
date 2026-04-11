@@ -486,7 +486,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
         </style>
     """, unsafe_allow_html=True)
 
-    # --- PAINEL DE GESTÃO ---
+# --- PAINEL DE GESTÃO ---
     with st.container(key="painel_branco"):
         st.markdown("<p style='text-align:center; color:gray; font-weight:bold; margin-bottom:15px;'>PAINEL DE GESTÃO</p>", unsafe_allow_html=True)
         g_col1, g_col2, g_col3, g_col4 = st.columns([1, 2.2, 1.3, 0.9])
@@ -503,28 +503,31 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 if st.button("Confirmar Matrícula", use_container_width=True):
                     idade_calc = datetime.now().year - n_nasc.year
                     nova_linha = [n_nome.upper(), n_turno, f"{idade_calc} ANOS", n_nasc.strftime("%d/%m/%Y"), n_comu.upper(), ""]
-                    conn.append_row(spreadsheet=sheet_id, worksheet=n_sala, data=nova_linha)
+                    conn.append_row(spreadsheet=nome_planilha, worksheet=n_sala, data=nova_linha)
                     st.success(f"{n_nome.upper()} matriculado!")
                     st.cache_data.clear()
                     st.rerun()
 
-with g_col2:
+        with g_col2:
             with st.popover("🤝 Registro de Padrinho/Madrinha", key="pad_popover", use_container_width=True):
                 st.markdown("##### 🤝 Novo Apadrinhamento")
                 s_busca = st.selectbox("Selecione a Sala:", list(TURMAS_CONFIG.keys()), key="pad_sala")
                 
-                # O bloco abaixo deve estar EXATAMENTE com este recuo:
-                df_b = conn.read(spreadsheet=nome_planilha, worksheet=s_busca).fillna("")
-                # ... lógica de filtro ...
-                
-                nome_p = st.text_input("Nome do Padrinho/Madrinha")
-                al_sel = st.selectbox("Escolha o Afilhado:", lista_lib)
-                
-                if st.button("Confirmar Apadrinhamento", use_container_width=True):
-                    # Todo o código de salvamento aqui dentro com mais um Tab de recuo
-                                                if nome_p:
+                try:
+                    df_b = conn.read(spreadsheet=nome_planilha, worksheet=s_busca).fillna("")
+                    df_b.columns = [str(c).strip().upper() for c in df_b.columns]
+                    
+                    filtro_vazios = ["", "-", "nan", "0", "NONE", "None"]
+                    lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].astype(str).str.upper().isin(filtro_vazios)]["ALUNO"].unique())
+                    
+                    if lista_lib:
+                        nome_p = st.text_input("Nome do Padrinho/Madrinha")
+                        al_sel = st.selectbox("Escolha o Afilhado:", lista_lib)
+                        
+                        if st.button("Confirmar Apadrinhamento", use_container_width=True):
+                            if nome_p:
                                 idx = df_b[df_b["ALUNO"] == al_sel].index[0] + 2
-                                conn.update_cell(spreadsheet=sheet_id, worksheet=s_busca, row=idx, col=6, value=nome_p.upper())
+                                conn.update_cell(spreadsheet=nome_planilha, worksheet=s_busca, row=int(idx), col=6, value=nome_p.upper())
                                 st.success("Registro concluído!")
                                 st.cache_data.clear()
                                 st.rerun()
@@ -533,35 +536,30 @@ with g_col2:
                     else:
                         st.info("Nenhum aluno sem padrinho nesta sala.")
                 except Exception as e:
-                    st.error(f"Erro ao carregar aba: {e}")
-                    pass
-
+                    st.error(f"Erro ao carregar dados: {e}")
 
         with g_col3:
             with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
                 st.markdown("##### ⏳ Matrícula Estendida")
                 s_est = st.selectbox("Origem dos Alunos:", list(TURMAS_CONFIG.keys()), key="sel_est_sala")
-                df_est = conn.read(spreadsheet=sheet_id, worksheet=s_est).fillna("")
+                df_est = conn.read(spreadsheet=nome_planilha, worksheet=s_est).fillna("")
                 df_est.columns = [str(c).strip().upper() for c in df_est.columns]
                 
                 selecionados = st.multiselect("Selecione os alunos:", sorted(df_est["ALUNO"].unique()))
                 
                 if st.button("Confirmar Turno Estendido", use_container_width=True):
                     if selecionados:
-# --- AJUSTE NA FORMA DE ACESSAR O GSPREAD ---
-try:
-    # Em vez de tentar cavar o atributo, use o .client direto do gsheets_connection
-    client = conn.client 
-    
-    # IMPORTANTE: Como você mudou o segredo para o NOME da planilha, 
-    # use client.open() em vez de client.open_by_key()
-    nome_planilha = st.secrets["connections"]["gsheets"]["spreadsheet"]
-    sh = client.open(nome_planilha) 
-    
-    ws = sh.worksheet(s_busca) # Ou a variável da aba correspondente
-    # ... código de atualização continua igual ...
-except Exception as e:
-    st.error(f"Erro ao acessar planilha: {e}")
+                        try:
+                            client = conn.client 
+                            sh = client.open(nome_planilha) 
+                            ws = sh.worksheet("TURNO_ESTENDIDO")
+                            for aluno in selecionados:
+                                ws.append_row([aluno.upper(), s_est, datetime.now().strftime("%Y")])
+                            st.success(f"{len(selecionados)} alunos adicionados!")
+                            st.cache_data.clear()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao salvar: {e}")
 
         with g_col4:
             with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):

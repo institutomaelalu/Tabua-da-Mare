@@ -24,6 +24,18 @@ st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 # --- 1. ESTABELECER CONEXÃO (OBRIGATÓRIO SER AQUI) ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+# --- VARIÁVEIS GLOBAIS IMPORTANTES ---
+CATEGORIAS = [
+    "Atividades em grupo/Proatividade", "Interesse pelo novo", "Compartilhamento de Materiais",
+    "Clareza e desenvoltura", "Respeito às regras", "Vocabulário adequado",
+    "Leitura e Escrita", "Compreensão de comandos", "Superação de desafios", "Assiduidade"
+]
+
+MARE_LABELS = {
+    1: "Maré Baixa", 2: "Maré Vazante", 
+    3: "Maré Enchente", 4: "Maré Alta", 5: "Maré Cheia"
+}
+
 # --- 2. CARREGAMENTO INICIAL ---
 try:
     # 1. Base Geral de Alunos
@@ -250,10 +262,6 @@ TURMAS_CONFIG = {
     "CIRAND. MUNDO": {"cor": C_ROXO, "key": "cirand_mundo"},
 }
 
-def get_gspread_client():
-    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-    return gspread.authorize(creds)
 
 def safe_read(worksheet_name):
     try:
@@ -543,15 +551,26 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
             st.markdown("##### ⚠️ Zona de Exclusão")
-            tipo_del = st.radio("Remover:", ["Aluno (Matrícula)", "Padrinho"])
-            s_del = st.selectbox("Local:", list(TURMAS_CONFIG.keys()) + ["TURNO_ESTENDIDO"])
+            tipo_del = st.radio("O que deseja remover?", ["Aluno (Matrícula)", "Padrinho"])
             
+            # --- CORREÇÃO DE LÓGICA AQUI ---
+            # Se for Padrinho, o Turno Estendido não entra na lista de opções.
+            if tipo_del == "Padrinho":
+                abas_disponiveis = list(TURMAS_CONFIG.keys())
+            else:
+                abas_disponiveis = list(TURMAS_CONFIG.keys()) + ["TURNO_ESTENDIDO"]
+            
+            s_del = st.selectbox("Localizar em:", abas_disponiveis)
+            
+            # Leitura dos dados para o selectbox
             df_del = conn.read(worksheet=s_del).fillna("")
             df_del.columns = [str(c).strip().upper() for c in df_del.columns]
-            lista_del = sorted(df_del["ALUNO"].unique()) if "ALUNO" in df_del.columns else []
-            al_del = st.selectbox("Aluno:", lista_del)
             
-            if st.button("🚨 EXCLUIR", use_container_width=True):
+            # Lista de alunos única e ordenada
+            lista_alunos_del = sorted(df_del["ALUNO"].unique()) if "ALUNO" in df_del.columns and not df_del.empty else []
+            al_del = st.selectbox("Selecionar Aluno:", lista_alunos_del)
+            
+            if st.button("🚨 EXCLUIR REGISTRO", use_container_width=True):
                 if al_del:
                     try:
                         # USANDO A FUNÇÃO SEGURA
@@ -559,19 +578,24 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                         sh = gc.open(nome_planilha)
                         ws = sh.worksheet(s_del)
                         
+                        # LOCALIZAR A LINHA (Index do pandas + 2)
                         idx_del = df_del[df_del["ALUNO"] == al_del].index[0] + 2
                         
                         if tipo_del == "Padrinho":
+                            # Coluna 7 (G) é PADRINHO nas abas das salas
                             ws.update_cell(idx_del, 7, "")
-                            st.success("Padrinho removido!")
+                            st.success(f"Padrinho removido da {s_del}!")
                         else:
+                            # DELETAR LINHA INTEIRA (Matrícula)
                             ws.delete_rows(idx_del)
-                            st.error("Registro excluído!")
+                            st.error(f"Matrícula de {al_del} excluída permanentemente!")
                             
                         st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao excluir: {e}")
+                else:
+                    st.warning("Selecione um aluno para excluir.")
 
     st.divider()
 

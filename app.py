@@ -422,108 +422,166 @@ st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Institu
 
 # --- ABAS ---
 # Certifique-se de que na sua sidebar o texto seja EXATAMENTE: 📝 Controle de Matrícula e Apadrinhamento
-if menu == "📝 Controle de Matrícula e Apadrinhamento":
+elif menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
     st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     
-    # --- CSS PARA INVERTER CORES DOS BOTÕES ---
-    st.markdown("""
+    # --- CSS DEFINITIVO PARA BOTÕES BRANCOS COM TEXTO COLORIDO E NEGRITO ---
+    # Pegamos as cores diretamente da configuração das salas
+    cor_rosa = TURMAS_CONFIG["SALA ROSA"]["cor"]
+    cor_amarela = TURMAS_CONFIG["SALA AMARELA"]["cor"]
+    cor_verde = TURMAS_CONFIG["SALA VERDE"]["cor"]
+    cor_azul = TURMAS_CONFIG["SALA AZUL"]["cor"]
+
+    st.markdown(f"""
         <style>
-        /* Altera o botão do Popover (o que abre a janela) */
-        div[data-testid="stPopover"] > button {
+        /* Estilo base para todos os popovers de gestão para inverter cores */
+        div[data-testid="stPopover"] > button {{
             background-color: white !important;
-            color: #31333F !important;
             font-weight: bold !important;
-            border: 1px solid #d3d3d3 !important;
             border-radius: 5px;
-        }
-        /* Força o texto dentro do botão a ser negrito */
-        div[data-testid="stPopover"] p {
+            use_container_width: True;
+        }}
+
+        /* --- Cores Específicas para CADA Botão (Texto e Borda) --- */
+        
+        /* 1. Botão Matrícula (SALA ROSA) */
+        div[key="mat_popover"] > button {{
+            color: {cor_rosa} !important;
+            border: 2px solid {cor_rosa} !important;
+        }}
+        /* Efeito hover para o botão Rosa */
+        div[key="mat_popover"] > button:hover {{
+            background-color: {cor_rosa}1A !important; /* 10% de opacidade da cor rosa */
+        }}
+
+        /* 2. Botão Registro de Padrinho/Madrinha (SALA AMARELA) */
+        div[key="pad_popover"] > button {{
+            color: {cor_amarela} !important;
+            border: 2px solid {cor_amarela} !important;
+        }}
+        /* Efeito hover para o botão Amarelo */
+        div[key="pad_popover"] > button:hover {{
+            background-color: {cor_amarela}1A !important;
+        }}
+
+        /* 3. Botão Turno Estendido (SALA VERDE) */
+        div[key="est_popover"] > button {{
+            color: {cor_verde} !important;
+            border: 2px solid {cor_verde} !important;
+        }}
+        /* Efeito hover para o botão Verde */
+        div[key="est_popover"] > button:hover {{
+            background-color: {cor_verde}1A !important;
+        }}
+
+        /* 4. Botão Remover (SALA AZUL) */
+        div[key="del_popover"] > button {{
+            color: {cor_azul} !important;
+            border: 2px solid {cor_azul} !important;
+        }}
+        /* Efeito hover para o botão Azul */
+        div[key="del_popover"] > button:hover {{
+            background-color: {cor_azul}1A !important;
+        }}
+
+        /* Força o negrito também nos parágrafos dentro dos botões (para garantir) */
+        div[data-testid="stPopover"] p {{
             font-weight: bold !important;
-            color: #31333F !important;
-        }
-        /* Efeito de passar o mouse (opcional, para dar feedback visual) */
-        div[data-testid="stPopover"] > button:hover {
-            border: 1px solid #31333F !important;
-            background-color: #f9f9f9 !important;
-        }
+        }}
         </style>
     """, unsafe_allow_html=True)
 
     # --- BLOCO DE GESTÃO (BOTÕES +) ---
-    col1, col2, col3, col4 = st.columns([1, 1.5, 1.2, 1])
+    # Usamos colunas para alinhamento e largura total.
+    # O botão Amarelo agora está na mesma linha e preenche o espaço.
+    gestao_col1, gestao_col2, gestao_col3, gestao_col4 = st.columns([1.1, 2.3, 1.4, 1.2])
 
-    # 1. MATRÍCULA REGULAR
-    with col1:
-        with st.popover("➕ Matrícula"):
-            st.markdown("##### 📝 Nova Matrícula")
+    # 1. MATRÍCULA REGULAR (SALA ROSA - Cor Rosa)
+    with gestao_col1:
+        # Usamos uma 'key' única para aplicar o CSS específico
+        with st.popover("➕ Matrícula", key="mat_popover"):
+            st.markdown(f"##### 📝 Nova Matrícula (<span style='color:{cor_rosa}'>Sala Rosa</span>)", unsafe_allow_html=True)
             n_nome = st.text_input("Nome do Aluno")
             n_nasc = st.date_input("Nascimento", format="DD/MM/YYYY")
-            n_sala = st.selectbox("Sala", list(TURMAS_CONFIG.keys()), key="reg_sala")
-            n_turno = st.selectbox("Turno", ["A", "B"], key="reg_turno")
+            n_turno = st.selectbox("Turno", ["A", "B"])
             n_comu = st.text_input("Comunidade")
             
             idade_calc = datetime.now().year - n_nasc.year - ((datetime.now().month, datetime.now().day) < (n_nasc.month, n_nasc.day))
             txt_idade = f"{idade_calc} ANOS"
             
             if st.button("Confirmar Matrícula", use_container_width=True):
-                nova_linha = [n_nome.upper(), n_turno, txt_idade, n_nasc.strftime("%d/%m/%Y"), n_comu.upper(), ""]
-                conn.append_row(worksheet=n_sala, data=nova_linha)
-                st.success("Matriculado!"); st.cache_data.clear()
+                if n_nome:
+                    nasc_str = n_nasc.strftime("%d/%m/%Y")
+                    # Ordem: ALUNO - TURMA - IDADE - NASC. - COMUNIDADE - PADRINHO
+                    nova_linha = [n_nome.upper(), n_turno, txt_idade, nasc_str, n_comu.upper(), ""]
+                    conn.append_row(worksheet="SALA ROSA", data=nova_linha)
+                    st.success("Matriculado na Sala Rosa!"); st.cache_data.clear()
+                else:
+                    st.warning("O nome do aluno é obrigatório.")
 
-    # 2. REGISTRO DE PADRINHO/MADRINHA
-    with col2:
-        with st.popover("🤝 Registro de Padrinho/Madrinha"):
-            st.markdown("##### 🤝 Novo Apadrinhamento")
-            s_busca = st.selectbox("Sala:", list(TURMAS_CONFIG.keys()), key="pad_sala")
-            df_b = conn.read(worksheet=s_busca).fillna("")
+    # 2. REGISTRO DE PADRINHO/MADRINHA (SALA AMARELA - Cor Amarela - ALINHADO)
+    with gestao_col2:
+        # Usamos uma 'key' única para aplicar o CSS específico
+        with st.popover("🤝 Registro de Padrinho/Madrinha", key="pad_popover"):
+            st.markdown(f"##### 🤝 Novo Apadrinhamento (<span style='color:{cor_amarela}'>Sala Amarela</span>)", unsafe_allow_html=True)
+            # Filtra apenas quem não tem padrinho na Sala Amarela
+            df_b = conn.read(worksheet="SALA AMARELA").fillna("")
             df_b.columns = [str(c).strip().upper() for c in df_b.columns]
             
             lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].isin(["", "-", "nan", "0"])]["ALUNO"].unique())
             
             nome_p = st.text_input("Nome do Padrinho/Madrinha")
-            al_sel = st.selectbox("Afilhado:", lista_lib)
+            al_sel = st.selectbox("Afilhado(a) (Apenas sem padrinho):", lista_lib)
             
             if st.button("Confirmar Apadrinhamento", use_container_width=True):
-                idx = df_b[df_b["ALUNO"] == al_sel].index[0] + 2
-                conn.update_cell(worksheet=s_busca, row=idx, col=6, value=nome_p.upper())
-                st.success("Padrinho Registrado!"); st.cache_data.clear()
+                if nome_p and al_sel:
+                    idx = df_b[df_b["ALUNO"] == al_sel].index[0] + 2
+                    conn.update_cell(worksheet="SALA AMARELA", row=idx, col=6, value=nome_p.upper())
+                    st.success("Padrinho Registrado na Sala Amarela!"); st.cache_data.clear()
+                else:
+                    st.warning("Preencha o nome do padrinho e selecione o afilhado.")
 
-    # 3. TURNO ESTENDIDO
-    with col3:
-        with st.popover("⏳ Turno Estendido"):
-            st.markdown("##### ⏳ Matrícula Estendida")
-            s_est = st.selectbox("Buscar alunos da Sala:", list(TURMAS_CONFIG.keys()))
-            df_est = conn.read(worksheet=s_est).fillna("")
+    # 3. TURNO ESTENDIDO (SALA VERDE - Cor Verde)
+    with gestao_col3:
+        # Usamos uma 'key' única para aplicar o CSS específico
+        with st.popover("⏳ Turno Estendido", key="est_popover"):
+            st.markdown(f"##### ⏳ Matrícula Estendida (<span style='color:{cor_verde}'>Sala Verde</span>)", unsafe_allow_html=True)
+            df_est = conn.read(worksheet="SALA VERDE").fillna("")
             lista_est = sorted(df_est["ALUNO"].unique())
             
-            selecionados = st.multiselect("Selecione os alunos:", lista_est)
+            selecionados = st.multiselect("Selecione os alunos da Sala Verde:", lista_est)
             
             if st.button("Matricular no Estendido", use_container_width=True):
                 for aluno in selecionados:
-                    conn.append_row(worksheet="TURNO_ESTENDIDO", data=[aluno.upper(), s_est])
-                st.success(f"{len(selecionados)} alunos adicionados!"); st.cache_data.clear()
+                    # Salva Nome e a Sala de Origem na aba TURNO_ESTENDIDO
+                    conn.append_row(worksheet="TURNO_ESTENDIDO", data=[aluno.upper(), "SALA VERDE"])
+                st.success(f"{len(selecionados)} alunos adicionados ao Turno Estendido!"); st.cache_data.clear()
 
-    # 4. REMOVER REGISTROS
-    with col4:
-        with st.popover("🗑️ Remover"):
-            st.markdown("##### ⚠️ Zona de Exclusão")
-            tipo_del = st.radio("O que deseja remover?", ["Aluno (Matrícula)", "Padrinho", "Turno Estendido"])
-            s_del = st.selectbox("De qual sala/aba?", list(TURMAS_CONFIG.keys()) + ["TURNO_ESTENDIDO"])
+    # 4. REMOVER REGISTROS (SALA AZUL - Cor Azul)
+    with gestao_col4:
+        # Usamos uma 'key' única para aplicar o CSS específico
+        with st.popover("🗑️ Remover", key="del_popover"):
+            st.markdown(f"##### ⚠️ Zona de Exclusão (<span style='color:{cor_azul}'>Sala Azul</span>)", unsafe_allow_html=True)
+            tipo_del = st.radio("O que deseja remover?", ["Aluno (Matrícula)", "Padrinho"])
             
-            df_del = conn.read(worksheet=s_del).fillna("")
+            # Busca dados apenas da Sala Azul para este exemplo
+            df_del = conn.read(worksheet="SALA AZUL").fillna("")
             df_del.columns = [str(c).strip().upper() for c in df_del.columns]
-            al_del = st.selectbox("Selecionar Aluno:", sorted(df_del["ALUNO"].unique()) if not df_del.empty else [])
+            al_del = st.selectbox("Selecionar Aluno da Sala Azul:", sorted(df_del["ALUNO"].unique()) if not df_del.empty else [])
             
             if st.button("🚨 EXCLUIR REGISTRO", use_container_width=True):
-                idx_del = df_del[df_del["ALUNO"] == al_del].index[0] + 2
-                if tipo_del == "Padrinho":
-                    conn.update_cell(worksheet=s_del, row=idx_del, col=6, value="")
-                    st.warning("Padrinho removido.")
+                if al_del:
+                    idx_del = df_del[df_del["ALUNO"] == al_del].index[0] + 2
+                    if tipo_del == "Padrinho":
+                        conn.update_cell(worksheet="SALA AZUL", row=idx_del, col=6, value="")
+                        st.warning(f"Padrinho removido do aluno {al_del} na Sala Azul.")
+                    else:
+                        conn.delete_rows(worksheet="SALA AZUL", indices=[idx_del])
+                        st.error(f"Matrícula do aluno {al_del} apagada da Sala Azul.")
+                    st.cache_data.clear()
                 else:
-                    conn.delete_rows(worksheet=s_del, indices=[idx_del])
-                    st.error("Registro apagado.")
-                st.cache_data.clear()
+                    st.warning("Selecione um aluno para remover.")
 
     st.divider()
 

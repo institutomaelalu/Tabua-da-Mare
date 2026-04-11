@@ -445,39 +445,40 @@ elif menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
     st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     
-    # 1. BOTÕES DE SELEÇÃO
+    # 1. BOTÕES DE SELEÇÃO DE SALA
     render_botoes_salas("btn_pad", "sel_pad")
     sala_atual = st.session_state.sel_pad
     cor_h = TURMAS_CONFIG[sala_atual]["cor"]
 
-    # --- CONEXÃO COM GOOGLE SHEETS ---
+    # --- CARREGAMENTO ---
     df_g = conn.read(worksheet="GERAL").fillna("")
     df_g.columns = [str(c).strip().upper() for c in df_g.columns]
 
     df_s = conn.read(worksheet=sala_atual).fillna("")
     df_s.columns = [str(c).strip().upper() for c in df_s.columns]
 
-    # 2. CONTADOR DE ALUNOS (Logo abaixo dos botões)
-    st.markdown(f"""
-        <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; border-left: 4px solid {cor_h}; margin: 10px 0 20px 0;">
-            <span style="font-size: 14px; color: #555;">📍 Atualmente existem <b>{len(df_s)}</b> alunos matriculados na <b>{sala_atual}</b></span>
-        </div>
-    """, unsafe_allow_html=True)
-
     if not df_s.empty:
-        # 3. RENDERIZAÇÃO DOS FILTROS
+        # 2. RENDERIZAÇÃO DOS FILTROS (Turno e Comunidade)
         tn, cm = render_filtros(df_g, "pad")
         
+        # 3. LÓGICA DE FILTRAGEM
         df_f = df_s.copy()
         if tn != "Todos":
             df_f = df_f[df_f["TURMA"] == tn]
         if cm != "Todas":
             df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-        # 4. MONTAGEM DA TABELA (Mantendo o formato original custom-table)
+        # 4. CONTADOR DINÂMICO (Atualiza conforme o filtro de Turno)
+        texto_turno = f" - {tn}" if tn != "Todos" else ""
+        st.markdown(f"""
+            <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; border-left: 4px solid {cor_h}; margin: 10px 0 20px 0;">
+                <span style="font-size: 14px; color: #555;">📍 Atualmente temos <b>{len(df_f)}</b> alunos matriculados na <b>{sala_atual}{texto_turno}</b></span>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # 5. MONTAGEM DA TABELA (custom-table com fonte 13px)
         v_cols = ["ALUNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
         
-        # Estilo para forçar fonte 13px e separadores suaves
         st.markdown(f"""
             <style>
                 .custom-table {{ font-size: 13px !important; width: 100%; border-collapse: collapse; }}
@@ -494,15 +495,12 @@ elif menu == "📝 Controle de Matrícula e Apadrinhamento":
             idade = str(r.get("IDADE", ""))
             comunidade = str(r.get("COMUNIDADE", ""))
             padrinho = str(r.get("PADRINHO/MADRINHA", ""))
-            
             padrinho_texto = padrinho if padrinho.lower() not in ["nan", "", "none", "0"] else "-"
             
             html += f'<tr><td>{n_l}</td><td>{idade}</td><td>{comunidade}</td><td>{padrinho_texto}</td></tr>'
         
         st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
-        
-        # Rodapé com contagem
-        st.caption(f"Total exibido: {len(df_f)} alunos na {sala_atual}")
+        st.caption(f"Total exibido: {len(df_f)} alunos")
         
     else: 
         st.warning(f"A aba '{sala_atual}' parece estar vazia na Google Sheet.")

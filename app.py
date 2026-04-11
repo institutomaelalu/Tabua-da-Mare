@@ -569,7 +569,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                             
                             sucesso = registrar_turno_estendido(
                                 aluno=al_mat, sala=sala_origem, avaliacao_tipo="MATRÍCULA",
-                                nivel="", evidencias_list=[], obs="", ano=2026
+                                nivel="", evidencias_list=[], obs="", ano=""
                             )
                             
                             if sucesso:

@@ -525,7 +525,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                     st.success("Registro concluído!"); st.cache_data.clear()
 
         with g_col3:
-with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
+            with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
                 st.markdown("##### ⏳ Matrícula Estendida")
                 s_est = st.selectbox("Origem dos Alunos:", list(TURMAS_CONFIG.keys()), key="sel_est_sala")
                 df_est = conn.read(worksheet=s_est).fillna("")

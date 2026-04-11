@@ -441,43 +441,112 @@ if menu == "👤 Matrícula":
                 st.success("Cadastrado com sucesso!"); st.rerun()
 
 elif menu == "📝 Alunos matriculados":
-    # (Mantido original com a aplicação de cor dinâmica no botão)
     st.markdown(f"### 📋 Quadro de Alunos Matriculados")
     render_botoes_salas("btn_mat", "sel_mat")
     st.info("✍️📖 = Aluno já matriculado no Turno Estendido")
-    df_g, df_s = safe_read("GERAL"), safe_read(st.session_state.sel_mat)
-    tn, cm = render_filtros(df_g, "mat"); df_f = aplicar_filtros(df_s, df_g, tn, cm)
+
+    # --- CONEXÃO COM GOOGLE SHEETS (R&D) ---
+    # Lemos a aba GERAL para os filtros e a aba da SALA selecionada para a lista
+    df_g = conn.read(worksheet="GERAL").fillna("")
+    df_g.columns = [str(c).strip().upper() for c in df_g.columns]
+    
+    # Lemos a aba específica da sala (ex: "SALA ROSA")
+    df_s = conn.read(worksheet=st.session_state.sel_mat).fillna("")
+    df_s.columns = [str(c).strip().upper() for c in df_s.columns]
+
+    # Renderiza filtros baseados na aba GERAL
+    tn, cm = render_filtros(df_g, "mat")
+    
+    # Filtragem dos dados da sala
+    df_f = df_s.copy()
+    if tn != "Todos":
+        df_f = df_f[df_f["TURMA"] == tn] # No seu arquivo da sala, a coluna é TURMA (A ou B)
+    if cm != "Todas":
+        df_f = df_f[df_f["COMUNIDADE"] == cm]
+
     cor_h = TURMAS_CONFIG[st.session_state.sel_mat]["cor"]
     st.markdown(f'<table class="custom-table"><thead style="background-color:{cor_h}"><tr><th style="width: 10%;">Sel.</th><th style="width: 45%;">ALUNO</th><th style="width: 15%;">IDADE</th><th style="width: 30%;">COMUNIDADE</th></tr></thead></table>', unsafe_allow_html=True)
+    
     selecionados = []
+    
+    # Iteração sobre os dados filtrados
     for i, r in df_f.iterrows():
         c0, c1, c2, c3 = st.columns([0.5, 3, 1, 2])
+        # Usamos o nome da coluna exatamente como no seu CSV: ALUNO
         n_l = str(r['ALUNO']).replace("**", "").strip()
-        if n_l in st.session_state["alunos_te_dict"]: c0.markdown("✍️📖")
+        
+        if n_l in st.session_state.get("alunos_te_dict", {}): 
+            c0.markdown("✍️📖")
         else:
-            if c0.checkbox("", key=f"chk_{i}"): selecionados.append(n_l)
-        c1.write(f"**{n_l}**"); c2.write(f"{r['IDADE']} anos"); c3.write(f"{r['COMUNIDADE']}")
+            # Usamos uma chave única combinando sala e nome para evitar conflitos
+            if c0.checkbox("", key=f"chk_{st.session_state.sel_mat}_{i}"): 
+                selecionados.append(n_l)
+        
+        c1.write(f"**{n_l}**")
+        c2.write(f"{r['IDADE']}") # No seu CSV, IDADE já vem como "05 ANOS"
+        c3.write(f"{r['COMUNIDADE']}")
+
     if selecionados:
         st.markdown(f"<style>div.stButton > button[key='btn_bulk_te'] {{ background-color: {cor_h} !important; color: white !important; opacity: 1.0 !important; }}</style>", unsafe_allow_html=True)
         if st.button(f"Matricular {len(selecionados)} aluno(s) no Turno Estendido", key="btn_bulk_te"):
-            for al in selecionados: st.session_state["alunos_te_dict"][al] = st.session_state.sel_mat
+            for al in selecionados: 
+                st.session_state["alunos_te_dict"][al] = st.session_state.sel_mat
+            st.success(f"{len(selecionados)} alunos adicionados à lista de matrícula!")
             st.rerun()
 
 elif menu == "🤝 Gestão de apadrinhamento":
-    # (Mantido original)
     st.markdown(f"### 🤝 Gestão de Apadrinhamento")
     render_botoes_salas("btn_pad", "sel_pad")
-    df_g, df_s = safe_read("GERAL"), safe_read(st.session_state.sel_pad)
+
+    # --- CONEXÃO COM GOOGLE SHEETS ---
+    # 1. Busca a base geral para os filtros (Turno/Comunidade)
+    df_g = conn.read(worksheet="GERAL").fillna("")
+    df_g.columns = [str(c).strip().upper() for c in df_g.columns]
+
+    # 2. Busca a aba específica da sala selecionada (ex: "SALA ROSA")
+    # O st.session_state.sel_pad contém o nome da sala vindo do botão
+    df_s = conn.read(worksheet=st.session_state.sel_pad).fillna("")
+    df_s.columns = [str(c).strip().upper() for c in df_s.columns]
+
     if not df_s.empty:
-        tn, cm = render_filtros(df_g, "pad"); df_f = aplicar_filtros(df_s, df_g, tn, cm)
+        # Renderiza os filtros usando a base geral
+        tn, cm = render_filtros(df_g, "pad")
+        
+        # Filtra os dados da sala selecionada
+        # Note: No arquivo da sala a coluna de turno chama-se "TURMA"
+        df_f = df_s.copy()
+        if tn != "Todos":
+            df_f = df_f[df_f["TURMA"] == tn]
+        if cm != "Todas":
+            df_f = df_f[df_f["COMUNIDADE"] == cm]
+
         cor_h = TURMAS_CONFIG[st.session_state.sel_pad]["cor"]
+        
+        # Colunas conforme a estrutura do seu arquivo CSV
         v_cols = ["ALUNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
+        
+        # Montagem da Tabela HTML
         html = f'<table class="custom-table"><thead style="background-color:{cor_h}"><tr>' + "".join([f'<th>{c}</th>' for c in v_cols]) + '</tr></thead><tbody>'
+        
         for _, r in df_f.iterrows():
-            n_l = str(r["ALUNO"]).replace("**", "").strip()
-            html += f'<tr><td>{n_l}</td><td>{r["IDADE"]}</td><td>{r["COMUNIDADE"]}</td><td>{r["PADRINHO/MADRINHA"]}</td></tr>'
+            # Limpeza do nome do aluno
+            n_l = str(r.get("ALUNO", "")).replace("**", "").strip()
+            idade = str(r.get("IDADE", ""))
+            comunidade = str(r.get("COMUNIDADE", ""))
+            padrinho = str(r.get("PADRINHO/MADRINHA", ""))
+            
+            # Se o padrinho estiver vazio ou for "nan", mostramos vazio para ficar limpo
+            padrinho_texto = padrinho if padrinho.lower() not in ["nan", "", "none", "0"] else ""
+            
+            html += f'<tr><td>{n_l}</td><td>{idade}</td><td>{comunidade}</td><td>{padrinho_texto}</td></tr>'
+        
         st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
-    else: st.warning("Nenhum dado encontrado para esta sala.")
+        
+        # Rodapé com contagem (estilo R&D)
+        st.caption(f"Total exibido: {len(df_f)} alunos na {st.session_state.sel_pad}")
+        
+    else: 
+        st.warning(f"A aba '{st.session_state.sel_pad}' parece estar vazia na Google Sheet.")
 
 # --- ABA: AVALIAÇÃO TÁBUA DA MARÉ ---
 elif menu == "📊 Avaliação da Tábua da Maré":

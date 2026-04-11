@@ -49,10 +49,31 @@ def carregar_dados_globais(aba):
         return pd.DataFrame()
 
 # --- 2. CARREGAMENTO INICIAL (SUBSTITUA O SEU POR ESTE) ---
-# Agora, em vez de ler direto, chamamos o motor
-df_g = carregar_dados_globais("GERAL")
-df_alf = carregar_dados_globais("TURNO_ESTENDIDO")
-df_aval = carregar_dados_globais("TABUA_MARE")
+@st.cache_data(ttl=600)  # Mantém os dados por 10 minutos na memória
+def carregar_dados_globais():
+    # 1. Base Geral
+    df_g = conn.read(worksheet="GERAL").fillna("")
+    df_g.columns = [str(c).strip().upper() for c in df_g.columns]
+    
+    # 2. Turno Estendido
+    df_te = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
+    df_te.columns = [str(c).strip().upper() for c in df_te.columns]
+
+    # 3. Tábua da Maré
+    df_tm = conn.read(worksheet="TABUA_MARE").fillna("")
+    df_tm.columns = [str(c).strip().upper() for c in df_tm.columns]
+    
+    # 4. Criar o dicionário de alunos do TE para navegação rápida
+    dict_te = {
+        str(row["ALUNO"]).strip(): str(row["SALA"]).strip().upper() 
+        for _, row in df_te.iterrows() if "ALUNO" in df_te.columns
+    }
+    
+    return df_g, df_te, df_tm, dict_te
+
+# Chame a função uma única vez no início do código
+df_g, df_alf, df_aval, dict_alunos_te = carregar_dados_globais()
+st.session_state["alunos_te_dict"] = dict_alunos_te
 
 # --- 3. FUNÇÕES DE FILTRO (Ajustadas para os novos nomes) ---
 def render_filtros(df_geral, key_suffix):
@@ -398,7 +419,8 @@ if not st.session_state.logado:
                 else:
                     encontrado = False
                     for sala in TURMAS_CONFIG.keys():
-                        df_s = safe_read(sala)
+                        # Filtra os alunos da base geral que pertencem a essa sala
+                        df_s = df_g[df_g["SALA"] == sala]
                         if not df_s.empty and "PADRINHO/MADRINHA" in df_s.columns:
                             if u in df_s["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper().unique():
                                 encontrado = True; break

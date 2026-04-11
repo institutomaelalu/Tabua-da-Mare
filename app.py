@@ -956,99 +956,109 @@ elif menu == "🌊 Canal do Apadrinhamento":
             st.markdown("---")
 
 # --- VISUALIZAÇÃO 1: GERAL (LIMPEZA TOTAL E GRÁFICO FULL WIDTH) ---
-            if modo == "🌊 Tábua da Maré (Geral)":
-                # 1. Busca de dados e Cor da Sala
-                info_row = afils[afils["ALUNO"].astype(str).str.contains(al_af, na=False)].iloc[0]
-                nome_sala = "Não informada"
-                cor_sala_bg = "#ffffff" 
-                
-                for nome_aba in TURMAS_CONFIG.keys():
-                    df_temp = safe_read(nome_aba)
-                    if not df_temp.empty and al_af in df_temp["ALUNO"].astype(str).values:
-                        nome_sala = nome_aba
-                        aba_upper = nome_aba.upper()
-                        if "AZUL" in aba_upper: cor_sala_bg = "#E3F2FD"
-                        elif "ROSA" in aba_upper: cor_sala_bg = "#FCE4EC"
-                        elif "VERDE" in aba_upper: cor_sala_bg = "#E8F5E9"
-                        elif "AMARELA" in aba_upper: cor_sala_bg = "#FFFDE7"
-                        elif "LARANJA" in aba_upper: cor_sala_bg = "#FFF3E0"
-                        break
+if modo == "🌊 Tábua da Maré (Geral)":
+    # 1. Busca de dados e Cor da Sala
+    # Usando ALUNO em maiúsculo para evitar o KeyError
+    info_row = afils[afils["ALUNO"].astype(str).str.contains(al_af, na=False)].iloc[0]
+    nome_sala = "Não informada"
+    cor_sala_bg = "#ffffff" 
+    
+    for nome_aba in TURMAS_CONFIG.keys():
+        df_temp = safe_read(nome_aba)
+        # Padronização preventiva das colunas da aba
+        if not df_temp.empty:
+            df_temp.columns = [str(c).strip().upper() for c in df_temp.columns]
+            if al_af in df_temp["ALUNO"].astype(str).values:
+                nome_sala = nome_aba
+                aba_upper = nome_aba.upper()
+                if "AZUL" in aba_upper: cor_sala_bg = "#E3F2FD"
+                elif "ROSA" in aba_upper: cor_sala_bg = "#FCE4EC"
+                elif "VERDE" in aba_upper: cor_sala_bg = "#E8F5E9"
+                elif "AMARELA" in aba_upper: cor_sala_bg = "#FFFDE7"
+                elif "LARANJA" in aba_upper: cor_sala_bg = "#FFF3E0"
+                break
 
-                # 2. CSS para remover duplicatas e aproximar o status
-                st.markdown("""
-                    <style>
-                    .status-mare-final {
-                        font-size: 11px !important;
-                        color: #2c3e50;
-                        margin-top: -10px; /* Aproxima da vasilha */
-                        font-weight: bold; /* Negrito conforme solicitado */
-                        text-align: center;
-                    }
-                    /* Força o sumiço de qualquer legenda externa que o Streamlit tente criar */
-                    .legenda-v-nome { display: none !important; } 
-                    </style>
-                """, unsafe_allow_html=True)
+    # 2. CSS para remover duplicatas e aproximar o status
+    st.markdown("""
+        <style>
+        .status-mare-final {
+            font-size: 11px !important;
+            color: #2c3e50;
+            margin-top: -10px; 
+            font-weight: bold; 
+            text-align: center;
+        }
+        .legenda-v-nome { display: none !important; } 
+        </style>
+    """, unsafe_allow_html=True)
 
-                # PARTE SUPERIOR: FICHA + VASILHAS
-                col_ficha, col_vasilhas = st.columns([1, 2.5])
+    # PARTE SUPERIOR: FICHA + VASILHAS
+    col_ficha, col_vasilhas = st.columns([1, 2.5])
+    
+    with col_ficha:
+        st.markdown(f"""
+            <div style="background-color: {cor_sala_bg}; padding: 15px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); min-height: 280px; color: black;">
+                <h4 style="margin: 0 0 10px 0; color: #1A5276; border-bottom: 1px solid rgba(0,0,0,0.1);">📋 Ficha</h4>
+                <p style="margin: 5px 0; font-size: 13px;"><b>👤 Nome:</b><br>{al_af}</p>
+                <p style="margin: 5px 0; font-size: 13px;"><b>🏫 Sala:</b><br>{nome_sala}</p>
+                <p style="margin: 5px 0; font-size: 13px;"><b>🎂 Idade:</b><br>{info_row.get('IDADE', '---')}</p>
+                <p style="margin: 5px 0; font-size: 13px;"><b>🏡 Comunidade:</b><br>{info_row.get('COMUNIDADE', 'Não informada')}</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with col_vasilhas:
+        df_av = df_aval.copy()
+        # Padroniza as colunas da aba TABUA_MARE para maiúsculo
+        df_av.columns = [str(c).strip().upper() for c in df_av.columns]
+        
+        # Correção do Erro: Buscando por "ALUNO" em vez de "Aluno"
+        dados_mare = df_av[df_av["ALUNO"] == al_af]
+        
+        if not dados_mare.empty:
+            r_mare = dados_mare.iloc[-1]
+            v_cols = st.columns(5)
+            valores_grafico = []
+            
+            for i, cat in enumerate(CATEGORIAS):
+                # Busca a nota usando a categoria em maiúsculo para bater com o df_av.columns
+                val = r_mare.get(cat.upper(), 0)
+                # Tenta converter para float caso esteja como string na planilha
+                try: val = float(val)
+                except: val = 0.0
                 
-                with col_ficha:
+                valores_grafico.append(val)
+                
+                status_txt = "Maré Baixa" if val <= 1 else "Maré Cheia" if val >= 3 else "Maré Alta"
+                
+                html_v = render_vasilha_mare(val, cat)
+                
+                # Limpeza de HTML conforme sua lógica original
+                html_v_limpo = html_v.split('<span style="position: absolute;')[0]
+                if not html_v_limpo.endswith('</div></div>'):
+                    html_v_limpo += '</div></div>'
+                
+                with v_cols[i % 5]:
                     st.markdown(f"""
-                        <div style="background-color: {cor_sala_bg}; padding: 15px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); min-height: 280px;">
-                            <h4 style="margin: 0 0 10px 0; color: #1A5276; border-bottom: 1px solid rgba(0,0,0,0.1);">📋 Ficha</h4>
-                            <p style="margin: 5px 0; font-size: 13px; color: black;"><b>👤 Nome:</b><br>{al_af}</p>
-                            <p style="margin: 5px 0; font-size: 13px; color: black;"><b>🏫 Sala:</b><br>{nome_sala}</p>
-                            <p style="margin: 5px 0; font-size: 13px; color: black;"><b>🎂 Idade:</b><br>{info_row.get('IDADE', '---')} anos</p>
-                            <p style="margin: 5px 0; font-size: 13px; color: black;"><b>🏡 Comunidade:</b><br>{info_row.get('COMUNIDADE', 'Não informada')}</p>
+                        <div style="text-align: center; margin-bottom: 5px;">
+                            {html_v_limpo}
+                            <div class="status-mare-final">{status_txt}</div>
                         </div>
                     """, unsafe_allow_html=True)
 
-                with col_vasilhas:
-                    df_av = (df_aval.copy())
-                    dados_mare = df_av[df_av["Aluno"] == al_af]
-                    
-                    if not dados_mare.empty:
-                        r_mare = dados_mare.iloc[-1]
-                        v_cols = st.columns(5)
-                        valores_grafico = []
-                        
-                        for i, cat in enumerate(CATEGORIAS):
-                            val = r_mare[cat]
-                            valores_grafico.append(val)
-                            
-                            status_txt = "Maré Baixa" if val <= 1 else "Maré Cheia" if val >= 3 else "Maré Alta"
-                            
-                            # Pegamos apenas o HTML da vasilha
-                            html_v = render_vasilha_mare(val, cat)
-                            
-                            # REMOÇÃO AGRESSIVA DE SETAS E LEGENDAS EXTERNAS
-                            # Cortamos qualquer conteúdo que venha após o fechamento da div principal da vasilha
-                            html_v_limpo = html_v.split('<span style="position: absolute;')[0]
-                            if not html_v_limpo.endswith('</div></div>'):
-                                html_v_limpo += '</div></div>'
-                            
-                            with v_cols[i % 5]:
-                                st.markdown(f"""
-                                    <div style="text-align: center; margin-bottom: 5px;">
-                                        {html_v_limpo}
-                                        <div class="status-mare-final">{status_txt}</div>
-                                    </div>
-                                """, unsafe_allow_html=True)
-
-                # PARTE INFERIOR: GRÁFICO LARGURA TOTAL
-                if not dados_mare.empty:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
-                    fig_espelho.update_layout(
-                        height=380,
-                        margin=dict(l=5, r=5, t=30, b=0),
-                        autosize=True,
-                        paper_bgcolor='rgba(0,0,0,0)',
-                        plot_bgcolor='rgba(0,0,0,0)'
-                    )
-                    st.plotly_chart(fig_espelho, use_container_width=True, config={'displayModeBar': False})
-                else:
-                    st.warning("Avaliação comportamental ainda não disponível.")
+    # PARTE INFERIOR: GRÁFICO LARGURA TOTAL
+    if not dados_mare.empty:
+        st.markdown("<br>", unsafe_allow_html=True)
+        fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
+        fig_espelho.update_layout(
+            height=380,
+            margin=dict(l=5, r=5, t=30, b=0),
+            autosize=True,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
+        st.plotly_chart(fig_espelho, use_container_width=True, config={'displayModeBar': False})
+    else:
+        st.warning("Avaliação comportamental (Tábua da Maré) ainda não registrada para este aluno.")
 
             # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---
             elif modo == "📚 Turno Estendido":

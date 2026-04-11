@@ -294,13 +294,18 @@ def get_gspread_client():
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
     return gspread.authorize(creds)
 
+@st.cache_data(ttl=600)  # Protege a API: só busca dados novos a cada 10 minutos
 def safe_read(worksheet_name):
+    """Lê uma aba específica com cache para evitar excesso de chamadas à API."""
     try:
-        # Simplificando a leitura
-        df = conn.read(worksheet=worksheet_name).fillna("")
+        # Importante: ttl=None aqui para não conflitar com o cache do Streamlit
+        df = conn.read(worksheet=worksheet_name, ttl=None).fillna("")
+        
+        # Padronização de colunas (R&D Standard)
         df.columns = [str(c).strip().upper() for c in df.columns]
         return df
-    except: 
+    except Exception as e:
+        # Se a aba não existir ou houver erro de conexão, retorna um DataFrame vazio
         return pd.DataFrame()
 
 def render_filtros(df_geral, key_suffix):
@@ -1230,7 +1235,7 @@ elif menu == "🌊 Tábua da Maré":
     df_av.columns = [str(c).strip().upper() for c in df_av.columns]
     
     # Leitura segura da aba selecionada
-    df_s = safe_read(st.session_state.sel_int)
+    df_s = df_g[df_g["SALA"] == st.session_state.sel_int]
     
     if not df_s.empty:
         df_s.columns = [str(c).strip().upper() for c in df_s.columns]

@@ -425,87 +425,87 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
     st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     
-    # Configuração de Cores (Identidade Visual)
+    # Cores da Identidade Visual
     c_rosa, c_amarela, c_verde, c_azul, c_lavanda = "#F783AC", "#FFE066", "#A9E34B", "#99E9F2", "#D0BFFF"
 
-    # --- CSS REVISADO (FORÇA TOTAL) ---
+    # --- CSS PARA A "TABELA" BRANCA E BOTÕES ---
     st.markdown(f"""
         <style>
-        /* 1. BOTÕES DE GESTÃO (Popovers Superiores) - BRANCO COM TEXTO COLORIDO */
-        /* Seleciona o botão dentro do popover e remove qualquer gradiente nativo */
+        /* 1. CRIA A "TABELA" (CONTAINER BRANCO) */
+        [data-testid="stVerticalBlock"] > div:has(div[key="container_gestao"]) {{
+            background-color: white !important;
+            padding: 15px !important;
+            border-radius: 12px !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
+            border: 1px solid #f0f0f0 !important;
+            margin-bottom: 20px !important;
+        }}
+
+        /* 2. RESET TOTAL DOS BOTÕES POPOVER (SUPERIORES) */
         div[data-testid="stPopover"] > button {{
             background-color: white !important;
             background-image: none !important;
             border-radius: 8px !important;
-            height: 3.2rem;
-            transition: 0.3s;
+            height: 3.2rem !important;
             box-shadow: none !important;
+            transition: 0.3s !important;
         }}
 
-        /* Cores de borda e texto específicas usando as chaves dos popovers */
+        /* Cores de borda e texto específicas */
         div[key="mat_popover"] > button {{ color: {c_rosa} !important; border: 2px solid {c_rosa} !important; }}
         div[key="pad_popover"] > button {{ color: {c_amarela} !important; border: 2px solid {c_amarela} !important; }}
         div[key="est_popover"] > button {{ color: {c_verde} !important; border: 2px solid {c_verde} !important; }}
         div[key="del_popover"] > button {{ color: {c_azul} !important; border: 2px solid {c_azul} !important; }}
 
-        /* Garante que o texto (tag p) dentro dos popovers seja negrito e colorido */
+        /* Texto dos popovers (SEM negrito, conforme solicitado) */
         div[data-testid="stPopover"] button p {{
-            font-weight: 800 !important;
+            font-weight: 500 !important;
             color: inherit !important;
         }}
 
-        /* 2. BOTÕES DE SELEÇÃO DE SALA (Inferiores) - COLORIDOS COM TEXTO BRANCO NEGRITO */
-        /* Mira em botões que começam com o prefixo btn_pad usado na sua função */
+        /* 3. BOTÕES DAS SALAS (INFERIORES) - FUNDO COLORIDO E TEXTO NEGRITO */
         div[key^="btn_pad"] > button {{
             color: white !important;
             border: none !important;
             background-image: none !important;
         }}
 
-        /* O SEGREDO DO NEGRITO NAS SALAS: Alcançar o parágrafo dentro do container de markdown */
+        /* NEGRITO ABSOLUTO PARA AS SALAS */
         div[key^="btn_pad"] button div[data-testid="stMarkdownContainer"] p {{
-            font-weight: 800 !important;
+            font-weight: 900 !important;
             color: white !important;
-            text-transform: uppercase;
+            font-size: 15px !important;
         }}
 
-        /* Cores de fundo específicas para as salas */
+        /* Cores de fundo das salas */
         div[key$="SALA ROSA"] > button {{ background-color: {c_rosa} !important; }}
         div[key$="SALA AMARELA"] > button {{ background-color: {c_amarela} !important; }}
-        div[key$="SALA VERDE"] > button {{ background-color: {c_verde} !important; }}
-        div[key$="SALA AZUL"] > button {{ background-color: {c_azul} !important; }}
-        div[key$="CIRAND. MUNDO"] > button {{ background-color: {c_lavanda} !important; }}
-
-        /* Efeito de hover para os botões inferiores */
-        div[key^="btn_pad"] > button:hover {{
-            filter: brightness(0.9);
-            color: white !important;
-        }}
+        div[key$="SALA VERDE"] > button {{ background-color: {cor_verde} !important; }}
+        div[key$="SALA AZUL"] > button {{ background-color: {cor_azul} !important; }}
+        div[key$="CIRAND. MUNDO"] > button {{ background-color: {cor_lavanda} !important; }}
         </style>
     """, unsafe_allow_html=True)
 
-    # --- BLOCO DE GESTÃO (Colunas e Popovers) ---
-    gestao_col1, gestao_col2, gestao_col3, gestao_col4 = st.columns([1, 2.2, 1.3, 0.9])
+    # --- CONTAINER DE GESTÃO (A "TABELA") ---
+    with st.container(key="container_gestao"):
+        st.markdown("<p style='text-align: center; color: #888; font-size: 12px; margin-bottom: 10px;'>PAINEL DE GESTÃO</p>", unsafe_allow_html=True)
+        g_col1, g_col2, g_col3, g_col4 = st.columns([1, 2.2, 1.3, 0.9])
 
-    with gestao_col1:
-        with st.popover("➕ Matrícula", key="mat_popover", use_container_width=True):
-            st.markdown("##### 📝 Nova Matrícula")
-            # ... (seu código de inputs aqui)
+        with g_col1:
+            with st.popover("➕ Matrícula", key="mat_popover", use_container_width=True):
+                st.write("Novo Registro")
 
-    with gestao_col2:
-        with st.popover("🤝 Registro de Padrinho/Madrinha", key="pad_popover", use_container_width=True):
-            st.markdown("##### 🤝 Novo Apadrinhamento")
-            # ... (seu código de inputs aqui)
+        with g_col2:
+            with st.popover("🤝 Registro de Padrinho/Madrinha", key="pad_popover", use_container_width=True):
+                st.write("Apadrinhamento")
 
-    with gestao_col3:
-        with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
-            st.markdown("##### ⏳ Matrícula Estendida")
-            # ... (seu código de inputs aqui)
+        with g_col3:
+            with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
+                st.write("Estendido")
 
-    with gestao_col4:
-        with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
-            st.markdown("##### ⚠️ Zona de Exclusão")
-            # ... (seu código de inputs aqui)
+        with g_col4:
+            with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
+                st.write("Remover")
 
     st.divider()
 

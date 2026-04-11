@@ -771,28 +771,33 @@ elif menu == "📖 Turno Estendido":
         st.error(f"Erro ao ler a folha de cálculo: {e}")
         st.stop()
 
-    # --- 2. LOCALIZAR ALUNO (BUSCA MANUAL) ---
+    # --- 2. LOCALIZAR ALUNO ---
     st.write("### 🔍 Localizar Aluno")
     lista_nomes_completa = sorted(list(dict_alunos_geral.keys()))
     
     busca_nome = st.text_input("Digite o nome para buscar:", placeholder="Ex: João Silva...").strip().upper()
-    
     lista_filtrada = [n for n in lista_nomes_completa if busca_nome in n.upper()] if busca_nome else lista_nomes_completa
 
     if lista_filtrada:
         aluno_sel = st.selectbox(f"Selecione o Aluno:", lista_filtrada)
         
-        # IDENTIFICAÇÃO DA SALA (ESTILO PÍLULA DINÂMICA)
-        sala_do_aluno = dict_alunos_geral.get(aluno_sel, "SALA NÃO DEFINIDA")
-        # Busca a cor no TURMAS_CONFIG (ex: SALA AZUL -> C_AZUL)
-        cor_pilula = TURMAS_CONFIG.get(sala_do_aluno, {"cor": "#566573"})["cor"]
+        # IDENTIFICAÇÃO DA SALA COM COR DINÂMICA
+        sala_raw = dict_alunos_geral.get(aluno_sel, "NÃO DEFINIDA")
+        
+        # Lógica de Cor: Se for Ciranda do Mundo ou não encontrada, usa o Roxo (C_ROXO)
+        if "CIRAND" in sala_raw or "MUNDO" in sala_raw:
+            cor_pilula = C_ROXO
+        else:
+            # Busca no TURMAS_CONFIG (ex: SALA AZUL, SALA VERDE)
+            cor_pilula = TURMAS_CONFIG.get(sala_raw, {"cor": C_ROXO})["cor"]
         
         st.markdown(f"""
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
-                <span style="font-weight: bold; font-size: 14px;">Sala de Origem:</span>
-                <span style="background-color: {cor_pilula}; color: white; padding: 5px 15px; 
-                border-radius: 20px; font-weight: 800; font-size: 12px; border: 1px solid rgba(0,0,0,0.1);">
-                    {sala_do_aluno}
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 25px; background: #f8f9fa; padding: 10px; border-radius: 12px;">
+                <span style="font-weight: bold; font-size: 15px; color: #444;">Sala de Origem:</span>
+                <span style="background-color: {cor_pilula}; color: white; padding: 6px 18px; 
+                border-radius: 50px; font-weight: 800; font-size: 13px; letter-spacing: 0.5px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.2);">
+                    {sala_raw}
                 </span>
             </div>
         """, unsafe_allow_html=True)
@@ -806,7 +811,7 @@ elif menu == "📖 Turno Estendido":
         st.markdown(f"Diagnóstico atual: <span class='sala-badge' style='background:{C_ROXO}'>{ultimo_nv}</span>", unsafe_allow_html=True)
         render_legenda_niveis()
 
-        # --- 4. FORMULÁRIO DE AVALIAÇÃO (COM ANO E ETAPA JUNTOS) ---
+        # --- 4. FORMULÁRIO DE AVALIAÇÃO ---
         st.write("### 📝 Critérios de Avaliação")
         
         try:
@@ -815,8 +820,8 @@ elif menu == "📖 Turno Estendido":
             
         novo_nv = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_ini)
 
-        with st.form("form_te_unificado"):
-            # O Ano Letivo movido para cá, conforme solicitado
+        with st.form("form_te_estendido_v2"):
+            # Ano e Etapa conforme solicitado
             ano_form = st.selectbox("Ano Letivo da Avaliação:", [2026, 2025])
             etapa_av = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
             
@@ -825,14 +830,14 @@ elif menu == "📖 Turno Estendido":
             evs = EVIDENCIAS_POR_NIVEL.get(novo_nv, [])
             st.write(f"**Evidências observadas para {novo_nv}:**")
             cols_ev = st.columns(3)
-            selecionadas = [ev for i, ev in enumerate(evs) if cols_ev[i%3].checkbox(ev, key=f"ev_te_f_{i}")]
+            selecionadas = [ev for i, ev in enumerate(evs) if cols_ev[i%3].checkbox(ev, key=f"ev_te_final_{i}")]
             
             obs_txt = st.text_area("Observações Adicionais:")
             
             if st.form_submit_button("🚀 Salvar Avaliação"):
                 sucesso = registrar_turno_estendido(
                     aluno=aluno_sel,
-                    sala=sala_do_aluno,
+                    sala=sala_raw,
                     avaliacao_tipo=etapa_av,
                     nivel=novo_nv,
                     evidencias_list=selecionadas,
@@ -841,11 +846,11 @@ elif menu == "📖 Turno Estendido":
                 )
                 
                 if sucesso:
-                    st.success(f"Avaliação de {aluno_sel} salva!")
+                    st.success(f"Avaliação de {aluno_sel} gravada com sucesso!")
                     st.cache_data.clear()
                     st.rerun()
     else:
-        st.warning("Nenhum aluno encontrado.")
+        st.warning("Nenhum aluno encontrado com este nome.")
 # --- ABA: DADOS - TURNO ESTENDIDO (ATUALIZADO COM CORES E LEGENDA) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("""

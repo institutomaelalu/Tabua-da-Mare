@@ -534,17 +534,22 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 
                 if st.button("Confirmar Turno Estendido", use_container_width=True):
                     try:
-                        # AGORA IDENTADO: Tudo dentro do try precisa de 4 espaços a mais
-                        sh = conn._instance.client.open_by_key(st.secrets["connections"]["gsheets"]["spreadsheet"])
+                        # Caminho compatível para acessar o gspread através da conexão
+                        if hasattr(conn, "_instance"):
+                            client = conn._instance.client
+                        else:
+                            client = conn.session.client
+                        
+                        # Abre a planilha e a aba
+                        sh = client.open_by_key(st.secrets["connections"]["gsheets"]["spreadsheet"])
                         ws = sh.worksheet("TURNO_ESTENDIDO")
                         
                         for aluno in selecionados:
-                            # Tudo dentro do for precisa de mais 4 espaços
                             ws.append_row([aluno.upper(), s_est])
                         
-                        st.success(f"{len(selecionados)} alunos adicionados ao Turno Estendido!")
+                        st.success(f"{len(selecionados)} alunos adicionados!")
                         st.cache_data.clear()
-                        st.rerun() 
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao salvar: {e}")
         with g_col4:

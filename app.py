@@ -548,7 +548,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
         with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
             st.markdown("##### ⏳ Matricular no Turno Estendido")
             
-            # Seleção do aluno (baseado na lista da aba GERAL)
+            # Seleção do aluno (baseado na lista da aba GERAL carregada anteriormente)
             al_mat = st.selectbox("Selecione o Aluno:", lista_alunos_geral, key="sel_aluno_matricula_te")
             
             if st.button("✅ Confirmar Matrícula", key="btn_confirmar_te"):
@@ -559,35 +559,35 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                         info_aluno = df_geral[df_geral["ALUNO"] == al_mat]
                         
                         if not info_aluno.empty:
-                            # Tenta pegar da coluna 'SALA' ou 'TURMA' (ajuste conforme o nome exato na sua planilha GERAL)
-                            sala_origem = info_aluno["SALA"].values[0] if "SALA" in df_geral.columns else info_aluno["TURMA"].values[0]
+                            # Tenta pegar da coluna 'SALA' ou 'TURMA' conforme a estrutura da sua planilha GERAL
+                            col_sala = "SALA" if "SALA" in df_geral.columns else "TURMA"
+                            sala_origem = info_aluno[col_sala].values[0]
                             
-                            # --- ENVIO SIMPLIFICADO ---
-                            # Chamamos a função de registro enviando apenas Nome e Sala
-                            # Nível e Obs são enviados como "-" ou vazios para não "poluir" a sheet
+                            # --- ENVIO PARA PLANILHA (CÉLULAS DE AVALIAÇÃO EM BRANCO) ---
+                            # Enviamos strings vazias "" para Diagnóstico e Obs para não preencher com "-"
                             sucesso = registrar_turno_estendido(
                                 aluno=al_mat,
                                 sala=sala_origem,
                                 avaliacao_tipo="MATRÍCULA",
-                                nivel="-",           # Valor nulo para diagnóstico
-                                evidencias_list=[],  # Lista vazia
-                                obs="-",             # Valor nulo para observação
+                                nivel="",           # Célula de diagnóstico vazia
+                                evidencias_list=[],  # Lista de checkboxes vazia
+                                obs="",             # Célula de observação vazia
                                 ano=2026
                             )
                             
                             if sucesso:
-                                st.success(f"✅ {al_mat} ({sala_origem}) matriculado!")
-                                st.cache_data.clear()
+                                st.success(f"✅ {al_mat} ({sala_origem}) matriculado com sucesso!")
+                                st.cache_data.clear() # Limpa o cache para atualizar a lista na aba de avaliação
                                 st.rerun()
                             else:
-                                st.error("Falha ao salvar na planilha.")
+                                st.error("Erro técnico: Não foi possível gravar na planilha.")
                         else:
-                            st.error("Aluno não encontrado na base Geral para identificar a sala.")
+                            st.error("Erro: Este aluno não foi encontrado na base GERAL para identificar a sala.")
                             
                     except Exception as e:
                         st.error(f"Erro ao processar matrícula: {e}")
                 else:
-                    st.warning("Selecione um aluno.")
+                    st.warning("Por favor, selecione um aluno antes de confirmar.")
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
             st.radio("Remover:", ["Aluno", "Padrinho"])

@@ -422,80 +422,85 @@ st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Institu
 
 # --- ABAS ---
 # Certifique-se de que na sua sidebar o texto seja EXATAMENTE: 📝 Controle de Matrícula e Apadrinhamento
+# --- ABAS ---
 if menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
     st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     
-    # --- CSS DEFINITIVO PARA BOTÕES BRANCOS COM TEXTO COLORIDO E NEGRITO ---
-    # Pegamos as cores diretamente da configuração das salas
-    cor_rosa = TURMAS_CONFIG["SALA ROSA"]["cor"]
-    cor_amarela = TURMAS_CONFIG["SALA AMARELA"]["cor"]
-    cor_verde = TURMAS_CONFIG["SALA VERDE"]["cor"]
-    cor_azul = TURMAS_CONFIG["SALA AZUL"]["cor"]
+    # Cores da Identidade Visual
+    cores = {
+        "ROSA": "#F783AC",
+        "AMARELO": "#FFE066",
+        "VERDE": "#A9E34B",
+        "AZUL": "#99E9F2",
+        "LAVANDA": "#D0BFFF"
+    }
 
+    # --- CSS CUSTOMIZADO ---
     st.markdown(f"""
         <style>
-        /* Estilo base para todos os popovers de gestão para inverter cores */
+        /* 1. BOTÕES DE GESTÃO (POPOVERS SUPERIORES) - FUNDO BRANCO, TEXTO COLORIDO */
         div[data-testid="stPopover"] > button {{
             background-color: white !important;
             font-weight: bold !important;
-            border-radius: 5px;
-            use_container_width: True;
+            border-radius: 8px;
+            transition: 0.3s;
         }}
 
-        /* --- Cores Específicas para CADA Botão (Texto e Borda) --- */
-        
-        /* 1. Botão Matrícula (SALA ROSA) */
-        div[key="mat_popover"] > button {{
-            color: {cor_rosa} !important;
-            border: 2px solid {cor_rosa} !important;
-        }}
-        /* Efeito hover para o botão Rosa */
-        div[key="mat_popover"] > button:hover {{
-            background-color: {cor_rosa}1A !important; /* 10% de opacidade da cor rosa */
-        }}
+        /* Cores específicas para as bordas e textos dos popovers */
+        div[key="mat_popover"] > button {{ color: {cores['ROSA']} !important; border: 2px solid {cores['ROSA']} !important; }}
+        div[key="pad_popover"] > button {{ color: {cores['AMARELO']} !important; border: 2px solid {cores['AMARELO']} !important; }}
+        div[key="est_popover"] > button {{ color: {cores['VERDE']} !important; border: 2px solid {cores['VERDE']} !important; }}
+        div[key="del_popover"] > button {{ color: {cores['AZUL']} !important; border: 2px solid {cores['AZUL']} !important; }}
 
-        /* 2. Botão Registro de Padrinho/Madrinha (SALA AMARELA) */
-        div[key="pad_popover"] > button {{
-            color: {cor_amarela} !important;
-            border: 2px solid {cor_amarela} !important;
-        }}
-        /* Efeito hover para o botão Amarelo */
-        div[key="pad_popover"] > button:hover {{
-            background-color: {cor_amarela}1A !important;
-        }}
-
-        /* 3. Botão Turno Estendido (SALA VERDE) */
-        div[key="est_popover"] > button {{
-            color: {cor_verde} !important;
-            border: 2px solid {cor_verde} !important;
-        }}
-        /* Efeito hover para o botão Verde */
-        div[key="est_popover"] > button:hover {{
-            background-color: {cor_verde}1A !important;
-        }}
-
-        /* 4. Botão Remover (SALA AZUL) */
-        div[key="del_popover"] > button {{
-            color: {cor_azul} !important;
-            border: 2px solid {cor_azul} !important;
-        }}
-        /* Efeito hover para o botão Azul */
-        div[key="del_popover"] > button:hover {{
-            background-color: {cor_azul}1A !important;
-        }}
-
-        /* Força o negrito também nos parágrafos dentro dos botões (para garantir) */
-        div[data-testid="stPopover"] p {{
+        /* 2. BOTÕES DE SELEÇÃO DE SALAS (INFERIORES) - COLORIDOS, TEXTO BRANCO */
+        div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button {{
+            color: white !important;
             font-weight: bold !important;
+            border: none !important;
+            border-radius: 8px;
+            text-transform: uppercase;
         }}
+        
+        /* Aplicando as cores de fundo para os botões das salas */
+        div[key="btn_rosa"] > button {{ background-color: {cores['ROSA']} !important; }}
+        div[key="btn_amarela"] > button {{ background-color: {cores['AMARELO']} !important; }}
+        div[key="btn_verde"] > button {{ background-color: {cores['VERDE']} !important; }}
+        div[key="btn_azul"] > button {{ background-color: {cores['AZUL']} !important; }}
+        div[key="btn_lavanda"] > button {{ background-color: {cores['LAVANDA']} !important; }}
+        
         </style>
     """, unsafe_allow_html=True)
 
-    # --- BLOCO DE GESTÃO (BOTÕES +) ---
-    # Usamos colunas para alinhamento e largura total.
-    # O botão Amarelo agora está na mesma linha e preenche o espaço.
-    gestao_col1, gestao_col2, gestao_col3, gestao_col4 = st.columns([1.1, 2.3, 1.4, 1.2])
+    # --- BLOCO DE GESTÃO (SUPERIOR) ---
+    col_gestao = st.columns([1, 1.8, 1.2, 0.8])
+
+    with col_gestao[0]:
+        with st.popover("➕ Matrícula", key="mat_popover", use_container_width=True):
+            st.write("Conteúdo Matrícula")
+
+    with col_gestao[1]:
+        with st.popover("🤝 Registro de Padrinho/Madrinha", key="pad_popover", use_container_width=True):
+            st.write("Conteúdo Padrinho")
+
+    with col_gestao[2]:
+        with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
+            st.write("Conteúdo Turno Estendido")
+
+    with col_gestao[3]:
+        with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
+            st.write("Conteúdo Remover")
+
+    st.divider()
+
+    # --- BOTÕES DAS SALAS (INFERIOR - FORMATO COLORIDO) ---
+    col_salas = st.columns(5)
+    
+    with col_salas[0]: st.button("SALA ROSA", key="btn_rosa", use_container_width=True)
+    with col_salas[1]: st.button("SALA AMARELA", key="btn_amarela", use_container_width=True)
+    with col_salas[2]: st.button("SALA VERDE", key="btn_verde", use_container_width=True)
+    with col_salas[3]: st.button("SALA AZUL", key="btn_azul", use_container_width=True)
+    with col_salas[4]: st.button("CIRAND. MUNDO", key="btn_lavanda", use_container_width=True)
 
     # 1. MATRÍCULA REGULAR (SALA ROSA - Cor Rosa)
     with gestao_col1:

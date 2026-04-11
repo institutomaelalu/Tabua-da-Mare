@@ -422,7 +422,7 @@ st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Institu
 
 # --- ABAS ---
 # Certifique-se de que na sua sidebar o texto seja EXATAMENTE: 📝 Controle de Matrícula e Apadrinhamento
-elif menu == "📝 Controle de Matrícula e Apadrinhamento":
+if menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
     st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     

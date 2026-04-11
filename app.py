@@ -532,23 +532,28 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 
                 if st.button("Confirmar Turno Estendido", use_container_width=True):
                     try:
-                        # 1. Localiza o cliente gspread de forma ultra-segura
+                        # 1. Busca o cliente gspread de forma exaustiva
                         client = None
                         
-                        # Tentativa A: Atributo client direto (comum em versões recentes)
+                        # Tenta encontrar o atributo que contém o 'open_by_key'
                         if hasattr(conn, "client"):
                             client = conn.client
-                        # Tentativa B: Através do _instance (comum em versões estáveis)
                         elif hasattr(conn, "_instance") and hasattr(conn._instance, "client"):
                             client = conn._instance.client
-                        # Tentativa C: Através da session
                         elif hasattr(conn, "session") and hasattr(conn.session, "client"):
                             client = conn.session.client
                         
-                        if client is None:
-                            st.error("Não foi possível acessar o driver de escrita. Verifique as configurações.")
+                        # Se o 'client' ainda for o wrapper, pegamos o atributo interno dele
+                        if client and not hasattr(client, "open_by_key"):
+                            if hasattr(client, "_client"):
+                                client = client._client
+                            elif hasattr(client, "service"):
+                                client = client.service
+
+                        if client is None or not hasattr(client, "open_by_key"):
+                            st.error("Não foi possível acessar o driver de escrita gspread.")
                         else:
-                            # 2. Acesso à planilha - O segredo está em usar o client correto
+                            # 2. Execução da escrita
                             spreadsheet_id = st.secrets["connections"]["gsheets"]["spreadsheet"]
                             sh = client.open_by_key(spreadsheet_id)
                             ws = sh.worksheet("TURNO_ESTENDIDO")
@@ -561,8 +566,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                             st.rerun()
                             
                     except Exception as e:
-                        # Se falhar o open_by_key, tentamos por título como último recurso
-                        st.error(f"Erro ao salvar: {e}")
+                        st.error(f"Erro técnico ao salvar: {e}")
 
         with g_col4:
             with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):

@@ -530,48 +530,48 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             selecionados = st.multiselect("Selecione os alunos:", lista_est)
             
             if st.button("Confirmar Matrícula no Turno Estendido"):
-    if selecionados:
-        try:
-            # 1. Conexão robusta usando gspread puro para garantir a escrita
-            import gspread
-            from google.oauth2.service_account import Credentials
-            
-            scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-            creds = Credentials.from_service_account_info(st.secrets["connections"]["gsheets"], scopes=scope)
-            gc = gspread.authorize(creds)
-            
-            # 2. Abre a planilha e a aba correta
-            sh = gc.open(nome_planilha)
-            ws = sh.worksheet("TURNO_ESTENDIDO")
-            
-            ano_atual = datetime.now().strftime("%Y")
-            
-            # 3. Itera sobre os alunos selecionados no multiselect
-            for aluno in selecionados:
-                # Criamos a linha com as 9 colunas da sua planilha:
-                # [ALUNO, SALA, 1 AVAL, 2 AVAL, 3 AVAL, ANO, DIAGNÓSTICO, EVIDÊNCIAS, OBSERVAÇÕES]
-                # Deixamos as colunas de avaliação e pedagógicas vazias ("") para preenchimento posterior
-                nova_linha = [
-                    aluno.upper(), # ALUNO
-                    s_est,         # SALA
-                    "",            # 1 AVALIAÇÃO
-                    "",            # 2 AVALIAÇÃO
-                    "",            # 3 AVALIAÇÃO
-                    ano_atual,     # ANO
-                    "",            # DIAGNÓSTICO
-                    "",            # EVIDÊNCIAS
-                    ""             # OBSERVAÇÕES PEDAGÓGICAS
-                ]
-                ws.append_row(nova_linha)
-            
-            st.success(f"✅ {len(selecionados)} aluno(s) registrados no Turno Estendido!")
-            st.cache_data.clear() # Força o app a ler os dados novos do Google Sheets
-            st.rerun()
-            
-        except Exception as e:
-            st.error(f"Erro ao acessar o Google Sheets: {e}")
-    else:
-        st.warning("Selecione pelo menos um aluno.")
+            if selecionados:
+                try:
+                    # 1. Conexão robusta usando gspread puro para garantir a escrita
+                    import gspread
+                    from google.oauth2.service_account import Credentials
+                    
+                    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+                    creds = Credentials.from_service_account_info(st.secrets["connections"]["gsheets"], scopes=scope)
+                    gc = gspread.authorize(creds)
+                    
+                    # 2. Abre a planilha e a aba correta
+                    sh = gc.open(nome_planilha)
+                    ws = sh.worksheet("TURNO_ESTENDIDO")
+                    
+                    ano_atual = datetime.now().strftime("%Y")
+                    
+                    # 3. Itera sobre os alunos selecionados no multiselect
+                    for aluno in selecionados:
+                        # Criamos a linha com as 9 colunas da sua planilha:
+                        # [ALUNO, SALA, 1 AVAL, 2 AVAL, 3 AVAL, ANO, DIAGNÓSTICO, EVIDÊNCIAS, OBSERVAÇÕES]
+                        # Deixamos as colunas de avaliação e pedagógicas vazias ("") para preenchimento posterior
+                        nova_linha = [
+                            aluno.upper(), # ALUNO
+                            s_est,         # SALA
+                            "",            # 1 AVALIAÇÃO
+                            "",            # 2 AVALIAÇÃO
+                            "",            # 3 AVALIAÇÃO
+                            ano_atual,     # ANO
+                            "",            # DIAGNÓSTICO
+                            "",            # EVIDÊNCIAS
+                            ""             # OBSERVAÇÕES PEDAGÓGICAS
+                        ]
+                        ws.append_row(nova_linha)
+                    
+                    st.success(f"✅ {len(selecionados)} aluno(s) registrados no Turno Estendido!")
+                    st.cache_data.clear() # Força o app a ler os dados novos do Google Sheets
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"Erro ao acessar o Google Sheets: {e}")
+            else:
+                st.warning("Selecione pelo menos um aluno.")
 
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):

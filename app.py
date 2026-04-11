@@ -33,51 +33,30 @@ ID_PLANILHA = "1Zj8u67oAWKgYRd2uOkGssdaxXnwdsKsZBDxeLChnBr4"
 nome_planilha = "APP_IMLA"
 sheet_id = nome_planilha
 
-# --- 1. ESTABELECER CONEXÃO ---
+# 1. CONFIGURAÇÃO E ESTILO (Sempre o primeiro comando Streamlit)
+st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
+# --- 1. ESTABELECER CONEXÃO (OBRIGATÓRIO SER AQUI) ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- NOVO: MOTOR DE CACHE (ADICIONE AQUI) ---
-@st.cache_data(ttl=600)
-def carregar_dados_globais(aba):
-    """
-    Função centralizada para leitura com cache. 
-    O parâmetro 'aba' permite que ela seja usada para qualquer planilha.
-    """
-    try:
-        # ttl=None dentro do read é vital para o st.cache_data gerenciar o tempo
-        df = conn.read(worksheet=aba, ttl=None).fillna("")
-        df.columns = [str(c).strip().upper() for c in df.columns]
-        return df
-    except Exception as e:
-        st.error(f"Erro ao carregar a aba {aba}: {e}")
-        return pd.DataFrame()
-
-# --- 2. CARREGAMENTO INICIAL (SUBSTITUA O SEU POR ESTE) ---
-@st.cache_data(ttl=600)  # Mantém os dados por 10 minutos na memória
-def carregar_dados_globais():
-    # 1. Base Geral
+# --- 2. CARREGAMENTO INICIAL ---
+try:
+    # 1. Base Geral de Alunos
     df_g = conn.read(worksheet="GERAL").fillna("")
     df_g.columns = [str(c).strip().upper() for c in df_g.columns]
     
-    # 2. Turno Estendido
-    df_te = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
-    df_te.columns = [str(c).strip().upper() for c in df_te.columns]
+    # 2. Base do Turno Estendido (Substitui o ALF_FILE)
+    df_alf = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
+    df_alf.columns = [str(c).strip().upper() for c in df_alf.columns]
 
-    # 3. Tábua da Maré
-    df_tm = conn.read(worksheet="TABUA_MARE").fillna("")
-    df_tm.columns = [str(c).strip().upper() for c in df_tm.columns]
+    # 3. Base da Tábua da Maré (Substitui o AVAL_FILE)
+    df_aval = conn.read(worksheet="TABUA_MARE").fillna("")
+    df_aval.columns = [str(c).strip().upper() for c in df_aval.columns]
     
-    # 4. Criar o dicionário de alunos do TE para navegação rápida
-    dict_te = {
-        str(row["ALUNO"]).strip(): str(row["SALA"]).strip().upper() 
-        for _, row in df_te.iterrows() if "ALUNO" in df_te.columns
-    }
-    
-    return df_g, df_te, df_tm, dict_te
-
-# Chame a função uma única vez no início do código
-df_g, df_alf, df_aval, dict_alunos_te = carregar_dados_globais()
-st.session_state["alunos_te_dict"] = dict_alunos_te
+except Exception as e:
+    st.error(f"Erro ao carregar dados da nuvem: {e}")
+    df_g = pd.DataFrame(columns=["ALUNO", "TURNO", "COMUNIDADE", "SALA"])
+    df_alf = pd.DataFrame(columns=["ALUNO", "SALA", "ANO", "AVALIAÇÃO", "DIAGNÓSTICO"])
+    df_aval = pd.DataFrame(columns=["ALUNO", "SEMESTRE"] + CATEGORIAS)
 
 # --- 3. FUNÇÕES DE FILTRO (Ajustadas para os novos nomes) ---
 def render_filtros(df_geral, key_suffix):
@@ -298,18 +277,13 @@ def get_gspread_client():
     creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
     return gspread.authorize(creds)
 
-@st.cache_data(ttl=600)  # Protege a API: só busca dados novos a cada 10 minutos
 def safe_read(worksheet_name):
-    """Lê uma aba específica com cache para evitar excesso de chamadas à API."""
     try:
-        # Importante: ttl=None aqui para não conflitar com o cache do Streamlit
-        df = conn.read(worksheet=worksheet_name, ttl=None).fillna("")
-        
-        # Padronização de colunas (R&D Standard)
+        # Simplificando a leitura
+        df = conn.read(worksheet=worksheet_name).fillna("")
         df.columns = [str(c).strip().upper() for c in df.columns]
         return df
-    except Exception as e:
-        # Se a aba não existir ou houver erro de conexão, retorna um DataFrame vazio
+    except: 
         return pd.DataFrame()
 
 def render_filtros(df_geral, key_suffix):
@@ -428,8 +402,7 @@ if not st.session_state.logado:
                 else:
                     encontrado = False
                     for sala in TURMAS_CONFIG.keys():
-                        # Filtra os alunos da base geral que pertencem a essa sala
-                        df_s = df_g[df_g["SALA"] == sala]
+                        df_s = safe_read(sala)
                         if not df_s.empty and "PADRINHO/MADRINHA" in df_s.columns:
                             if u in df_s["PADRINHO/MADRINHA"].astype(str).str.strip().str.upper().unique():
                                 encontrado = True; break
@@ -776,31 +749,29 @@ elif menu == "📊 Avaliação da Tábua da Maré":
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
 
-    # 1. LEITURA VIA MOTOR (Rápido e Seguro)
-    # Certifique-se que carregar_dados_globais(aba) está definida no topo com @st.cache_data
-    df_logica = carregar_dados_globais("TURNO_ESTENDIDO")
+    try:
+        # 1. LEITURA FRESH
+        df_h = conn.read(worksheet="TURNO_ESTENDIDO", ttl=0).fillna("")
+        df_logica = df_h.copy()
+        df_logica.columns = [str(c).strip().upper() for c in df_logica.columns]
+        
+        col_diag = next((c for c in ["NIVEL", "DIAGNÓSTICO", "NÍVEL", "DIAGNOSTICO"] if c in df_logica.columns), None)
+        col_aluno = "ALUNO" if "ALUNO" in df_logica.columns else None
+        col_sala = "SALA" if "SALA" in df_logica.columns else None
 
-    if df_logica.empty:
-        st.error("Não foi possível carregar os dados da aba TURNO_ESTENDIDO.")
+        if not df_logica.empty and col_aluno and col_sala:
+            dict_alunos_geral = {
+                str(row[col_aluno]).strip(): str(row[col_sala]).strip().upper() 
+                for _, row in df_logica.iterrows() if str(row[col_aluno]).strip()
+            }
+        else:
+            dict_alunos_geral = {}
+
+    except Exception as e:
+        st.error(f"Erro ao ler a folha de cálculo: {e}")
         st.stop()
 
-    # 2. IDENTIFICAÇÃO DINÂMICA DE COLUNAS
-    # Usamos list comprehension para garantir que pegamos o nome exato da coluna no DF
-    col_diag = next((c for c in ["DIAGNÓSTICO", "NÍVEL", "NIVEL", "DIAGNOSTICO"] if c in df_logica.columns), None)
-    col_aluno = next((c for c in ["ALUNO", "NOME"] if c in df_logica.columns), None)
-    col_sala = next((c for c in ["SALA", "TURMA"] if c in df_logica.columns), None)
-
-    # 3. CONSTRUÇÃO DO DICIONÁRIO (Em memória)
-    if col_aluno and col_sala:
-        dict_alunos_geral = {
-            str(row[col_aluno]).strip(): str(row[col_sala]).strip().upper() 
-            for _, row in df_logica.iterrows() if str(row[col_aluno]).strip()
-        }
-    else:
-        st.error("Colunas essenciais (ALUNO/SALA) não encontradas na planilha.")
-        st.stop()
-
-    # --- 4. LOCALIZAR ALUNO ---
+    # --- 2. LOCALIZAR ALUNO ---
     st.write("### 🔍 Localizar Aluno")
     lista_nomes_completa = sorted(list(dict_alunos_geral.keys()))
     
@@ -810,20 +781,29 @@ elif menu == "📖 Turno Estendido":
     if lista_filtrada:
         aluno_sel = st.selectbox(f"Selecione o Aluno:", lista_filtrada)
         
-        # IDENTIFICAÇÃO DA SALA
+        # IDENTIFICAÇÃO DA SALA COM COR DINÂMICA (CORREÇÃO DE CORES)
         sala_raw = dict_alunos_geral.get(aluno_sel, "NÃO DEFINIDA")
         
-        # Lógica de Cores
-        cor_pilula = C_ROXO
-        if "AZUL" in sala_raw: cor_pilula = C_AZUL
-        elif "VERDE" in sala_raw: cor_pilula = C_VERDE
-        elif "ROSA" in sala_raw: cor_pilula = C_ROSA
-        elif "AMARELA" in sala_raw or "AMARELO" in sala_raw: cor_pilula = C_AMARELO
+        # 1. Tenta encontrar a cor exata ou aproximada
+        cor_pilula = C_ROXO # Padrão
+        
+        if "AZUL" in sala_raw:
+            cor_pilula = C_AZUL
+        elif "VERDE" in sala_raw:
+            cor_pilula = C_VERDE
+        elif "ROSA" in sala_raw:
+            cor_pilula = C_ROSA
+        elif "AMARELA" in sala_raw or "AMARELO" in sala_raw:
+            cor_pilula = C_AMARELO
+        elif "CIRAND" in sala_raw or "MUNDO" in sala_raw:
+            cor_pilula = C_ROXO # Identidade do App
         
         st.markdown(f"""
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 25px; background: #f8f9fa; padding: 10px; border-radius: 12px; border-left: 5px solid {cor_pilula};">
                 <span style="font-weight: bold; font-size: 15px; color: #444;">Sala de Origem:</span>
-                <span style="background-color: {cor_pilula}; color: white; padding: 6px 18px; border-radius: 50px; font-weight: 800; font-size: 13px;">
+                <span style="background-color: {cor_pilula}; color: white; padding: 6px 18px; 
+                border-radius: 50px; font-weight: 800; font-size: 13px; letter-spacing: 0.5px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.2);">
                     {sala_raw}
                 </span>
             </div>
@@ -831,45 +811,38 @@ elif menu == "📖 Turno Estendido":
         
         st.divider()
 
-        # --- 5. DIAGNÓSTICO ATUAL ---
-        df_al = df_logica[df_logica[col_aluno].astype(str).str.strip() == aluno_sel]
-        ultimo_nv = "Sem registro"
-        if not df_al.empty and col_diag:
-            # Pega o último diagnóstico registrado (última linha)
-            ultimo_nv = str(df_al[col_diag].iloc[-1]).strip()
+        # --- 3. LEGENDA DE NÍVEIS ---
+        df_al = df_logica[df_logica["ALUNO"].astype(str).str.strip() == aluno_sel]
+        ultimo_nv = df_al[col_diag].iloc[-1] if not df_al.empty and col_diag else "Sem registro"
         
         st.markdown(f"Diagnóstico atual: <span class='sala-badge' style='background:{C_ROXO}'>{ultimo_nv}</span>", unsafe_allow_html=True)
         render_legenda_niveis()
 
-        # --- 6. FORMULÁRIO DE AVALIAÇÃO ---
+        # --- 4. FORMULÁRIO DE AVALIAÇÃO ---
         st.write("### 📝 Critérios de Avaliação")
         
-        idx_ini = 0
-        if ultimo_nv in NIVEIS_ALF:
-            idx_ini = NIVEIS_ALF.index(ultimo_nv)
+        try:
+            idx_ini = NIVEIS_ALF.index(ultimo_nv) if ultimo_nv in NIVEIS_ALF else 0
+        except: idx_ini = 0
             
         novo_nv = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_ini)
 
         with st.form("form_te_unificado_v3"):
-            col1, col2 = st.columns(2)
-            ano_form = col1.selectbox("Ano Letivo:", [2026, 2025])
-            etapa_av = col2.selectbox("Etapa:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
+            # Ano e Etapa conforme solicitado
+            ano_form = st.selectbox("Ano Letivo da Avaliação:", [2026, 2025])
+            etapa_av = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
             
             st.divider()
             
             evs = EVIDENCIAS_POR_NIVEL.get(novo_nv, [])
             st.write(f"**Evidências observadas para {novo_nv}:**")
-            
             cols_ev = st.columns(3)
-            selecionadas = []
-            for i, ev in enumerate(evs):
-                if cols_ev[i%3].checkbox(ev, key=f"ev_final_te_{i}"):
-                    selecionadas.append(ev)
+            selecionadas = [ev for i, ev in enumerate(evs) if cols_ev[i%3].checkbox(ev, key=f"ev_final_te_{i}")]
             
             obs_txt = st.text_area("Observações Adicionais:")
             
             if st.form_submit_button("🚀 Salvar Avaliação"):
-                if registrar_turno_estendido(
+                sucesso = registrar_turno_estendido(
                     aluno=aluno_sel,
                     sala=sala_raw,
                     avaliacao_tipo=etapa_av,
@@ -877,9 +850,11 @@ elif menu == "📖 Turno Estendido":
                     evidencias_list=selecionadas,
                     obs=obs_txt,
                     ano=int(ano_form)
-                ):
-                    st.success(f"Avaliação gravada!")
-                    st.cache_data.clear() # Limpa para o próximo carregamento ler o dado novo
+                )
+                
+                if sucesso:
+                    st.success(f"Avaliação de {aluno_sel} gravada com sucesso!")
+                    st.cache_data.clear()
                     st.rerun()
     else:
         st.warning("Nenhum aluno encontrado.")
@@ -1235,15 +1210,7 @@ elif menu == "🌊 Tábua da Maré":
     df_av = df_aval.copy()
     df_av.columns = [str(c).strip().upper() for c in df_av.columns]
     
-    # --- BUSCA SEGURA DA COLUNA SALA ---
-# Verifica qual é o nome real da coluna (evita erro se for 'Sala', 'sala' ou 'SALA')
-colunas_disponiveis = [str(c).upper() for c in df_g.columns]
-
-if "SALA" in colunas_disponiveis:
-    df_s = df_g[df_g["SALA"] == st.session_state.sel_int]
-else:
-    # Se não achar a coluna SALA, tenta ler a aba individual como fazíamos antes (fallback)
-    st.warning("Coluna 'SALA' não encontrada na Base Geral. Tentando leitura direta...")
+    # Leitura segura da aba selecionada
     df_s = safe_read(st.session_state.sel_int)
     
     if not df_s.empty:

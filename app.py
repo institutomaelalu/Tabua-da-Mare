@@ -760,9 +760,9 @@ elif menu == "📖 Turno Estendido":
         # Coluna de diagnóstico flexível
         col_diag = next((c for c in ["NIVEL", "DIAGNÓSTICO", "NÍVEL"] if c in df_logica.columns), None)
 
-        # Mapeamento robusto: Criamos chaves limpas para Aluno e Sala
+        # Mapeamento robusto: Aluno -> Sala
         if not df_logica.empty and "ALUNO" in df_logica.columns and "SALA" in df_logica.columns:
-            # Criamos uma lista de dicionários normalizada para garantir o de-para
+            # Criamos o dicionário limpando tudo para não haver erro de comparação
             dict_alunos_te = {
                 str(row["ALUNO"]).strip(): str(row["SALA"]).strip().upper() 
                 for _, row in df_logica.iterrows()
@@ -776,35 +776,37 @@ elif menu == "📖 Turno Estendido":
 
     # --- 1. SELEÇÃO DE ANO (LISTA/SELECTBOX) ---
     st.write("### 📅 Período da Avaliação")
-    ano_selecionado = st.selectbox("Selecione o Ano Letivo:", [2026, 2025], index=0)
-    st.session_state.ano_registro_te = ano_selecionado
+    # Removidos os botões, agora é uma lista suspensa
+    ano_opcoes = [2026, 2025]
+    st.session_state.ano_registro_te = st.selectbox("Selecione o Ano Letivo:", ano_opcoes)
     
-    # Mensagem de confirmação abaixo da lista
     st.info(f"📍 **Avaliação referente ao ano de {st.session_state.ano_registro_te}**")
     st.divider()
 
     # --- 2. BOTÕES DAS SALAS (APENAS AZUL, VERDE E CIRAND. MUNDO) ---
     salas_especificas = ["SALA AZUL", "SALA VERDE", "CIRAND. MUNDO"]
     
+    # Garante que a sala selecionada seja uma das permitidas
     if "sel_te_aba" not in st.session_state or st.session_state.sel_te_aba not in salas_especificas:
         st.session_state.sel_te_aba = "SALA AZUL"
     
-    # Usa a função oficial de botões filtrando apenas as 3 permitidas
+    # Chama sua função oficial do topo para manter a identidade visual (Rosa, Verde, etc)
     render_botoes_salas("btn_te_restrito", "sel_te_aba", salas_permitidas=salas_especificas)
     
-    sala_atual = st.session_state.sel_te_aba.strip().upper()
+    # Variável para comparação (Normalizada)
+    sala_alvo_comparacao = st.session_state.sel_te_aba.strip().upper()
     
-    # FILTRAGEM: Busca alunos cujo nome da sala na planilha bate com o botão (ambos em UPPER e sem espaços)
+    # FILTRAGEM DE ALUNOS: Compara a sala da planilha com a sala do botão
     alunos_da_sala = [
         nome for nome, sala in dict_alunos_te.items() 
-        if sala == sala_selecionada
+        if sala == sala_alvo_comparacao
     ]
     
     if alunos_da_sala:
         aluno_sel = st.selectbox("Selecione o Aluno:", sorted(list(set(alunos_da_sala))))
         
-        # --- 3. LEGENDA DE NÍVEIS ---
-        # Filtra histórico do aluno no ano específico para mostrar o último nível
+        # --- 3. LEGENDA DE NÍVEIS (FUNÇÃO OFICIAL) ---
+        # Busca histórico para o ano selecionado
         df_al = df_logica[
             (df_logica["ALUNO"].astype(str).str.strip() == aluno_sel) & 
             (df_logica["ANO"].astype(str).str.contains(str(st.session_state.ano_registro_te)))
@@ -824,13 +826,13 @@ elif menu == "📖 Turno Estendido":
             
         novo_nv = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_ini)
 
-        with st.form("f_te_final_final"):
+        with st.form("f_te_final_ajustado"):
             etapa_av = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
             evs = EVIDENCIAS_POR_NIVEL.get(novo_nv, [])
             
             st.write(f"**Evidências observadas para {novo_nv}:**")
             c_ev = st.columns(3)
-            selecionadas = [ev for i, ev in enumerate(evs) if c_ev[i%3].checkbox(ev, key=f"chk_te_def_{i}")]
+            selecionadas = [ev for i, ev in enumerate(evs) if c_ev[i%3].checkbox(ev, key=f"chk_te_ok_{i}")]
             
             obs_txt = st.text_area("Observações Adicionais:")
             
@@ -850,10 +852,11 @@ elif menu == "📖 Turno Estendido":
                     st.cache_data.clear()
                     st.rerun()
     else:
-        # Se não ler, mostramos o que o sistema está "enxergando" para ajudar no diagnóstico
-        st.warning(f"Nenhum aluno encontrado para **{st.session_state.sel_te_aba}** na aba TURNO_ESTENDIDO.")
-        if st.checkbox("Verificar dados brutos da planilha"):
-            st.write("Salas encontradas na planilha (sem duplicatas):", list(set(dict_alunos_te.values())))
+        st.warning(f"Nenhum aluno encontrado para **{st.session_state.sel_te_aba}** na aba de Turno Estendido.")
+        # Ajuda para o usuário entender o que está na planilha
+        if st.checkbox("Verificar nomes das salas na planilha"):
+            salas_encontradas = sorted(list(set(dict_alunos_te.values())))
+            st.write("Salas lidas na planilha:", salas_encontradas)
 # --- ABA: DADOS - TURNO ESTENDIDO (ATUALIZADO COM CORES E LEGENDA) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("""

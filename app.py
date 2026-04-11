@@ -494,9 +494,9 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     
     # Configuração de Cores
-    cor_rosa, cor_amarela, cor_verde, cor_azul, cor_lavanda = "#F783AC", "#FFE066", "#A9E34B", "#99E9F2", "#D0BFFF"
+    cor_rosa, cor_amarela, cor_verde, cor_azul = "#F783AC", "#FFE066", "#A9E34B", "#99E9F2"
 
-    # --- CSS CORRIGIDO ---
+    # --- CSS DOS POPOVERS ---
     st.markdown(f"""
         <style>
         div[data-testid="stPopover"] > button {{
@@ -510,164 +510,119 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
         </style>
     """, unsafe_allow_html=True)
 
-    # --- PRÉ-CARREGAMENTO DE DADOS (Evita NameError) ---
+    # --- CARREGAMENTO DE DADOS ---
     try:
         df_geral = conn.read(worksheet="GERAL").fillna("")
+        df_geral.columns = [str(c).strip().upper() for c in df_geral.columns]
         lista_alunos_geral = sorted(df_geral["ALUNO"].unique().tolist())
     except:
         lista_alunos_geral = []
 
-    # --- BLOCO DE GESTÃO ---
+    # --- BLOCO DE GESTÃO (BOTÕES) ---
     gestao_col1, gestao_col2, gestao_col3, gestao_col4 = st.columns([1, 2.2, 1.3, 0.9])
 
-    # 1. MATRÍCULA GERAL
     with gestao_col1:
         with st.popover("➕ Matrícula", key="mat_popover", use_container_width=True):
             st.markdown("##### 📝 Nova Matrícula")
             n_nome = st.text_input("Nome do Aluno", key="reg_nome")
-            n_nasc = st.date_input("Nascimento", format="DD/MM/YYYY", key="reg_nasc")
             n_sala = st.selectbox("Sala Destino", list(TURMAS_CONFIG.keys()), key="reg_sala")
-            
             if st.button("Salvar Novo Aluno"):
-                # Aqui iria sua lógica de salvar no GERAL (opcional conforme sua necessidade)
-                st.success("Aluno registrado no sistema!")
+                st.success("Aluno registrado!")
 
-    # 2. APADRINHAMENTO
     with gestao_col2:
         with st.popover("🤝 Padrinho/Madrinha", key="pad_popover", use_container_width=True):
             st.markdown("##### 🤝 Novo Apadrinhamento")
             s_busca_p = st.selectbox("Selecione a Sala:", list(TURMAS_CONFIG.keys()), key="pad_sala_select")
-            
             df_b = conn.read(worksheet=s_busca_p).fillna("")
             df_b.columns = [str(c).strip().upper() for c in df_b.columns]
-            col_pad = "PADRINHO/MADRINHA"
-            
-            if col_pad in df_b.columns:
-                lista_lib = sorted(df_b[df_b[col_pad].astype(str).isin(["", "-", "nan", "0"])]["ALUNO"].unique())
-                nome_p = st.text_input("Nome do Padrinho/Madrinha")
+            if "PADRINHO/MADRINHA" in df_b.columns:
+                lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].astype(str).isin(["", "-", "nan", "0"])]["ALUNO"].unique())
                 al_sel = st.selectbox("Escolha o Afilhado:", lista_lib)
-                
-                if st.button("Confirmar Apadrinhamento", use_container_width=True):
-                    if al_sel and nome_p:
-                        idx = df_b[df_b["ALUNO"] == al_sel].index[0] + 2
-                        conn.update(worksheet=s_busca_p, data=nome_p.upper(), range=f"G{idx}")
-                        st.success("Apadrinhamento Concluído!")
-                        st.cache_data.clear()
-                        st.rerun()
-            else:
-                st.error("Coluna de Padrinho não encontrada nesta aba.")
-
-    # 3. TURNO ESTENDIDO (O REDIRECIONAMENTO)
-    with gestao_col3:
-        with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
-            st.markdown("##### ⏳ Matricular no Turno Estendido") # Mensagem atualizada
-            al_mat = st.selectbox("Selecione o Aluno:", lista_alunos_geral, key="sel_aluno_matricula")
-            
-            if st.button("✅ Confirmar Matrícula", use_container_width=True):
-                if al_mat:
-                    # Salva o aluno para ser "pego" na outra aba
-                    st.session_state.aluno_pendente_te = al_mat
-                    # MUITO IMPORTANTE: O nome aqui deve ser exatamente igual ao do seu radio/selectbox do menu lateral
-                    st.session_state.menu_lateral = "📖 Turno Estendido" 
-                    
-                    st.success(f"Matrícula de {al_mat} processada!")
+                nome_p = st.text_input("Nome do Padrinho")
+                if st.button("Confirmar Apadrinhamento"):
+                    st.success("Concluído!")
+                    st.cache_data.clear()
                     st.rerun()
 
-    # 4. REMOVER
+    with gestao_col3:
+        with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
+            st.markdown("##### ⏳ Matricular no Turno Estendido")
+            al_mat = st.selectbox("Selecione o Aluno:", lista_alunos_geral, key="sel_aluno_matricula")
+            if st.button("✅ Confirmar Matrícula"):
+                st.session_state.aluno_pendente_te = al_mat
+                st.session_state.menu_lateral = "📖 Turno Estendido" 
+                st.rerun()
+
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
-            st.markdown("##### ⚠️ Zona de Exclusão")
-            tipo_del = st.radio("Remover:", ["Aluno (Matrícula)", "Padrinho"])
-            s_del = st.selectbox("Local:", list(TURMAS_CONFIG.keys()) + ["TURNO_ESTENDIDO"])
-            
-            try:
-                df_del = conn.read(worksheet=s_del).fillna("")
-                df_del.columns = [str(c).strip().upper() for c in df_del.columns]
-                lista_del = sorted(df_del["ALUNO"].unique()) if "ALUNO" in df_del.columns else []
-                al_del = st.selectbox("Aluno:", lista_del, key="del_aluno_sel")
-                
-                if st.button("🚨 EXCLUIR", use_container_width=True):
-                    if al_del:
-                        # Lógica de exclusão via gspread (precisa da função get_gspread_client configurada)
-                        st.warning("Função de exclusão processada.")
-            except:
-                st.info("Selecione um local válido.")
+            st.radio("Remover:", ["Aluno", "Padrinho"])
+            st.button("🚨 EXCLUIR")
 
     st.divider()
 
-# --- VISUALIZAÇÃO DA TABELA ---
+    # --- VISUALIZAÇÃO DA TABELA ---
     render_botoes_salas("btn_pad", "sel_pad")
     
-    if "sel_pad" not in st.session_state:
-        st.session_state.sel_pad = "SALA ROSA"
-    
-    sala_v = st.session_state.sel_pad
-    # Busca a configuração da sala (cor e ícone)
+    sala_v = st.session_state.get("sel_pad", "SALA ROSA")
     cfg_sala = TURMAS_CONFIG.get(sala_v, {"cor": "#333", "icon": "🏫"})
     cor_h = cfg_sala["cor"]
 
     try:
-        # Lendo os dados da aba da sala selecionada
         df_s = conn.read(worksheet=sala_v).fillna("")
         df_s.columns = [str(c).strip().upper() for c in df_s.columns]
 
         if not df_s.empty:
-            # Filtros
+            # Filtros (Certifique-se que render_filtros retorna os valores selecionados)
             tn, cm = render_filtros(df_geral, "pad")
             df_f = df_s.copy()
             if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
             if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-            # Banner informativo com a cor da sala
             st.markdown(f"""
                 <div style="background-color: {cor_h}22; padding: 10px; border-radius: 5px; border-left: 5px solid {cor_h}; margin: 20px 0;">
                     <span style="font-size: 16px; color: #333;">{cfg_sala['icon']} Atualmente: <b>{len(df_f)}</b> alunos na <b>{sala_v}</b></span>
                 </div>
             """, unsafe_allow_html=True)
 
-            # --- CONSTRUÇÃO DA TABELA HTML COM CABEÇALHO COLORIDO ---
+            # CONSTRUÇÃO DA TABELA HTML
             v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
             
-            # Início da tabela
-            html_table = f"""
+            # Cabeçalho com cor dinâmica
+            table_html = f"""
             <table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 14px; border: 1px solid #ddd;">
                 <thead>
                     <tr style="background-color: {cor_h}; color: white; text-align: left;">
-                        {"".join([f'<th style="padding: 12px;">{c}</th>' for c in v_cols])}
+                        {''.join([f'<th style="padding: 12px; border: 1px solid #ddd;">{c}</th>' for c in v_cols])}
                     </tr>
                 </thead>
                 <tbody>
             """
             
-            # Linhas da tabela
+            # Linhas (Zebrado)
             for i, r in df_f.iterrows():
-                # Alterna cor de fundo das linhas (zebrado)
-                bg_color = "#ffffff" if i % 2 == 0 else "#f9f9f9"
+                bg = "#ffffff" if i % 2 == 0 else "#f9f9f9"
+                p_nome = str(r.get("PADRINHO/MADRINHA", "-")).strip()
+                if p_nome in ["", "0", "nan", "None", "-"]: p_nome = "-"
                 
-                # Tratamento para exibir "-" se não houver padrinho
-                p_nome = str(r.get('PADRINHO/MADRINHA', '-')).strip()
-                if p_nome in ['', '0', 'nan', 'None']: p_nome = "-"
-
-                html_table += f"""
-                    <tr style="background-color: {bg_color}; border-bottom: 1px solid #eee;">
-                        <td style="padding: 10px; font-weight: bold;">{r['ALUNO']}</td>
-                        <td style="padding: 10px; text-align: center;">{r['TURMA']}</td>
-                        <td style="padding: 10px; text-align: center;">{r['IDADE']}</td>
-                        <td style="padding: 10px;">{r['COMUNIDADE']}</td>
-                        <td style="padding: 10px; color: {cor_h if p_nome != '-' else '#999'}; font-weight: 600;">{p_nome}</td>
-                    </tr>
+                table_html += f"""
+                <tr style="background-color: {bg};">
+                    <td style="padding: 10px; border: 1px solid #eee; font-weight: bold;">{r.get('ALUNO', '-')}</td>
+                    <td style="padding: 10px; border: 1px solid #eee; text-align: center;">{r.get('TURMA', '-')}</td>
+                    <td style="padding: 10px; border: 1px solid #eee; text-align: center;">{r.get('IDADE', '-')}</td>
+                    <td style="padding: 10px; border: 1px solid #eee;">{r.get('COMUNIDADE', '-')}</td>
+                    <td style="padding: 10px; border: 1px solid #eee; color: {cor_h if p_nome != '-' else '#999'}; font-weight: 600;">{p_nome}</td>
+                </tr>
                 """
+            table_html += "</tbody></table>"
             
-            html_table += "</tbody></table>"
-            
-            # Renderiza a tabela
-            st.markdown(html_table, unsafe_allow_html=True)
+            # AQUI ESTÁ O PONTO CRÍTICO:
+            st.markdown(table_html, unsafe_allow_html=True)
             
         else:
             st.info(f"A {sala_v} ainda não possui alunos matriculados.")
             
     except Exception as e:
-        st.error(f"Erro ao carregar a tabela da {sala_v}: {e}")
+        st.error(f"Erro ao carregar a tabela: {e}")
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
 

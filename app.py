@@ -532,7 +532,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 lista_est = sorted(df_est["ALUNO"].unique())
                 selecionados = st.multiselect("Selecione os alunos:", lista_est)
                 if st.button("Confirmar Turno Estendido", use_container_width=True):
-                try:
+                    try:
                     # Acessa a planilha específica através do cliente gspread
                     sh = conn._instance.client.open_by_key(st.secrets["connections"]["gsheets"]["spreadsheet"])
                     ws = sh.worksheet("TURNO_ESTENDIDO")

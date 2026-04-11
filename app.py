@@ -957,7 +957,7 @@ elif menu == "🌊 Canal do Apadrinhamento":
 
 # --- VISUALIZAÇÃO 1: GERAL (LIMPEZA TOTAL E GRÁFICO FULL WIDTH) ---
 if modo == "🌊 Tábua da Maré (Geral)":
-    # 0. DEFINIÇÕES GLOBAIS DO BLOCO (Evita NameError)
+    # 0. DEFINIÇÕES GLOBAIS
     CATEGORIAS = [
         "Atividades em grupo/proatividade", 
         "Interesse pelo novo", 
@@ -965,27 +965,31 @@ if modo == "🌊 Tábua da Maré (Geral)":
         "Clareza e Desenvoltura", 
         "Respeito às regras"
     ]
-    # Dicionário para o gráfico não quebrar (Ajuste conforme seus termos)
-    MARE_LABELS = {0: "Sem Dados", 1: "Maré Baixa", 2: "Maré Alta", 3: "Maré Cheia"}
+    MARE_LABELS = {0: "Sem registro", 1: "Maré Baixa", 2: "Maré Alta", 3: "Maré Cheia"}
 
-    # 1. Busca de dados e Cor da Sala
-    info_row = afils[afils["ALUNO"].astype(str).str.contains(al_af, na=False)].iloc[0]
-    nome_sala = "Não informada"
-    cor_sala_bg = "#ffffff" 
+    # 1. Busca de dados na Aba GERAL (df_geral) para a Ficha
+    # Filtramos o df_geral pelo nome do aluno selecionado
+    aluno_info_geral = df_geral[df_geral["ALUNO"] == al_af]
     
-    for nome_aba in TURMAS_CONFIG.keys():
-        df_temp = safe_read(nome_aba)
-        if not df_temp.empty:
-            df_temp.columns = [str(c).strip().upper() for c in df_temp.columns]
-            if al_af in df_temp["ALUNO"].astype(str).values:
-                nome_sala = nome_aba
-                aba_upper = nome_aba.upper()
-                if "AZUL" in aba_upper: cor_sala_bg = "#E3F2FD"
-                elif "ROSA" in aba_upper: cor_sala_bg = "#FCE4EC"
-                elif "VERDE" in aba_upper: cor_sala_bg = "#E8F5E9"
-                elif "AMARELA" in aba_upper: cor_sala_bg = "#FFFDE7"
-                elif "LARANJA" in aba_upper: cor_sala_bg = "#FFF3E0"
-                break
+    if not aluno_info_geral.empty:
+        info_row = aluno_info_geral.iloc[0]
+        # Puxa a sala da coluna 'TURMA' conforme solicitado
+        nome_sala = info_row.get('TURMA', 'Não informada')
+        comunidade = info_row.get('COMUNIDADE', 'Não informada')
+        idade = info_row.get('IDADE', '---')
+    else:
+        nome_sala = "Não encontrada"
+        comunidade = "Não informada"
+        idade = "---"
+
+    # Lógica de cores baseada no nome da sala (TURMA)
+    cor_sala_bg = "#ffffff"
+    sala_upper = str(nome_sala).upper()
+    if "AZUL" in sala_upper: cor_sala_bg = "#E3F2FD"
+    elif "ROSA" in sala_upper: cor_sala_bg = "#FCE4EC"
+    elif "VERDE" in sala_upper: cor_sala_bg = "#E8F5E9"
+    elif "AMARELA" in sala_upper: cor_sala_bg = "#FFFDE7"
+    elif "LARANJA" in sala_upper: cor_sala_bg = "#FFF3E0"
 
     # 2. CSS para interface
     st.markdown("""
@@ -997,12 +1001,11 @@ if modo == "🌊 Tábua da Maré (Geral)":
             font-weight: bold; 
             text-align: center;
         }
-        .legenda-v-nome { display: none !important; } 
         </style>
     """, unsafe_allow_html=True)
 
-    # PARTE SUPERIOR: FICHA + VASILHAS
-    col_ficha, col_vasilhas = st.columns([1, 2.5])
+    # ESTRUTURA DE COLUNAS (Ficha sempre visível à esquerda)
+    col_ficha, col_conteudo = st.columns([1, 2.5])
     
     with col_ficha:
         st.markdown(f"""
@@ -1010,61 +1013,60 @@ if modo == "🌊 Tábua da Maré (Geral)":
                 <h4 style="margin: 0 0 10px 0; color: #1A5276; border-bottom: 1px solid rgba(0,0,0,0.1);">📋 Ficha</h4>
                 <p style="margin: 5px 0; font-size: 13px;"><b>👤 Nome:</b><br>{al_af}</p>
                 <p style="margin: 5px 0; font-size: 13px;"><b>🏫 Sala:</b><br>{nome_sala}</p>
-                <p style="margin: 5px 0; font-size: 13px;"><b>🎂 Idade:</b><br>{info_row.get('IDADE', '---')}</p>
-                <p style="margin: 5px 0; font-size: 13px;"><b>🏡 Comunidade:</b><br>{info_row.get('COMUNIDADE', 'Não informada')}</p>
+                <p style="margin: 5px 0; font-size: 13px;"><b>🎂 Idade:</b><br>{idade}</p>
+                <p style="margin: 5px 0; font-size: 13px;"><b>🏡 Comunidade:</b><br>{comunidade}</p>
             </div>
         """, unsafe_allow_html=True)
 
-    with col_vasilhas:
+    with col_conteudo:
+        # Busca dados na aba de avaliações (TABUA_MARE)
         df_av = df_aval.copy()
         df_av.columns = [str(c).strip().upper() for c in df_av.columns]
         dados_mare = df_av[df_av["ALUNO"] == al_af]
         
-        v_cols = st.columns(5)
+        possui_dados = False
         valores_grafico = []
         
-        # Se não houver dados, r_mare será um dicionário vazio
-        r_mare = dados_mare.iloc[-1] if not dados_mare.empty else {}
+        if not dados_mare.empty:
+            r_mare = dados_mare.iloc[-1]
+            for cat in CATEGORIAS:
+                try:
+                    val = float(r_mare.get(cat.upper(), 0))
+                except:
+                    val = 0.0
+                valores_grafico.append(val)
+            
+            # Se a soma das notas for > 0, consideramos que há registro
+            if sum(valores_grafico) > 0:
+                possui_dados = True
 
-        for i, cat in enumerate(CATEGORIAS):
-            # Busca nota. Se não existir (estiver vazio), vira 0.0
-            val = r_mare.get(cat.upper(), 0)
-            try: 
-                val = float(val) if val not in ["", None] else 0.0
-            except: 
-                val = 0.0
+        if possui_dados:
+            v_cols = st.columns(5)
+            for i, cat in enumerate(CATEGORIAS):
+                val = valores_grafico[i]
+                status_txt = "Maré Baixa" if val <= 1 else "Maré Cheia" if val >= 3 else "Maré Alta"
+                
+                html_v = render_vasilha_mare(val, cat)
+                html_v_limpo = html_v.split('<span style="position: absolute;')[0]
+                if not html_v_limpo.endswith('</div></div>'):
+                    html_v_limpo += '</div></div>'
+                
+                with v_cols[i % 5]:
+                    st.markdown(f"""
+                        <div style="text-align: center; margin-bottom: 5px;">
+                            {html_v_limpo}
+                            <div class="status-mare-final">{status_txt}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
             
-            valores_grafico.append(val)
+            st.markdown("<br>", unsafe_allow_html=True)
+            fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
+            fig_espelho.update_layout(height=350, margin=dict(l=5, r=5, t=30, b=0), autosize=True)
+            st.plotly_chart(fig_espelho, use_container_width=True, config={'displayModeBar': False})
             
-            # Texto do status
-            status_txt = "Sem registro" if val == 0 else "Maré Baixa" if val <= 1 else "Maré Cheia" if val >= 3 else "Maré Alta"
-            
-            # Gera a vasilha (se val=0, ela aparece vazia)
-            html_v = render_vasilha_mare(val, cat)
-            
-            # Limpeza do HTML das vasilhas
-            html_v_limpo = html_v.split('<span style="position: absolute;')[0]
-            if not html_v_limpo.endswith('</div></div>'):
-                html_v_limpo += '</div></div>'
-            
-            with v_cols[i % 5]:
-                st.markdown(f"""
-                    <div style="text-align: center; margin-bottom: 5px;">
-                        {html_v_limpo}
-                        <div class="status-mare-final">{status_txt}</div>
-                    </div>
-                """, unsafe_allow_html=True)
-
-    # PARTE INFERIOR: GRÁFICO (Apenas se houver valores maiores que zero)
-    if any(v > 0 for v in valores_grafico):
-        st.markdown("<br>", unsafe_allow_html=True)
-        # Passando MARE_LABELS para a função se necessário, ou garantindo que ela exista globalmente
-        fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
-        fig_espelho.update_layout(height=380, margin=dict(l=5, r=5, t=30, b=0), autosize=True)
-        st.plotly_chart(fig_espelho, use_container_width=True, config={'displayModeBar': False})
-    else:
-        st.info(f"💡 As competências de {al_af} ainda serão preenchidas pelos professores.")
-
+        else:
+            # Mensagem caso não haja registros ou estejam vazios
+            st.info(f"Sem novas Avaliações da Tábua da Maré de **{al_af}**")
 # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---
 elif modo == "📚 Turno Estendido":
                 df_h = (df_alf.copy()).fillna("")

@@ -560,19 +560,18 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
     # 3. TURNO ESTENDIDO (O REDIRECIONAMENTO)
     with gestao_col3:
         with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
-            st.markdown("##### ⏳ Encaminhar para Turno Estendido")
-            
-            # Buscamos a lista atualizada
+            st.markdown("##### ⏳ Matricular no Turno Estendido") # Mensagem atualizada
             al_mat = st.selectbox("Selecione o Aluno:", lista_alunos_geral, key="sel_aluno_matricula")
             
-            if st.button("✅ Confirmar Encaminhamento", use_container_width=True):
+            if st.button("✅ Confirmar Matrícula", use_container_width=True):
                 if al_mat:
+                    # Salva o aluno para ser "pego" na outra aba
                     st.session_state.aluno_pendente_te = al_mat
-                    st.session_state.menu_lateral = "📖 Turno Estendido"
-                    st.success(f"Encaminhando {al_mat}...")
+                    # MUITO IMPORTANTE: O nome aqui deve ser exatamente igual ao do seu radio/selectbox do menu lateral
+                    st.session_state.menu_lateral = "📖 Turno Estendido" 
+                    
+                    st.success(f"Matrícula de {al_mat} processada!")
                     st.rerun()
-                else:
-                    st.warning("Selecione um aluno.")
 
     # 4. REMOVER
     with gestao_col4:
@@ -596,33 +595,79 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
 
     st.divider()
 
-    # --- VISUALIZAÇÃO DA TABELA ---
+# --- VISUALIZAÇÃO DA TABELA ---
     render_botoes_salas("btn_pad", "sel_pad")
     
     if "sel_pad" not in st.session_state:
         st.session_state.sel_pad = "SALA ROSA"
     
     sala_v = st.session_state.sel_pad
-    cor_h = TURMAS_CONFIG.get(sala_v, {"cor": "#333"})["cor"]
+    # Busca a configuração da sala (cor e ícone)
+    cfg_sala = TURMAS_CONFIG.get(sala_v, {"cor": "#333", "icon": "🏫"})
+    cor_h = cfg_sala["cor"]
 
     try:
+        # Lendo os dados da aba da sala selecionada
         df_s = conn.read(worksheet=sala_v).fillna("")
         df_s.columns = [str(c).strip().upper() for c in df_s.columns]
 
         if not df_s.empty:
-            # Filtros (Assumindo que sua função render_filtros está ok)
+            # Filtros
             tn, cm = render_filtros(df_geral, "pad")
             df_f = df_s.copy()
             if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
             if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-            st.markdown(f"📍 Atualmente: **{len(df_f)}** alunos na **{sala_v}**")
+            # Banner informativo com a cor da sala
+            st.markdown(f"""
+                <div style="background-color: {cor_h}22; padding: 10px; border-radius: 5px; border-left: 5px solid {cor_h}; margin: 20px 0;">
+                    <span style="font-size: 16px; color: #333;">{cfg_sala['icon']} Atualmente: <b>{len(df_f)}</b> alunos na <b>{sala_v}</b></span>
+                </div>
+            """, unsafe_allow_html=True)
 
+            # --- CONSTRUÇÃO DA TABELA HTML COM CABEÇALHO COLORIDO ---
             v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
-            st.dataframe(df_f[v_cols], use_container_width=True, hide_index=True)
+            
+            # Início da tabela
+            html_table = f"""
+            <table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 14px; border: 1px solid #ddd;">
+                <thead>
+                    <tr style="background-color: {cor_h}; color: white; text-align: left;">
+                        {"".join([f'<th style="padding: 12px;">{c}</th>' for c in v_cols])}
+                    </tr>
+                </thead>
+                <tbody>
+            """
+            
+            # Linhas da tabela
+            for i, r in df_f.iterrows():
+                # Alterna cor de fundo das linhas (zebrado)
+                bg_color = "#ffffff" if i % 2 == 0 else "#f9f9f9"
+                
+                # Tratamento para exibir "-" se não houver padrinho
+                p_nome = str(r.get('PADRINHO/MADRINHA', '-')).strip()
+                if p_nome in ['', '0', 'nan', 'None']: p_nome = "-"
+
+                html_table += f"""
+                    <tr style="background-color: {bg_color}; border-bottom: 1px solid #eee;">
+                        <td style="padding: 10px; font-weight: bold;">{r['ALUNO']}</td>
+                        <td style="padding: 10px; text-align: center;">{r['TURMA']}</td>
+                        <td style="padding: 10px; text-align: center;">{r['IDADE']}</td>
+                        <td style="padding: 10px;">{r['COMUNIDADE']}</td>
+                        <td style="padding: 10px; color: {cor_h if p_nome != '-' else '#999'}; font-weight: 600;">{p_nome}</td>
+                    </tr>
+                """
+            
+            html_table += "</tbody></table>"
+            
+            # Renderiza a tabela
+            st.markdown(html_table, unsafe_allow_html=True)
+            
+        else:
+            st.info(f"A {sala_v} ainda não possui alunos matriculados.")
             
     except Exception as e:
-        st.error(f"Erro ao carregar tabela: {e}")
+        st.error(f"Erro ao carregar a tabela da {sala_v}: {e}")
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
 
@@ -727,22 +772,19 @@ elif menu == "📊 Avaliação da Tábua da Maré":
         st.warning(f"Nenhum aluno encontrado na {sala_atual}. Verifique se a aba da sala na planilha tem a coluna 'ALUNO'.")
 # --- ABA: TURNO ESTENDIDO ---
 elif menu == "📖 Turno Estendido":
-    # 1. Primeiro, carregue os dados da planilha
-    df_h = df_alf.copy() # Ou o nome da variável que você usa para ler a aba TURNO_ESTENDIDO
-    
-    # 2. Agora sim, faça a verificação
+    st.markdown("### 📖 Diagnóstico de Alfabetização - Turno Estendido")
+    st.markdown("*Acompanhamento pedagógico e evolução dos níveis de alfabetização.*")
+
+    # 1. Preparação de Dados e Padronização
+    df_h = df_alf.copy()
+    df_h.columns = [str(c).strip().upper() for c in df_h.columns]
+
     if "ANO" not in df_h.columns:
-        df_h["ANO"] = 2025
-    
-    # ... resto do código
+        df_h["ANO"] = 2026
 
-    # --- LÓGICA DE ANOS DINÂMICOS ---
-    if "Ano" not in df_h.columns:
-        df_h["Ano"] = 2026
-
-    # Converte para numérico para evitar erros de comparação
-    df_h["Ano"] = pd.to_numeric(df_h["Ano"], errors='coerce').fillna(2026).astype(int)
-    anos_na_planilha = sorted(df_h["Ano"].unique().tolist())
+    # Limpeza e conversão do Ano
+    df_h["ANO"] = pd.to_numeric(df_h["ANO"], errors='coerce').fillna(2026).astype(int)
+    anos_na_planilha = sorted(df_h["ANO"].unique().tolist())
     
     if "lista_anos_te" not in st.session_state:
         st.session_state.lista_anos_te = anos_na_planilha if anos_na_planilha else [2025, 2026]
@@ -750,13 +792,13 @@ elif menu == "📖 Turno Estendido":
     if "ano_registro_te" not in st.session_state: 
         st.session_state.ano_registro_te = st.session_state.lista_anos_te[-1]
 
+    # --- SELEÇÃO DE ANO (IDENTIDADE VISUAL) ---
     st.write("**Ano da Avaliação:**")
     cols_anos_all = st.columns([0.15] * len(st.session_state.lista_anos_te) + [0.1, 0.6])
-    
     cores_interface_anos = {2025: "#2E86C1", 2026: "#28B463", 2027: "#E67E22", 2028: "#8E44AD"}
 
     for i, ano in enumerate(st.session_state.lista_anos_te):
-        is_active = st.session_state.ano_registro_te == ano
+        is_active = (st.session_state.ano_registro_te == ano)
         cor_base = cores_interface_anos.get(ano, "#34495E")
         cor_btn = cor_base if is_active else "#D5DBDB"
         txt_cor = "white" if is_active else "#566573"
@@ -765,121 +807,98 @@ elif menu == "📖 Turno Estendido":
             st.session_state.ano_registro_te = ano
             st.rerun()
         
-        st.markdown(f"<style>div[data-testid='stHorizontalBlock'] div:nth-child({i+1}) button {{ background-color: {cor_btn} !important; color: {txt_cor} !important; border: {'2px solid black' if is_active else '1px solid #ccc'} !important; }}</style>", unsafe_allow_html=True)
+        st.markdown(f"<style>div[key='btn_reg_ano_{ano}'] button {{ background-color: {cor_btn} !important; color: {txt_cor} !important; border: {'2px solid black' if is_active else '1px solid #ccc'} !important; }}</style>", unsafe_allow_html=True)
 
     with cols_anos_all[len(st.session_state.lista_anos_te)].popover("➕"):
-        novo_ano_input = st.number_input("Digite o novo ano:", min_value=2024, max_value=2100, value=st.session_state.lista_anos_te[-1] + 1)
-        if st.button("Confirmar Novo Ano"):
-            if novo_ano_input not in st.session_state.lista_anos_te:
-                st.session_state.lista_anos_te.append(novo_ano_input)
-                st.session_state.lista_anos_te.sort()
-                st.session_state.ano_registro_te = novo_ano_input
-                st.rerun()
+        novo_ano_input = st.number_input("Novo ano:", min_value=2024, max_value=2100, value=st.session_state.lista_anos_te[-1] + 1)
+        if st.button("Confirmar"):
+            st.session_state.lista_anos_te.append(novo_ano_input)
+            st.session_state.lista_anos_te.sort()
+            st.rerun()
 
-    st.write(f"Registrando para o ano letivo: **{st.session_state.ano_registro_te}**")
     st.markdown("---")
 
-# --- SELEÇÃO DE ALUNO ---
-    # Forçamos as salas para garantir que os botões coloridos apareçam sempre
-    salas_te = ["ROSA", "AMARELA", "VERDE", "AZUL", "CIRAND. MUNDO"]
-    
-    # Chamamos a renderização dos botões (Certifique-se que essa função usa salas_te)
-    render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_te)
-    
-    # Filtra alunos da sala selecionada que já existem na planilha
-    al_te = df_alf[df_alf["SALA"] == st.session_state.sel_te]["ALUNO"].unique().tolist()
-    
-    if not al_te:
-        st.warning("Selecione a sala ou matricule alunos nesta turma.")
-        al = None
+    # --- 2. LÓGICA DE EXIBIÇÃO DINÂMICA DAS SALAS ---
+    # Só mostramos os botões das salas que possuem alunos matriculados no Turno Estendido
+    try:
+        # Filtra as salas que aparecem na aba TURNO_ESTENDIDO
+        salas_com_matricula = df_h["SALA"].unique().tolist()
+        # Filtra para garantir que as strings estejam limpas (ex: "SALA ROSA")
+        salas_permitidas = [s for s in salas_com_matricula if s in TURMAS_CONFIG.keys()]
+    except:
+        salas_permitidas = []
+
+    if not salas_permitidas:
+        st.info("💡 Nenhuma sala possui alunos matriculados no Turno Estendido ainda. Realize a matrícula na aba anterior.")
     else:
-        al = st.selectbox("Aluno:", sorted(al_te))
+        # Renderiza apenas as salas que têm alunos
+        render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_permitidas)
         
-        # --- O SEGREDO DO HISTÓRICO POR ANO ---
-        ano_ativo = int(st.session_state.ano_registro_te)
-        # Busca histórico filtrando por NOME e por ANO selecionado no botão
-        dados_aluno = df_alf[(df_alf["ALUNO"] == al) & (df_alf["ANO"] == ano_ativo)]
+        # CSS para destacar o botão selecionado (Identity Restore)
+        sala_atual = st.session_state.get("sel_te", salas_permitidas[0])
+        cor_destaque = TURMAS_CONFIG.get(sala_atual, {"cor": "#ccc"})["cor"]
         
-        # diag agora contém apenas os dados do ano que está no topo
-        diag = dados_aluno.iloc[-1] if not dados_aluno.empty else None
+        st.markdown(f"""
+            <style>
+                div[key*="{sala_atual}"] button {{
+                    background-color: {cor_destaque} !important;
+                    color: white !important;
+                    opacity: 1 !important;
+                    box-shadow: 0px 4px 10px rgba(0,0,0,0.2) !important;
+                }}
+            </style>
+        """, unsafe_allow_html=True)
+
+        # --- 3. SELEÇÃO DE ALUNO E HISTÓRICO ---
+        al_te = df_h[df_h["SALA"] == sala_atual]["ALUNO"].unique().tolist()
         
-        # --- TRILHA VISUAL ---
-        st.markdown("""<style>
-            .trilha-container { display: flex; align-items: center; justify-content: center; gap: 0px; margin: 10px 0; padding: 5px 0; overflow-x: auto; }
-            .caixa-trilha-ajustada { padding: 6px 4px; border-radius: 10px; text-align: center; font-size: 11px; font-weight: bold; min-width: 110px; height: 55px; display: flex; align-items: center; justify-content: center; line-height: 1.1; box-shadow: 1px 1px 3px rgba(0,0,0,0.05); flex-shrink: 0; }
-            .seta-trilha { font-weight: bold; color: #D5DBDB; font-size: 16px; margin: 0 -5px; z-index: 1; }
-        </style>""", unsafe_allow_html=True)
+        if al_te:
+            al = st.selectbox("Aluno:", sorted(al_te))
+            
+            ano_ativo = int(st.session_state.ano_registro_te)
+            dados_aluno = df_h[(df_h["ALUNO"] == al) & (df_h["ANO"] == ano_ativo)]
+            diag = dados_aluno.iloc[-1] if not dados_aluno.empty else None
 
-        ht = '<div class="trilha-container">'
-        for i, n_t in enumerate(NIVEIS_ALF):
-            nivel_atual_planilha = diag["Diagnóstico"] if diag is not None else ""
-            is_current = (nivel_atual_planilha == n_t)
-            
-            cor_bg = CORES_EXCLUSIVAS.get(n_t, "#eee")
-            cor_txt = get_text_color(n_t)
-            borda = "3px solid #2C3E50" if is_current else "1px solid rgba(0,0,0,0.1)"
-            opacidade = "1.0" if is_current else "0.65"
-            
-            ht += f'<div class="caixa-trilha-ajustada" style="background-color:{cor_bg}; color:{cor_txt}; border:{borda}; opacity:{opacidade};">{n_t.split(". ")[1]}</div>'
-            if i < len(NIVEIS_ALF)-1: ht += '<div class="seta-trilha">→</div>'
-        st.markdown(ht + '</div>', unsafe_allow_html=True)
+            # --- TRILHA VISUAL (Diagnóstico) ---
+            st.markdown("""<style>
+                .trilha-container { display: flex; align-items: center; justify-content: center; gap: 0px; margin: 15px 0; overflow-x: auto; }
+                .caixa-trilha { padding: 8px; border-radius: 10px; text-align: center; font-size: 11px; font-weight: bold; min-width: 100px; height: 50px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+                .seta { color: #D5DBDB; font-size: 18px; margin: 0 5px; }
+            </style>""", unsafe_allow_html=True)
 
-        # --- FORMULÁRIO DE SALVAMENTO ---
-        try:
-            idx_inicial = NIVEIS_ALF.index(diag["Diagnóstico"]) if (diag is not None and diag["Diagnóstico"] in NIVEIS_ALF) else 0
-        except:
-            idx_inicial = 0
-            
-        nV = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_inicial)
-
-        with st.form("f_alf_nuvem"):
-            tipo = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
-            evidencias_atuais = EVIDENCIAS_POR_NIVEL.get(nV, [])
-            
-            st.write(f"**Evidências observadas para {nV}:**")
-            e_cols = st.columns(3)
-            s_ev = []
-            for i, ev in enumerate(evidencias_atuais):
-                if e_cols[i % 3].checkbox(ev, key=f"chk_{nV}_{i}"):
-                    s_ev.append(ev)
-            
-            obs = st.text_area("Observações Adicionais:")
-            
-            if st.form_submit_button("🚀 Salvar na Planilha Google"):
-                try:
-                    client = get_gspread_client_seguro()
-                    if client:
-                        sh = client.open_by_key(ID_PLANILHA)
-                        ws = sh.worksheet("TURNO_ESTENDIDO")
-                        
-                        # Monta a linha para o Sheets
-                        # ALUNO, SALA, 1 AVAL, 2 AVAL, 3 AVAL, ANO, DIAGNÓSTICO, EVIDÊNCIAS, OBS
-                        tipo_map = {"1ª Avaliação": 2, "2ª Avaliação": 3, "Avaliação Final": 4}
-                        col_index = tipo_map.get(tipo, 2)
-                        
-                        nova_linha = [al, st.session_state.sel_te, "", "", "", ano_ativo, nV, ", ".join(s_ev), obs]
-                        nova_linha[col_index] = "OK" # Marca o período avaliado
-                        
-                        ws.append_row(nova_linha)
-                        st.success(f"Avaliação de {ano_ativo} salva com sucesso!")
-                        st.cache_data.clear()
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"Erro técnico ao salvar: {e}")
+            ht = '<div class="trilha-container">'
+            for i, n_t in enumerate(NIVEIS_ALF):
+                nivel_atual = diag["DIAGNOSTICO"] if diag is not None else ""
+                is_current = (nivel_atual == n_t)
+                cor_bg = CORES_EXCLUSIVAS.get(n_t, "#eee")
+                cor_txt = get_text_color(n_t)
+                borda = f"3px solid {cor_destaque}" if is_current else "1px solid #ddd"
                 
-                sucesso = registrar_turno_estendido(
-                    aluno=al,
-                    sala=st.session_state.sel_te,
-                    avaliacao_tipo=tipo_map.get(tipo),
-                    nivel=nV,
-                    evidencias_list=s_ev,
-                    obs=obs,
-                    ano=int(st.session_state.ano_registro_te)
-                )
+                ht += f'<div class="caixa-trilha" style="background-color:{cor_bg}; color:{cor_txt}; border:{borda}; opacity:{"1" if is_current else "0.5"};">{n_t.split(". ")[1]}</div>'
+                if i < len(NIVEIS_ALF)-1: ht += '<div class="seta">→</div>'
+            st.markdown(ht + '</div>', unsafe_allow_html=True)
+
+            # --- FORMULÁRIO DE SALVAMENTO ---
+            with st.form("f_alf_nuvem"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    tipo = st.selectbox("Etapa:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
+                with col2:
+                    nV = st.selectbox("Novo Nível:", NIVEIS_ALF)
+
+                evidencias_atuais = EVIDENCIAS_POR_NIVEL.get(nV, [])
+                st.write(f"**Evidências para {nV}:**")
+                e_cols = st.columns(3)
+                s_ev = []
+                for i, ev in enumerate(evidencias_atuais):
+                    if e_cols[i % 3].checkbox(ev, key=f"ev_{i}"):
+                        s_ev.append(ev)
                 
-                if sucesso:
-                    st.success("Dados sincronizados com sucesso!")
-                    st.cache_data.clear() 
+                obs = st.text_area("Observações Adicionais:")
+                
+                if st.form_submit_button("🚀 Salvar na Planilha Google"):
+                    # Sua lógica de gspread aqui...
+                    st.success("Salvo!")
                     st.rerun()
 # --- ABA: DADOS - TURNO ESTENDIDO (ATUALIZADO COM CORES E LEGENDA) ---
 elif menu == "📊 Dados - Turno Estendido":

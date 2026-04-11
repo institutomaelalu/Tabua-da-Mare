@@ -447,7 +447,7 @@ elif menu == "📝 Alunos matriculados":
     sala_atual = st.session_state.sel_mat
     cor_h = TURMAS_CONFIG[sala_atual]["cor"]
     
-    # --- 1. CARREGAMENTO E FILTRAGEM (Mantido conforme original) ---
+    # --- 1. CARREGAMENTO E FILTRAGEM ---
     df_g = conn.read(worksheet="GERAL").fillna("")
     df_g.columns = [str(c).strip().upper() for c in df_g.columns]
     df_s = conn.read(worksheet=sala_atual).fillna("")
@@ -460,22 +460,19 @@ elif menu == "📝 Alunos matriculados":
     if cm != "Todas":
         df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-    # --- 2. ESTATÍSTICAS (Estilo Padronizado) ---
+    # --- 2. ESTATÍSTICAS ---
     st.markdown(f"""
-        <div style="background-color: #f8f9fa; padding: 12px; border-radius: 10px; border-left: 5px solid {cor_h}; margin-bottom: 20px; font-family: 'Source Sans Pro', sans-serif;">
-            <span style="font-size: 14px; color: #666;">📊 <b>Estatísticas da Sala:</b></span><br>
-            <span style="font-size: 16px; color: #333;">
-                👥 Total na <b>{sala_atual}</b>: {len(df_s)} alunos | 🔍 No filtro atual (<b>{tn}</b>): <b>{len(df_f)}</b> alunos
+        <div style="background-color: #f8f9fa; padding: 10px; border-radius: 8px; border-left: 4px solid {cor_h}; margin-bottom: 15px; font-family: sans-serif;">
+            <span style="font-size: 13px; color: #666;">📊 <b>Estatísticas da Sala:</b></span><br>
+            <span style="font-size: 14px; color: #333;">
+                👥 Total na <b>{sala_atual}</b>: {len(df_s)} alunos | 🔍 Filtro atual: <b>{len(df_f)}</b> alunos
             </span>
         </div>
     """, unsafe_allow_html=True)
 
-    st.info("✍️📖 = Aluno já matriculado no Turno Estendido")
-
-    # --- 3. CABEÇALHO DA TABELA (Corrigido para alinhar com st.columns) ---
-    # Removida a tag <table> que causava o erro de exibição de texto
+    # --- 3. CABEÇALHO DA TABELA ---
     st.markdown(f"""
-        <div style="background-color:{cor_h}; color: white; padding: 12px; border-radius: 5px 5px 0 0; display: flex; font-family: 'Source Sans Pro', sans-serif; font-weight: bold; font-size: 14px; text-transform: uppercase;">
+        <div style="background-color:{cor_h}; color: white; padding: 10px; border-radius: 5px 5px 0 0; display: flex; font-family: sans-serif; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
             <div style="flex: 0.8; text-align: center;">SEL.</div>
             <div style="flex: 3;">ALUNO</div>
             <div style="flex: 1;">IDADE</div>
@@ -485,43 +482,57 @@ elif menu == "📝 Alunos matriculados":
     
     selecionados = []
 
-    # --- 4. LISTAGEM (Estética idêntica à Gestão de Apadrinhamento) ---
+    # --- 4. LISTAGEM SUAVIZADA ---
     for i, r in df_f.iterrows():
-        # Usamos as mesmas proporções do cabeçalho
         c0, c1, c2, c3 = st.columns([0.8, 3, 1, 2])
         
         n_l = str(r.get("ALUNO", "")).replace("**", "").strip()
         idade = str(r.get("IDADE", ""))
         comunidade = str(r.get("COMUNIDADE", ""))
         
+        # Estilo para as fontes das linhas
+        estilo_fonte = "font-family: sans-serif; font-size: 13px; color: #444; margin-top: 4px; margin-bottom: 4px;"
+        
         with c0:
             if n_l in st.session_state.get("alunos_te_dict", {}): 
-                st.markdown('<p style="text-align:center; margin-top:10px;">✍️📖</p>', unsafe_allow_html=True)
+                st.markdown(f'<p style="text-align:center; {estilo_fonte}">✍️📖</p>', unsafe_allow_html=True)
             else:
+                # O checkbox do streamlit tem um padding fixo, ajustamos a margem para alinhar
+                st.markdown('<div style="margin-top: -5px;">', unsafe_allow_html=True)
                 if st.checkbox("", key=f"chk_mat_{sala_atual}_{i}"): 
                     selecionados.append(n_l)
+                st.markdown('</div>', unsafe_allow_html=True)
         
-        # O estilo abaixo força a fonte e o tamanho iguais aos da tabela HTML
         with c1:
-            st.markdown(f'<p style="margin-top:12px; font-family: \'Source Sans Pro\', sans-serif; font-size: 15px; color: #333;">{n_l}</p>', unsafe_allow_html=True)
+            st.markdown(f'<p style="{estilo_fonte}">{n_l}</p>', unsafe_allow_html=True)
         with c2:
-            st.markdown(f'<p style="margin-top:12px; font-family: \'Source Sans Pro\', sans-serif; font-size: 15px; color: #333;">{idade}</p>', unsafe_allow_html=True)
+            st.markdown(f'<p style="{estilo_fonte}">{idade}</p>', unsafe_allow_html=True)
         with c3:
-            st.markdown(f'<p style="margin-top:12px; font-family: \'Source Sans Pro\', sans-serif; font-size: 15px; color: #333;">{comunidade}</p>', unsafe_allow_html=True)
+            st.markdown(f'<p style="{estilo_fonte}">{comunidade}</p>', unsafe_allow_html=True)
         
-        # Linha separadora horizontal (substitui a borda da tabela)
-        st.markdown('<hr style="margin:0; border:0; border-bottom: 1px solid #eee;">', unsafe_allow_html=True)
+        st.markdown('<hr style="margin:0; border:0; border-bottom: 1px solid #f0f0f0;">', unsafe_allow_html=True)
 
-    # --- 5. AÇÃO EM MASSA (Mantido funcionalidade original) ---
+    # --- 5. BOTÃO DE AÇÃO ---
     if selecionados:
-        st.write("---")
-        st.markdown(f"""<style> div.stButton > button {{ background-color: {cor_h} !important; color: white !important; font-weight: bold; width: 100%; border-radius: 8px; }} </style>""", unsafe_allow_html=True)
-        if st.button(f"🚀 Matricular {len(selecionados)} aluno(s) no Turno Estendido", key="btn_bulk_te"):
+        st.markdown(f"""
+            <style> 
+            div.stButton > button {{ 
+                background-color: {cor_h} !important; 
+                color: white !important; 
+                font-size: 14px;
+                font-weight: 500; 
+                width: 100%; 
+                border-radius: 8px;
+                margin-top: 15px;
+            }} 
+            </style>
+        """, unsafe_allow_html=True)
+        if st.button(f"🚀 Matricular {len(selecionados)} aluno(s)"):
             if "alunos_te_dict" not in st.session_state:
                 st.session_state["alunos_te_dict"] = {}
             for al in selecionados:
                 st.session_state["alunos_te_dict"][al] = sala_atual
-            st.success(f"✅ {len(selecionados)} alunos matriculados!")
+            st.success(f"✅ Sucesso!")
             st.rerun()
 elif menu == "🤝 Gestão de apadrinhamento":
     st.markdown(f"### 🤝 Gestão de Apadrinhamento")

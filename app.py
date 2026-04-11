@@ -1127,7 +1127,7 @@ elif modo == "📚 Turno Estendido":
 elif menu == "🌊 Tábua da Maré":
     st.markdown(f"### 🌊 Tábua da Maré")
     
-    # 1. Definições locais para evitar NameError
+    # 1. Definições Locais (Garante que o código saiba o que comparar)
     CATEGORIAS = [
         "Atividades em grupo/proatividade", 
         "Interesse pelo novo", 
@@ -1136,48 +1136,50 @@ elif menu == "🌊 Tábua da Maré":
         "Respeito às regras"
     ]
     
-    # Renderiza os botões das salas (Azul, Verde, etc)
+    # Renderiza os botões das salas (Azul, Verde, etc.)
     render_botoes_salas("btn_int", "sel_int")
     
-    # 2. Carga de dados
+    # 2. Preparação dos Dados
     df_av = df_aval.copy()
-    # Padroniza colunas das avaliações para evitar erro de Case Sensitive
+    # Padroniza para MAIÚSCULO para evitar erros de digitação na planilha
     df_av.columns = [str(c).strip().upper() for c in df_av.columns]
     
+    # Lê a aba da sala selecionada no botão
     df_s = safe_read(st.session_state.sel_int)
     
     if not df_s.empty:
         df_s.columns = [str(c).strip().upper() for c in df_s.columns]
-        # Pega a lista de alunos da sala selecionada
+        # Lista de alunos da sala selecionada
         alunos_sala = [str(n).replace("**", "").strip() for n in df_s["ALUNO"].unique()]
         
-        # Filtra as avaliações apenas para os alunos desta sala
+        # Filtra as avaliações da Tábua da Maré apenas para esses alunos
         df_f = df_av[df_av["ALUNO"].isin(alunos_sala)]
         
         if not df_f.empty:
-            # Ordena e itera pelos alunos
+            # Itera sobre cada aluno encontrado nas avaliações
             for al in sorted(df_f["ALUNO"].unique()):
                 with st.expander(f"📊 {al}"):
+                    # Filtra todas as avaliações históricas desse aluno específico
                     dados_aluno = df_f[df_f["ALUNO"] == al]
                     
                     for _, r in dados_aluno.iterrows():
-                        # Busca o período (Coluna PERIODO ou DATA)
+                        # Identifica o período (usa 'PERIODO' ou 'DATA', o que existir)
                         periodo = r.get("PERIODO", "Avaliação")
                         st.write(f"**{periodo}**")
                         
-                        # Extrai os valores das categorias para o gráfico
+                        # Coleta as notas das 5 categorias
                         valores = []
-                        for c in CATEGORIAS:
+                        for cat in CATEGORIAS:
                             try:
-                                val = r.get(c.upper(), 0)
-                                valores.append(float(val) if val not in ["", None] else 0.0)
+                                v = r.get(cat.upper(), 0)
+                                valores.append(float(v) if v not in ["", None] else 0.0)
                             except:
                                 valores.append(0.0)
                         
-                        # Renderiza o gráfico
+                        # Gera o gráfico de radar para cada período avaliado
                         fig = criar_grafico_mare(CATEGORIAS, valores)
-                        st.plotly_chart(fig, use_container_width=True, key=f"g_indiv_{al}_{periodo}")
-        else: 
-            st.info("Nenhuma avaliação lançada para os alunos desta sala.")
-    else: 
-        st.error("Erro ao carregar os dados dos alunos desta sala.")
+                        st.plotly_chart(fig, use_container_width=True, key=f"g_tabua_{al}_{periodo}")
+        else:
+            st.info("Nenhuma avaliação encontrada para os alunos desta sala.")
+    else:
+        st.error("Não foi possível carregar a lista de alunos desta sala.")

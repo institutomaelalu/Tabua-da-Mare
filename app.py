@@ -440,8 +440,8 @@ if menu == "👤 Matrícula":
                 sh.worksheet("GERAL").append_row([nome, sala, turno, idade, comu, ""])
                 st.success("Cadastrado com sucesso!"); st.rerun()
 
-elif menu == "🤝 Controle de Matrícula e Apadrinhamento":
-    st.markdown("### 🤝 Controle de Matrícula e Apadrinhamento")
+elif menu == "📝 Controle de Matrícula e Apadrinhamento":
+    st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
     st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     
     # 1. BOTÕES DE SELEÇÃO E CONTADOR

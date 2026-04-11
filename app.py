@@ -522,7 +522,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 conn.update_cell(worksheet=s_busca, row=idx, col=6, value=nome_p.upper())
                 st.success("Registro concluído!"); st.cache_data.clear()
 
-    with gestao_col3:
+with gestao_col3:
         with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
             st.markdown("##### ⏳ Matrícula Estendida")
             s_est = st.selectbox("Origem dos Alunos:", list(TURMAS_CONFIG.keys()), key="sel_est_sala")
@@ -532,42 +532,41 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             lista_est = sorted(df_est_leitura["ALUNO"].unique())
             selecionados = st.multiselect("Selecione 1 ou mais alunos:", lista_est)
             
+            # O código abaixo precisa estar IDENTADO para dentro do st.popover
             if st.button("Confirmar Turno Estendido", use_container_width=True):
-    if selecionados:
-        try:
-            # 1. ACESSO CORRETO AO CLIENTE (Resolve o erro AttributeError)
-            client = conn._instance 
-            sh = client.open(nome_planilha)
-            ws = sh.worksheet("TURNO_ESTENDIDO")
-            
-            ano_atual = datetime.now().strftime("%Y")
-            
-            for aluno in selecionados:
-                # 2. MONTANDO A LINHA EXATAMENTE COMO SEU CABEÇALHO
-                # [ALUNO, SALA, 1 AVAL, 2 AVAL, 3 AVAL, ANO, DIAG, EVID, OBS]
-                # Deixamos as avaliações e observações vazias ("") para preencher depois
-                linha_para_salvar = [
-                    aluno.upper(), # ALUNO
-                    s_est,         # SALA
-                    "",            # 1 AVALIAÇÃO
-                    "",            # 2 AVALIAÇÃO
-                    "",            # 3 AVALIAÇÃO
-                    ano_atual,     # ANO
-                    "",            # DIAGNÓSTICO
-                    "",            # EVIDÊNCIAS
-                    ""             # OBSERVAÇÕES PEDAGÓGICAS
-                ]
-                
-                ws.append_row(linha_para_salvar)
-            
-            st.success(f"{len(selecionados)} aluno(s) adicionado(s) com sucesso!")
-            st.cache_data.clear() # Limpa o cache para mostrar os novos dados na tela
-            st.rerun()
-            
-        except Exception as e:
-            st.error(f"Erro técnico ao salvar: {e}")
-    else:
-        st.warning("Selecione pelo menos um aluno.")
+                # TUDO daqui para baixo foi empurrado para a direita para ficar DENTRO do botão
+                if selecionados:
+                    try:
+                        # ACESSO AO CLIENTE (Resolve o erro AttributeError)
+                        client = conn._instance 
+                        sh = client.open(nome_planilha)
+                        ws = sh.worksheet("TURNO_ESTENDIDO")
+                        
+                        ano_atual = datetime.now().strftime("%Y")
+                        
+                        for aluno in selecionados:
+                            # Montando a linha conforme seu cabeçalho de 9 colunas
+                            linha_para_salvar = [
+                                aluno.upper(), # ALUNO
+                                s_est,         # SALA
+                                "",            # 1 AVALIAÇÃO
+                                "",            # 2 AVALIAÇÃO
+                                "",            # 3 AVALIAÇÃO
+                                ano_atual,     # ANO
+                                "",            # DIAGNÓSTICO
+                                "",            # EVIDÊNCIAS
+                                ""             # OBSERVAÇÕES PEDAGÓGICAS
+                            ]
+                            ws.append_row(linha_para_salvar)
+                        
+                        st.success(f"{len(selecionados)} aluno(s) adicionado(s)!")
+                        st.cache_data.clear() 
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"Erro técnico ao salvar: {e}")
+                else:
+                    st.warning("Selecione pelo menos um aluno.")
 
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):

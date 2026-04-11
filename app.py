@@ -709,7 +709,18 @@ elif menu == "📊 Dados - Turno Estendido":
 
     if "Ano" not in df_h.columns:
         df_h["Ano"] = 2025
-        conn.update(worksheet="TURNO_ESTENDIDO", data=df_h)
+# --- AJUSTE DE COMPATIBILIDADE (R&D) ---
+# 1. Fazemos uma cópia limpa
+df_save = df_h.copy()
+
+# 2. Convertemos todos os nomes de colunas para strings puras (resolve o AttributeError)
+df_save.columns = [str(c) for c in df_save.columns]
+
+# 3. Convertemos todos os dados para strings ou tipos básicos, removendo objetos do Pandas
+df_save = df_save.astype(str)
+
+# 4. Agora enviamos para a nuvem
+conn.update(worksheet="TURNO_ESTENDIDO", data=df_save)
 
     # 1. SELEÇÃO DE ANO
     st.write("Selecione o Ano:")

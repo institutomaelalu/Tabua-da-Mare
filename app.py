@@ -871,7 +871,7 @@ elif menu == "📊 Dados - Turno Estendido":
     
     # 1. LEITURA PROTEGIDA (Usa o motor de cache que definimos no topo)
     # Certifique-se que df_alf é carregado por: carregar_dados_globais("TURNO_ESTENDIDO")
-    df_h = carregar_dados_globais("TURNO_ESTENDIDO")
+    df_h = engine_leitura_dados("TURNO_ESTENDIDO")
 
     if df_h.empty:
         st.warning("Nenhum dado encontrado na aba Turno Estendido.")

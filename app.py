@@ -2,49 +2,21 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
-import os
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
-# 1. CONFIGURAÇÃO E ESTILO (Sempre o primeiro comando Streamlit)
+
+# =================================================================
+# 1. CONFIGURAÇÃO, CONSTANTES E ESTILO
+# =================================================================
 st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
-# --- 1. ESTABELECER CONEXÃO (OBRIGATÓRIO SER AQUI) ---
-conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. CARREGAMENTO INICIAL ---
-try:
-    # 1. Base Geral de Alunos
-    df_g = conn.read(worksheet="GERAL").fillna("")
-    df_g.columns = [str(c).strip().upper() for c in df_g.columns]
-    
-    # 2. Base do Turno Estendido (Substitui o ALF_FILE)
-    df_alf = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
-    df_alf.columns = [str(c).strip().upper() for c in df_alf.columns]
+# Definições Globais (Evita NameError)
+CATEGORIAS = [
+    "Identidade e Autonomia", "Corpo e Movimento", "Oralidade e Escrita", 
+    "Raciocínio Lógico", "Natureza e Sociedade", "Artes Visuais", 
+    "Musicalização", "Teatro", "Culinária", "Horta"
+]
 
-    # 3. Base da Tábua da Maré (Substitui o AVAL_FILE)
-    df_aval = conn.read(worksheet="TABUA_MARE").fillna("")
-    df_aval.columns = [str(c).strip().upper() for c in df_aval.columns]
-    
-except Exception as e:
-    st.error(f"Erro ao carregar dados da nuvem: {e}")
-    df_g = pd.DataFrame(columns=["ALUNO", "TURNO", "COMUNIDADE", "SALA"])
-    df_alf = pd.DataFrame(columns=["ALUNO", "SALA", "ANO", "AVALIAÇÃO", "DIAGNÓSTICO"])
-    df_aval = pd.DataFrame(columns=["ALUNO", "SEMESTRE"] + CATEGORIAS)
-
-# --- 3. FUNÇÕES DE FILTRO (Ajustadas para os novos nomes) ---
-def render_filtros(df_geral, key_suffix):
-    f1, f2 = st.columns(2)
-    tn = f1.selectbox("Filtrar Turno", ["Todos", "A", "B"], key=f"tn_{key_suffix}")
-    
-    # Verificação de segurança para evitar o KeyError: 'COMUNIDADE'
-    if "COMUNIDADE" in df_geral.columns:
-        comu_list = ["Todas"] + sorted([c for c in df_geral["COMUNIDADE"].unique() if str(c).strip()])
-    else:
-        comu_list = ["Todas"]
-        
-    cm = f2.selectbox("Filtrar Comunidade", comu_list, key=f"cm_{key_suffix}")
-    return tn, cm
-
-# --- DEFINIÇÕES DE NÍVEIS E CORES (MATRIZES) ---
 NIVEIS_ALF = [
     "1. Pré-Silábico", "2. Silábico s/ Valor", "3. Silábico c/ Valor", 
     "4. Silábico Alfabético", "5. Alfabético Inicial", "6. Alfabético Final", 
@@ -53,77 +25,118 @@ NIVEIS_ALF = [
 
 MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
 
-CORES_EXCLUSIVAS = {
-    "1. Pré-Silábico": "#FADBD8", "2. Silábico s/ Valor": "#FDEBD0", 
-    "3. Silábico c/ Valor": "#FCF3CF", "4. Silábico Alfabético": "#D5F5E3", 
-    "5. Alfabético Inicial": "#A9DFBF", "6. Alfabético Final": "#D6EAF8", 
-    "7. Alfabético Ortográfico": "#EBDEF0"
+TURMAS_CONFIG = {
+    "SALA ROSA": {"cor": "#F783AC", "icone": "🌸"},
+    "SALA AMARELA": {"cor": "#FFE066", "icone": "⭐"},
+    "SALA VERDE": {"cor": "#A9E34B", "icone": "🌿"},
+    "SALA AZUL": {"cor": "#99E9F2", "icone": "💧"},
+    "CIRAND. MUNDO": {"cor": "#D0BFFF", "icone": "🌍"}
 }
 
 # Cores de Identidade Visual
 C_ROSA, C_VERDE, C_AZUL, C_AMARELO, C_ROXO = "#ff81ba", "#a8cf45", "#5cc6d0", "#ffc713", "#6741d9"
-C_AZUL_MARE = "#8fd9fb" 
+C_AZUL_MARE = "#8fd9fb"
 
-# --- FUNÇÕES DE REGISTRO (ESCRITA NA NUVEM) ---
+# Estilização CSS Única
+st.markdown(f"""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    .stApp {{ background-color: #ffffff; font-family: 'Inter', sans-serif; }}
+    div[key="painel_branco"] {{
+        background-color: white !important; padding: 20px; border-radius: 15px;
+        border: 1px solid #E0E0E0; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 25px;
+    }}
+    /* Botões das Salas */
+    div[key^="btn_m_salas"] button {{ font-weight: 900 !important; color: white !important; font-size: 14px !important; }}
+    </style>
+    """, unsafe_allow_html=True)
 
-def registrar_turno_estendido(aluno, sala, avaliacao_tipo, nivel, evidencias_list, obs, ano=2026):
-    """Salva dados na aba TURNO_ESTENDIDO"""
-    try:
-        # Lê a aba atual
-        df_atual = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
-        evidencias_str = "; ".join(evidencias_list) if isinstance(evidencias_list, list) else evidencias_list
-        
-        novo_registro = {
-            "DATA": datetime.now().strftime("%d/%m/%Y"),
-            "ALUNO": aluno,
-            "SALA": sala,
-            "1 AVALIAÇÃO": nivel if avaliacao_tipo == "1ª Avaliação" else "",
-            "2 AVALIAÇÃO": nivel if avaliacao_tipo == "2ª Avaliação" else "",
-            "3 AVALIAÇÃO": nivel if avaliacao_tipo == "3ª Avaliação" else "",
-            "ANO": ano,
-            "DIAGNÓSTICO": nivel,
-            "EVIDÊNCIAS": evidencias_str,
-            "OBSERVAÇÕES PEDAGÓGICAS": obs
-        }
-        
-        df_final = pd.concat([df_atual, pd.DataFrame([novo_registro])], ignore_index=True)
-        conn.update(worksheet="TURNO_ESTENDIDO", data=df_final)
-        st.cache_data.clear()
-        return True
-    except Exception as e:
-        st.error(f"Erro ao salvar Turno Estendido: {e}")
-        return False
+# =================================================================
+# 2. CONEXÃO E CARREGAMENTO DE DADOS
+# =================================================================
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-def registrar_tabua_mare(aluno, sala, semestre, notas_dict, obs):
-    """Salva ou atualiza dados na aba TABUA_MARE"""
-    try:
-        df_atual = conn.read(worksheet="TABUA_MARE").fillna("")
-        
-        # Lógica de Update ou Insert
-        mask = (df_atual["ALUNO"] == aluno) & (df_atual["SEMESTRE"] == semestre)
-        
-        if mask.any():
-            idx = df_atual.index[mask][0]
-            for col, valor in notas_dict.items():
-                df_atual.at[idx, col] = valor
-            df_atual.at[idx, "OBSERVAÇÕES PEDAGÓGICAS"] = obs
-            df_atual.at[idx, "SALA"] = sala
+try:
+    # Extração segura do ID da Planilha
+    raw_url = st.secrets["connections"]["gsheets"]["spreadsheet"]
+    sheet_id = raw_url.split("/d/")[-1].split("/")[0] if "/d/" in raw_url else raw_url
+
+    # Carregamento Principal
+    df_g = conn.read(spreadsheet=sheet_id, worksheet="GERAL").fillna("")
+    df_g.columns = [str(c).strip().upper() for c in df_g.columns]
+    
+    df_alf = conn.read(spreadsheet=sheet_id, worksheet="TURNO_ESTENDIDO").fillna("")
+    df_alf.columns = [str(c).strip().upper() for c in df_alf.columns]
+
+    df_aval = conn.read(spreadsheet=sheet_id, worksheet="TABUA_MARE").fillna("")
+    df_aval.columns = [str(c).strip().upper() for c in df_aval.columns]
+    
+except Exception as e:
+    st.error(f"Erro ao carregar dados da nuvem: {e}")
+    df_g = pd.DataFrame(columns=["ALUNO", "TURNO", "COMUNIDADE", "SALA"])
+    df_alf = pd.DataFrame(columns=["ALUNO", "SALA", "ANO", "DIAGNÓSTICO"])
+    df_aval = pd.DataFrame(columns=["ALUNO", "SEMESTRE"] + [c.upper() for c in CATEGORIAS])
+
+# =================================================================
+# 3. FUNÇÕES AUXILIARES E FILTROS
+# =================================================================
+
+def render_filtros(df_geral, key_suffix):
+    f1, f2 = st.columns(2)
+    tn = f1.selectbox("Filtrar Turno", ["Todos", "A", "B"], key=f"tn_{key_suffix}")
+    
+    comu_list = ["Todas"]
+    if "COMUNIDADE" in df_geral.columns:
+        comu_list += sorted([c for c in df_geral["COMUNIDADE"].unique() if str(c).strip()])
+    
+    cm = f2.selectbox("Filtrar Comunidade", comu_list, key=f"cm_{key_suffix}")
+    return tn, cm
+
+def aplicar_filtros(df_alvo, df_geral, tn, cm):
+    df_f = df_alvo.copy()
+    if df_f.empty: return df_f
+    
+    df_f.columns = [str(c).strip().upper() for c in df_f.columns]
+    
+    if tn != "Todos":
+        alunos_no_turno = df_geral[df_geral["TURNO"].astype(str).str.contains(tn, na=False)]["ALUNO"].unique()
+        df_f = df_f[df_f["ALUNO"].isin(alunos_no_turno)]
+    
+    if cm != "Todas":
+        if "COMUNIDADE" in df_f.columns:
+            df_f = df_f[df_f["COMUNIDADE"] == cm]
         else:
-            registro = {"ALUNO": aluno, "SALA": sala, "SEMESTRE": semestre, "OBSERVAÇÕES PEDAGÓGICAS": obs}
-            registro.update(notas_dict)
-            df_atual = pd.concat([df_atual, pd.DataFrame([registro])], ignore_index=True)
+            alunos_na_comu = df_geral[df_geral["COMUNIDADE"] == cm]["ALUNO"].unique()
+            df_f = df_f[df_f["ALUNO"].isin(alunos_na_comu)]
+    return df_f
+
+def render_botoes_salas(key_prefix, session_key):
+    salas = list(TURMAS_CONFIG.keys())
+    cols = st.columns(len(salas))
+    
+    if session_key not in st.session_state:
+        st.session_state[session_key] = salas[0]
+
+    for i, sala in enumerate(salas):
+        cor = TURMAS_CONFIG[sala]["cor"]
+        op = "1.0" if st.session_state[session_key] == sala else "0.4"
         
-        conn.update(worksheet="TABUA_MARE", data=df_atual)
-        st.cache_data.clear()
-        return True
-    except Exception as e:
-        st.error(f"Erro ao sincronizar Tábua da Maré: {e}")
-        return False
+        # Estilo do botão individual
+        st.markdown(f"""
+            <style>
+            div[key="{key_prefix}_{sala}"] button {{
+                background-color: {cor} !important;
+                opacity: {op} !important;
+                border: none !important;
+            }}
+            </style>
+        """, unsafe_allow_html=True)
+        
+        if cols[i].button(sala, key=f"{key_prefix}_{sala}", use_container_width=True):
+            st.session_state[session_key] = sala
+            st.rerun()
 
-# --- COMPONENTES VISUAIS E SUPORTE ---
-
-def get_text_color(nivel=None):
-    return "#2C3E50"
+# --- Outras funções visuais (render_legenda_niveis, render_vasilha_mare) seguem abaixo...
 
 def render_legenda_niveis():
     st.markdown("##### 📝 Legenda de Níveis")

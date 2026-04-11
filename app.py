@@ -526,49 +526,47 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
                 st.markdown("##### ⏳ Matrícula Estendida")
                 s_est = st.selectbox("Origem dos Alunos:", list(TURMAS_CONFIG.keys()), key="sel_est_sala")
+                
                 df_est = conn.read(worksheet=s_est).fillna("")
+                df_est.columns = [str(c).strip().upper() for c in df_est.columns]
                 lista_est = sorted(df_est["ALUNO"].unique())
+                
                 selecionados = st.multiselect("Selecione os alunos:", lista_est)
                 
                 if st.button("Confirmar Turno Estendido", use_container_width=True):
-                    try:
-                        # 1. Busca o cliente de escrita
-                        client = None
-                        if hasattr(conn, "_instance") and hasattr(conn._instance, "client"):
-                            client = conn._instance.client
-                        elif hasattr(conn, "client"):
-                            client = conn.client
-                        elif hasattr(conn, "session") and hasattr(conn.session, "client"):
-                            client = conn.session.client
-                        
-                        # Escavação profunda para o gspread
-                        if client and not hasattr(client, "open_by_key"):
-                            client = getattr(client, "_client", getattr(client, "service", client))
+                    if not selecionados:
+                        st.warning("Selecione os alunos primeiro.")
+                    else:
+                        try:
+                            # 1. Busca o cliente gspread
+                            client = None
+                            for attr in ["client", "_instance", "session"]:
+                                obj = getattr(conn, attr, None)
+                                if obj and hasattr(obj, "open_by_key"): client = obj; break
+                                if obj and hasattr(obj, "client") and hasattr(obj.client, "open_by_key"): client = obj.client; break
+                            
+                            # Escavação se o client for apenas um wrapper
+                            if client and not hasattr(client, "open_by_key"):
+                                client = getattr(client, "_client", getattr(client, "service", client))
 
-                        if client is None:
-                            st.error("Não foi possível acessar o driver de escrita.")
-                        else:
-                            # 2. Acesso aos dados nos Secrets
-                            # Certifique-se que em .streamlit/secrets.toml existe o campo [connections.gsheets]
-                            spreadsheet_id = st.secrets["connections"]["gsheets"]["spreadsheet"]
-                            sh = client.open_by_key(spreadsheet_id)
-                            
-                            # 3. Verificação da Aba (Evita o 404)
-                            try:
+                            if client is None:
+                                st.error("Erro de conexão com o driver de escrita.")
+                            else:
+                                # 2. Limpeza do ID da Planilha (caso venha o link completo)
+                                raw_id = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                                s_id = raw_id.split("/d/")[-1].split("/")[0] if "/d/" in raw_id else raw_id
+                                
+                                sh = client.open_by_key(s_id)
                                 ws = sh.worksheet("TURNO_ESTENDIDO")
-                            except Exception:
-                                st.error("Erro 404: A aba 'TURNO_ESTENDIDO' não foi encontrada na sua planilha.")
-                                st.stop()
-                            
-                            for aluno in selecionados:
-                                ws.append_row([aluno.upper(), s_est])
-                            
-                            st.success(f"{len(selecionados)} alunos adicionados!")
-                            st.cache_data.clear()
-                            st.rerun()
-                            
-                    except Exception as e:
-                        st.error(f"Erro ao salvar: {e}")
+                                
+                                for aluno in selecionados:
+                                    ws.append_row([aluno.upper(), s_est])
+                                
+                                st.success(f"{len(selecionados)} alunos adicionados!")
+                                st.cache_data.clear()
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao salvar: {e}")
 
         with g_col4:
             with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):

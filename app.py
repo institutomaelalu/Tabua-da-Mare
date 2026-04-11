@@ -616,10 +616,10 @@ with gestao_col4:
                 else:
                     st.warning("Selecione um aluno para excluir.")
 
-    # --- BOTÕES DAS SALAS (COLORIDOS) ---
+   # --- BOTÕES DAS SALAS (COLORIDOS) ---
     render_botoes_salas("btn_pad", "sel_pad")
     
-    # Garantia de que há uma sala selecionada
+    # Garantia de que há uma sala selecionada no estado da sessão
     if "sel_pad" not in st.session_state:
         st.session_state.sel_pad = "SALA ROSA"
     
@@ -627,35 +627,39 @@ with gestao_col4:
     cor_h = TURMAS_CONFIG[sala_v]["cor"]
 
     # --- VISUALIZAÇÃO DOS DADOS ---
-    df_g = conn.read(worksheet="GERAL").fillna("")
-    df_s = conn.read(worksheet=sala_v).fillna("")
-    df_s.columns = [str(c).strip().upper() for c in df_s.columns]
+    try:
+        df_g = conn.read(worksheet="GERAL").fillna("")
+        df_s = conn.read(worksheet=sala_v).fillna("")
+        df_s.columns = [str(c).strip().upper() for c in df_s.columns]
 
-    if not df_s.empty:
-        tn, cm = render_filtros(df_g, "pad")
-        df_f = df_s.copy()
-        if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
-        if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
+        if not df_s.empty:
+            tn, cm = render_filtros(df_g, "pad")
+            df_f = df_s.copy()
+            if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
+            if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-        t_turno = f" - {tn}" if tn != "Todos" else ""
-        st.markdown(f"""
-            <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; border-left: 4px solid {cor_h}; margin: 10px 0 20px 0;">
-                <span style="font-size: 14px; color: #555;">📍 Atualmente temos <b>{len(df_f)}</b> alunos matriculados na <b>{sala_v}{t_turno}</b></span>
-            </div>
-        """, unsafe_allow_html=True)
+            t_turno = f" - {tn}" if tn != "Todos" else ""
+            st.markdown(f"""
+                <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; border-left: 4px solid {cor_h}; margin: 10px 0 20px 0;">
+                    <span style="font-size: 14px; color: #555;">📍 Atualmente temos <b>{len(df_f)}</b> alunos matriculados na <b>{sala_v}{t_turno}</b></span>
+                </div>
+            """, unsafe_allow_html=True)
 
-        v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
-        st.markdown(f"""<style>
-            .custom-table {{ font-size: 13px !important; width: 100%; border-collapse: collapse; }}
-            .custom-table thead th {{ background-color: {cor_h} !important; color: white !important; padding: 10px; text-align: left; }}
-            .custom-table td {{ padding: 8px 10px; border-bottom: 1px solid #f0f0f0; border-right: 1px solid #f0f0f0; }}
-        </style>""", unsafe_allow_html=True)
+            v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
+            st.markdown(f"""<style>
+                .custom-table {{ font-size: 13px !important; width: 100%; border-collapse: collapse; }}
+                .custom-table thead th {{ background-color: {cor_h} !important; color: white !important; padding: 10px; text-align: left; }}
+                .custom-table td {{ padding: 8px 10px; border-bottom: 1px solid #f0f0f0; border-right: 1px solid #f0f0f0; }}
+            </style>""", unsafe_allow_html=True)
 
-        html = f'<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in v_cols]) + '</tr></thead><tbody>'
-        for _, r in df_f.iterrows():
-            p_txt = str(r.get('PADRINHO/MADRINHA','')) if str(r.get('PADRINHO/MADRINHA','')) not in ['nan','', '0', '-'] else '-'
-            html += f"<tr><td>{r['ALUNO']}</td><td style='text-align:center'>{r['TURMA']}</td><td>{r['IDADE']}</td><td>{r['COMUNIDADE']}</td><td>{p_txt}</td></tr>"
-        st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
+            html = f'<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in v_cols]) + '</tr></thead><tbody>'
+            for _, r in df_f.iterrows():
+                p_val = r.get('PADRINHO/MADRINHA', '')
+                p_txt = str(p_val) if str(p_val).strip() not in ['nan', '', '0', '-'] else '-'
+                html += f"<tr><td>{r['ALUNO']}</td><td style='text-align:center'>{r['TURMA']}</td><td>{r['IDADE']}</td><td>{r['COMUNIDADE']}</td><td>{p_txt}</td></tr>"
+            st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"Erro ao carregar dados da sala: {e}")
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
 

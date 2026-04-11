@@ -257,10 +257,10 @@ st.markdown(f"""
 
 # 2. Funções de Dados
 TURMAS_CONFIG = {
-    "ROSA": {"cor": C_ROSA, "icon": "🌸"},
-    "AMARELA": {"cor": C_AMARELO, "icon": "⭐"},
-    "VERDE": {"cor": C_VERDE, "icon": "🌿"},
-    "AZUL": {"cor": C_AZUL, "icon": "💧"},
+    "SALA ROSA": {"cor": C_ROSA, "icon": "🌸"},
+    "SALA AMARELA": {"cor": C_AMARELO, "icon": "⭐"},
+    "SALA VERDE": {"cor": C_VERDE, "icon": "🌿"},
+    "SALA AZUL": {"cor": C_AZUL, "icon": "💧"},
     "CIRAND. MUNDO": {"cor": C_ROXO, "icon": "🌍"}
 }
 
@@ -319,21 +319,17 @@ def aplicar_filtros(df_alvo, df_geral, tn, cm):
     return df_f
 
 def render_botoes_salas(key_prefix, session_key, salas_permitidas=None):
-    # Define as salas (usa as do dicionário se não vier nenhuma permitida)
     salas = salas_permitidas if salas_permitidas else list(TURMAS_CONFIG.keys())
-    
     cols = st.columns(len(salas))
     
-    for i, sala in enumerate(salas):
-        # --- O SEGREDO ESTÁ AQUI ---
-        # .strip() remove espaços vazios. .upper() garante que tudo seja maiúsculo.
-        nome_limpo = str(sala).strip().upper()
+    for i, nome_aba in enumerate(salas):
+        cfg = TURMAS_CONFIG.get(nome_aba, {"cor": "#566573", "icon": "🏫"})
         
-        # Se não encontrar a sala no TURMAS_CONFIG, usa uma cor cinza padrão (#566573)
-        cfg = TURMAS_CONFIG.get(nome_limpo, {"cor": "#566573", "icon": "🏫"})
+        # Estética: No botão, removemos a palavra "SALA" para não ficar repetitivo
+        # Mas internamente, o valor salvo será o nome completo da aba ("SALA ROSA")
+        label_exibicao = nome_aba.replace("SALA ", "")
         
-        # Lógica de estilo para o botão selecionado
-        is_active = st.session_state.get(session_key) == sala
+        is_active = st.session_state.get(session_key) == nome_aba
         op = "1.0" if is_active else "0.35"
         
         st.markdown(f'''
@@ -343,14 +339,14 @@ def render_botoes_salas(key_prefix, session_key, salas_permitidas=None):
                     color: white !important;
                     opacity: {op};
                     border: {"2px solid black" if is_active else "1px solid #ccc"} !important;
+                    font-weight: bold !important;
                 }}
             </style>
         ''', unsafe_allow_html=True)
         
-        if cols[i].button(f"{cfg.get('icon', '')} {sala}", key=f"{key_prefix}_{nome_limpo}"):
-            st.session_state[session_key] = sala
+        if cols[i].button(f"{cfg['icon']} {label_exibicao}", key=f"{key_prefix}_{i}"):
+            st.session_state[session_key] = nome_aba
             st.rerun()
-
 def criar_grafico_mare(categorias, valores):
     fig = go.Figure(go.Scatter(
         x=categorias, y=valores, fill='tozeroy', mode='markers+lines',

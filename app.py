@@ -426,18 +426,26 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
     st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     
-    # --- CSS PARA INVERTER CORES DOS BOTÕES (Fundo Branco, Texto Colorido e Negrito) ---
+    # --- CSS PARA INVERTER CORES DOS BOTÕES ---
     st.markdown("""
         <style>
+        /* Altera o botão do Popover (o que abre a janela) */
         div[data-testid="stPopover"] > button {
             background-color: white !important;
-            color: #31333F !important; /* Cor padrão do texto */
+            color: #31333F !important;
             font-weight: bold !important;
             border: 1px solid #d3d3d3 !important;
+            border-radius: 5px;
         }
-        /* Ajuste específico para o texto dos botões dentro dos popovers para ficarem com a cor do tema */
+        /* Força o texto dentro do botão a ser negrito */
         div[data-testid="stPopover"] p {
             font-weight: bold !important;
+            color: #31333F !important;
+        }
+        /* Efeito de passar o mouse (opcional, para dar feedback visual) */
+        div[data-testid="stPopover"] > button:hover {
+            border: 1px solid #31333F !important;
+            background-color: #f9f9f9 !important;
         }
         </style>
     """, unsafe_allow_html=True)

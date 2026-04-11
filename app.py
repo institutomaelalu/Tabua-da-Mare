@@ -6,15 +6,29 @@ import os
 import gspread
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
-def get_gspread_client(connection):
-    """Tenta encontrar o cliente gspread dentro da conexão GSheets do Streamlit"""
-    if hasattr(connection, "_instance"):
-        instance = connection._instance
-        # Tenta .client (comum no st-gsheets) ou retorna a própria instância
-        if hasattr(instance, "client"):
-            return instance.client
-        return instance
-    return connection
+def get_gspread_client_seguro():
+    import gspread
+    from google.oauth2.service_account import Credentials
+    
+    # Scopes necessários para o Google autorizar a escrita
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    
+    # Tenta carregar as credenciais do segredo do Streamlit
+    try:
+        creds = Credentials.from_service_account_info(
+            st.secrets["connections"]["gsheets"], 
+            scopes=scopes
+        )
+        return gspread.authorize(creds)
+    except Exception as e:
+        st.error(f"Erro nas credenciais: {e}")
+        return None
+
+# ID da sua planilha (extraído do seu histórico)
+ID_PLANILHA = "1Zj8u67oAWKgYRd2uOkGssdaxXnwdsKsZBDxeLChnBr4"
 
 nome_planilha = "APP_IMLA"
 sheet_id = nome_planilha
@@ -766,17 +780,28 @@ elif menu == "📖 Turno Estendido":
     st.write(f"Registrando para o ano letivo: **{st.session_state.ano_registro_te}**")
     st.markdown("---")
 
-    # --- SELEÇÃO DE ALUNO ---
-    salas_te = sorted(list(set(st.session_state["alunos_te_dict"].values())))
-    if salas_te:
-        if st.session_state.sel_te not in salas_te: st.session_state.sel_te = salas_te[0]
-        render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_te)
-        
-        al_te = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_te]
+# --- SELEÇÃO DE ALUNO ---
+    # Forçamos as salas para garantir que os botões coloridos apareçam sempre
+    salas_te = ["ROSA", "AMARELA", "VERDE", "AZUL", "CIRAND. MUNDO"]
+    
+    # Chamamos a renderização dos botões (Certifique-se que essa função usa salas_te)
+    render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_te)
+    
+    # Filtra alunos da sala selecionada que já existem na planilha
+    al_te = df_alf[df_alf["SALA"] == st.session_state.sel_te]["ALUNO"].unique().tolist()
+    
+    if not al_te:
+        st.warning("Selecione a sala ou matricule alunos nesta turma.")
+        al = None
+    else:
         al = st.selectbox("Aluno:", sorted(al_te))
         
-        # Puxa o histórico do aluno
-        dados_aluno = df_h[df_h["Aluno"] == al]
+        # --- O SEGREDO DO HISTÓRICO POR ANO ---
+        ano_ativo = int(st.session_state.ano_registro_te)
+        # Busca histórico filtrando por NOME e por ANO selecionado no botão
+        dados_aluno = df_alf[(df_alf["ALUNO"] == al) & (df_alf["ANO"] == ano_ativo)]
+        
+        # diag agora contém apenas os dados do ano que está no topo
         diag = dados_aluno.iloc[-1] if not dados_aluno.empty else None
         
         # --- TRILHA VISUAL ---
@@ -822,26 +847,26 @@ elif menu == "📖 Turno Estendido":
             obs = st.text_area("Observações Adicionais:")
             
             if st.form_submit_button("🚀 Salvar na Planilha Google"):
-                tipo_map = {
-                    "1ª Avaliação": "1 Avaliação",
-                    "2ª Avaliação": "2 Avaliação",
-                    "Avaliação Final": "3 Avaliação"
-                }
-                
-                sucesso = registrar_turno_estendido(
-                    aluno=al,
-                    sala=st.session_state.sel_te,
-                    avaliacao_tipo=tipo_map.get(tipo),
-                    nivel=nV,
-                    evidencias_list=s_ev,
-                    obs=obs,
-                    ano=int(st.session_state.ano_registro_te)
-                )
-                
-                if sucesso:
-                    st.success("Dados sincronizados com sucesso!")
-                    st.cache_data.clear() 
-                    st.rerun()
+                try:
+                    client = get_gspread_client_seguro()
+                    if client:
+                        sh = client.open_by_key(ID_PLANILHA)
+                        ws = sh.worksheet("TURNO_ESTENDIDO")
+                        
+                        # Monta a linha para o Sheets
+                        # ALUNO, SALA, 1 AVAL, 2 AVAL, 3 AVAL, ANO, DIAGNÓSTICO, EVIDÊNCIAS, OBS
+                        tipo_map = {"1ª Avaliação": 2, "2ª Avaliação": 3, "Avaliação Final": 4}
+                        col_index = tipo_map.get(tipo, 2)
+                        
+                        nova_linha = [al, st.session_state.sel_te, "", "", "", ano_ativo, nV, ", ".join(s_ev), obs]
+                        nova_linha[col_index] = "OK" # Marca o período avaliado
+                        
+                        ws.append_row(nova_linha)
+                        st.success(f"Avaliação de {ano_ativo} salva com sucesso!")
+                        st.cache_data.clear()
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Erro técnico ao salvar: {e}")
 # --- ABA: DADOS - TURNO ESTENDIDO (ATUALIZADO COM CORES E LEGENDA) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("""

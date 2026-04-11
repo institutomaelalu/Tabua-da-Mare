@@ -38,9 +38,13 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- NOVO: MOTOR DE CACHE (ADICIONE AQUI) ---
 @st.cache_data(ttl=600)
-def carregar_dados_globais(aba): # Adicionamos 'aba' aqui
+def carregar_dados_globais(aba):
+    """
+    Função centralizada para leitura com cache. 
+    O parâmetro 'aba' permite que ela seja usada para qualquer planilha.
+    """
     try:
-        # ttl=None é fundamental para o cache_data funcionar
+        # ttl=None dentro do read é vital para o st.cache_data gerenciar o tempo
         df = conn.read(worksheet=aba, ttl=None).fillna("")
         df.columns = [str(c).strip().upper() for c in df.columns]
         return df

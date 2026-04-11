@@ -902,37 +902,42 @@ elif menu == "📊 Dados - Turno Estendido":
     ano_sel = st.session_state.ano_ativo_te
     st.markdown(f"**Exibindo dados de: {ano_sel}**")
 
-    # --- 1. LEGENDA DE NÍVEIS ---
+   # --- 1. LEGENDA DE NÍVEIS ---
     st.markdown("##### 📝 Legenda de Níveis")
-        cols_leg = st.columns(len(NIVEIS_ALF))
-    for i, nv in enumerate(NIVEIS_ALF):
-    nv = str(r.get("NÍVEL", "")).strip() # Garante que nv seja string e sem espaços
-    cor_fundo = CORES_EXCLUSIVAS.get(nv, "#eee") 
+    cols_leg = st.columns(len(NIVEIS_ALF))
+    
+    for i, nv_label in enumerate(NIVEIS_ALF):
+        # Usamos nv_label para a legenda e CORES_EXCLUSIVAS que definimos no topo
+        cor_fundo = CORES_EXCLUSIVAS.get(nv_label, "#eee")
+        cor_txt = get_text_color(nv_label)
         
         cols_leg[i].markdown(f"""
             <div style="background-color:{cor_fundo}; color:{cor_txt}; padding:8px 2px; border-radius:10px; 
             text-align:center; font-size:10px; font-weight:bold; min-height:50px; display:flex; align-items:center; justify-content:center; line-height:1.1; border: 1px solid rgba(0,0,0,0.05);">
-                {nv.split(". ")[1]}
+                {nv_label.split(". ")[1] if ". " in nv_label else nv_label}
             </div>
         """, unsafe_allow_html=True)
 
     # --- 2. FUNÇÃO AUXILIAR MARÉ ---
     def get_status_mare_html(nv_atual, hist):
         pct, txt = 85, "maré baixa"
-        if nv_atual == "7. Alfabético Ortográfico": pct, txt = 15, "maré cheia"
+        if nv_atual == "7. Alfabético Ortográfico": 
+            pct, txt = 15, "maré cheia"
         elif len(hist) >= 2:
-            n_at, n_ant = MAPA_NIVEIS.get(nv_atual, 0), MAPA_NIVEIS.get(hist[-2], 0)
+            n_at = MAPA_NIVEIS.get(nv_atual, 0)
+            n_ant = MAPA_NIVEIS.get(hist[-2], 0)
             if n_at > n_ant: pct, txt = 45, "maré enchente"
             elif n_at < n_ant: pct, txt = 70, "maré vazante"
         
         return f'''
-        <div class="mare-box">
-            <div class="mare-mini-tabela" style="background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%); clip-path: path('M 0 4 Q 10 0 20 4 T 40 4 L 40 20 L 0 20 Z');"></div>
-            <span class="mare-texto-tabela">{txt}</span>
+        <div style="text-align:center;">
+            <div style="width:40px; height:20px; margin:0 auto; background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%); clip-path: path('M 0 4 Q 10 0 20 4 T 40 4 L 40 20 L 0 20 Z');"></div>
+            <span style="font-size:9px; color:#5DADE2; font-weight:bold; text-transform:uppercase;">{txt}</span>
         </div>'''
 
     cols_header = ["Nome do Aluno", "1ª Sondagem", "2ª Sondagem", "3ª Sondagem", "STATUS MARÉ"]
-    if ano_sel == 2026: cols_header.insert(1, "Diagnóstico Atual")
+    if ano_sel == 2026: 
+        cols_header.insert(1, "Diagnóstico Atual")
 
     html_tab = f"""<table style="width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border: 1px solid #eee; color: #2C3E50;">
         <thead><tr style="background-color: #F8F9FA;">{"".join([f'<th style="padding:12px; border:1px solid #eee; font-size:12px;">{c}</th>' for c in cols_header])}</tr></thead>
@@ -947,16 +952,16 @@ elif menu == "📊 Dados - Turno Estendido":
         if ano_sel == 2026:
             d_ant = df_h[(df_h["ALUNO"] == al) & (df_h["ANO"] == 2025) & (df_h["AVALIACAO"] == "Avaliação Final")]
             if not d_ant.empty:
-                nv = d_ant["NIVEL"].iloc[0]
-                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv)}; color:{get_text_color(nv)}; text-align:center; font-weight:bold; font-size:10px; border:1px solid #eee; padding:8px;">{nv.split(". ")[1]}</td>'
+                nv = str(d_ant["NIVEL"].iloc[0])
+                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv, "#eee")}; color:{get_text_color(nv)}; text-align:center; font-weight:bold; font-size:10px; border:1px solid #eee; padding:8px;">{nv.split(". ")[1] if ". " in nv else nv}</td>'
             else: 
                 html_tab += '<td style="text-align:center; border:1px solid #eee; color:#ccc;">-</td>'
 
         for etapa in ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"]:
             r = dados_ano[dados_ano["AVALIACAO"] == etapa]
             if not r.empty:
-                nv = r["NIVEL"].iloc[0]
-                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv)}; color:{get_text_color(nv)}; text-align:center; font-weight:bold; border:1px solid #eee; font-size:11px; padding:8px;">{nv.split(". ")[1]}</td>'
+                nv = str(r["NIVEL"].iloc[0])
+                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv, "#eee")}; color:{get_text_color(nv)}; text-align:center; font-weight:bold; border:1px solid #eee; font-size:11px; padding:8px;">{nv.split(". ")[1] if ". " in nv else nv}</td>'
             else: 
                 html_tab += '<td style="border:1px solid #eee;"></td>'
 

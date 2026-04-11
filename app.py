@@ -79,8 +79,6 @@ NIVEIS_ALF = [
     "7. Alfabético Ortográfico"
 ]
 
-MAPA_NIVEIS = {niv: i+1 for i, niv in enumerate(NIVEIS_ALF)}
-
 CORES_EXCLUSIVAS = {
     "1. Pré-Silábico": "#FADBD8", "2. Silábico s/ Valor": "#FDEBD0", 
     "3. Silábico c/ Valor": "#FCF3CF", "4. Silábico Alfabético": "#D5F5E3", 

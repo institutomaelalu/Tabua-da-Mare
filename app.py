@@ -746,8 +746,9 @@ elif menu == "📊 Avaliação da Tábua da Maré":
     else:
         st.warning(f"Nenhum aluno encontrado na {sala_atual}. Verifique se a aba da sala na planilha tem a coluna 'ALUNO'.")
 # --- ABA: TURNO ESTENDIDO ---
-        elif menu == "📖 Turno Estendido":
+    elif menu == "📖 Turno Estendido":
         st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
+        
         try:
             # Carrega os dados da aba TURNO_ESTENDIDO
             df_h = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
@@ -756,19 +757,20 @@ elif menu == "📊 Avaliação da Tábua da Maré":
             st.error(f"Erro ao conectar com a planilha: {e}")
             st.stop()
 
-        # Condição: Só prossegue se houver dados
+        # Verifica se há dados
         if df_h.empty or "ALUNO" not in df_h.columns:
             st.warning("Nenhum aluno matriculado no Turno Estendido até o momento.")
             st.info("Para matricular um aluno, vá na aba 'Controle de Matrícula e Apadrinhamento'.")
-            st.stop() # Interrompe a execução aqui para não dar erro no formulário abaixo
+            st.stop()
 
-        # 1. BOTÕES DE SELEÇÃO DE SALAS
+        # 1. BOTÕES DE SELEÇÃO DE SALAS (Interface padronizada)
         render_botoes_salas("btn_te", "sel_te")
         sala_v = st.session_state.get("sel_te", "SALA ROSA")
         
         # 2. SELEÇÃO DE ANO
         if "lista_anos_te" not in st.session_state:
             st.session_state.lista_anos_te = sorted(df_h["ANO"].unique().tolist()) if "ANO" in df_h.columns else [2026]
+        
         if "ano_registro_te" not in st.session_state:
             st.session_state.ano_registro_te = 2026
 
@@ -782,23 +784,20 @@ elif menu == "📊 Avaliação da Tábua da Maré":
         st.divider()
 
         # 3. FILTRAGEM DE ALUNOS
-        dict_alunos_te = pd.Series(df_h.SALA.values, index=df_h.ALUNO.values).to_dict()
-        alunos_na_sala = [n for n, s in dict_alunos_te.items() if str(s).strip().upper() == str(sala_v).strip().upper()]
+        # Filtra os alunos que pertencem à sala selecionada
+        alunos_na_sala = df_h[df_h["SALA"].str.upper() == sala_v.upper()]["ALUNO"].unique().tolist()
 
         if not alunos_na_sala:
-            st.info(f"Não há alunos do Turno Estendido registrados na **{sala_v}** para o ano selecionado.")
-            st.stop() # Interrompe aqui se a sala escolhida não tiver ninguém
+            st.info(f"Não há alunos do Turno Estendido registrados na **{sala_v}**.")
+            st.stop()
 
         al_sel = st.selectbox("Selecione o Aluno para Avaliação:", sorted(alunos_na_sala))
 
-        # --- A PARTIR DAQUI O ALUNO JÁ ESTÁ SELECIONADO ---
-        
-        # Histórico para a trilha
+        # --- 4. HISTÓRICO E TRILHA (Só executa se houver aluno selecionado) ---
         dados_al = df_h[df_h["ALUNO"] == al_sel]
         diag_rec = dados_al.iloc[-1] if not dados_al.empty else None
         nivel_atual = diag_rec["DIAGNÓSTICO"] if diag_rec is not None else ""
 
-        # --- TRILHA DE DIAGNÓSTICO (Visual) ---
         st.markdown("""<style>
             .trilha-te { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 15px 0; overflow-x: auto; }
             .box-te { padding: 8px; border-radius: 12px; text-align: center; font-size: 10px; font-weight: bold; min-width: 95px; height: 42px; display: flex; align-items: center; justify-content: center; line-height: 1.1; }
@@ -814,9 +813,11 @@ elif menu == "📊 Avaliação da Tábua da Maré":
             if i < len(NIVEIS_ALF)-1: ht += '<span style="color:#ccc">→</span>'
         st.markdown(ht + '</div>', unsafe_allow_html=True)
 
-        # --- FORMULÁRIO DE REGISTRO ---
-        try: idx_in = NIVEIS_ALF.index(nivel_atual) if nivel_atual in NIVEIS_ALF else 0
-        except: idx_in = 0
+        # --- 5. FORMULÁRIO DE REGISTRO ---
+        try:
+            idx_in = NIVEIS_ALF.index(nivel_atual) if nivel_atual in NIVEIS_ALF else 0
+        except:
+            idx_in = 0
             
         novo_nivel = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_in)
 
@@ -826,7 +827,6 @@ elif menu == "📊 Avaliação da Tábua da Maré":
             st.write("**Evidências observadas:**")
             evidencias = EVIDENCIAS_POR_NIVEL.get(novo_nivel, [])
             e_cols = st.columns(3)
-            # Nota: usei al_sel no key para evitar conflitos ao trocar de aluno
             selecionados = [ev for i, ev in enumerate(evidencias) if e_cols[i%3].checkbox(ev, key=f"ev_te_{al_sel}_{i}")]
             
             obs = st.text_area("Observações Pedagógicas Adicionais:")

@@ -92,6 +92,14 @@ CORES_EXCLUSIVAS = {
 C_ROSA, C_VERDE, C_AZUL, C_AMARELO, C_ROXO = "#ff81ba", "#a8cf45", "#5cc6d0", "#ffc713", "#6741d9"
 C_AZUL_MARE = "#8fd9fb" 
 
+MARE_LABELS = {
+    1: "Maré Baixa",
+    2: "Maré Vazante",
+    3: "Maré Enchente",
+    4: "Maré Alta",
+    5: "Maré Cheia"
+}
+
 # --- FUNÇÕES DE REGISTRO (ESCRITA NA NUVEM) ---
 
 def registrar_turno_estendido(aluno, sala, avaliacao_tipo, nivel, evidencias_list, obs, ano=2026):
@@ -347,15 +355,30 @@ def render_botoes_salas(key_prefix, session_key, salas_permitidas=None):
         if cols[i].button(f"{cfg['icon']} {label_exibicao}", key=f"{key_prefix}_{i}"):
             st.session_state[session_key] = nome_aba
             st.rerun()
-def criar_grafico_mare(categorias, valores):
-    fig = go.Figure(go.Scatter(
-        x=categorias, y=valores, fill='tozeroy', mode='markers+lines',
-        line=dict(color=C_AZUL_MARE, width=4, shape='spline'),
-        marker=dict(size=10, color=C_AZUL),
-        text=[MARE_LABELS[int(v)] for v in valores], hoverinfo="text+x"
+def criar_grafico_mare(CATEGORIAS, valores):
+    import plotly.graph_objects as go
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatterpolar(
+        r=valores,
+        theta=CATEGORIAS,
+        fill='toself',
+        # Aqui o .get() protege o código se o valor não for 1-5
+        text=[MARE_LABELS.get(int(v), "Nível Indefinido") for v in valores],
+        hoverinfo="text+theta",
+        line=dict(color='#2E86C1')
     ))
-    fig.update_layout(paper_bgcolor='white', plot_bgcolor='white', yaxis=dict(range=[0.5, 4.5], visible=False),
-        xaxis=dict(showgrid=False, zeroline=False), height=400, margin=dict(l=20, r=20, t=30, b=80))
+    
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, 5])
+        ),
+        showlegend=False,
+        margin=dict(l=40, r=40, t=20, b=20),
+        height=350
+    )
+    
     return fig
 
 # --- INICIALIZAÇÃO DE SESSÃO ---

@@ -532,46 +532,40 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             if st.button("Confirmar Matrícula no Turno Estendido"):
                 if selecionados:
                     try:
-                        # 1. Conexão robusta usando gspread puro para garantir a escrita
+                        # 1. Autenticação Direta
                         import gspread
                         from google.oauth2.service_account import Credentials
                         
                         scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
                         creds = Credentials.from_service_account_info(st.secrets["connections"]["gsheets"], scopes=scope)
-                        gc = gspread.authorize(creds)
+                        client = gspread.authorize(creds)
                         
-                        # 2. Abre a planilha e a aba correta
-                        sh = gc.open(nome_planilha)
+                        # 2. Abrir a planilha (DICA: Use o ID se o Nome falhar)
+                        # O ID é aquela sequência de letras e números na URL da sua planilha
+                        sh = client.open("APP_IMLA") 
                         ws = sh.worksheet("TURNO_ESTENDIDO")
                         
                         ano_atual = datetime.now().strftime("%Y")
                         
-                        # 3. Itera sobre os alunos selecionados no multiselect
+                        # 3. Preparar as linhas para inserção em lote (mais rápido e seguro)
+                        novas_linhas = []
                         for aluno in selecionados:
-                            # Criamos a linha com as 9 colunas da sua planilha:
-                            # [ALUNO, SALA, 1 AVAL, 2 AVAL, 3 AVAL, ANO, DIAGNÓSTICO, EVIDÊNCIAS, OBSERVAÇÕES]
-                            # Deixamos as colunas de avaliação e pedagógicas vazias ("") para preenchimento posterior
-                            nova_linha = [
-                                aluno.upper(), # ALUNO
-                                s_est,         # SALA
-                                "",            # 1 AVALIAÇÃO
-                                "",            # 2 AVALIAÇÃO
-                                "",            # 3 AVALIAÇÃO
-                                ano_atual,     # ANO
-                                "",            # DIAGNÓSTICO
-                                "",            # EVIDÊNCIAS
-                                ""             # OBSERVAÇÕES PEDAGÓGICAS
-                            ]
-                            ws.append_row(nova_linha)
+                            # [ALUNO, SALA, 1 AVAL, 2 AVAL, 3 AVAL, ANO, DIAGNÓSTICO, EVIDÊNCIAS, OBS]
+                            linha = [aluno.upper(), s_est, "", "", "", ano_atual, "", "", ""]
+                            novas_linhas.append(linha)
                         
-                        st.success(f"✅ {len(selecionados)} aluno(s) registrados no Turno Estendido!")
-                        st.cache_data.clear() # Força o app a ler os dados novos do Google Sheets
+                        # 4. Enviar tudo de uma vez
+                        ws.append_rows(novas_linhas)
+                        
+                        st.success(f"✅ {len(selecionados)} aluno(s) matriculado(s)!")
+                        st.cache_data.clear()
                         st.rerun()
-                        
+            
                     except Exception as e:
-                        st.error(f"Erro ao acessar o Google Sheets: {e}")
+                        # Se o erro persistir, ele vai mostrar o detalhe técnico real aqui
+                        st.error(f"Erro técnico ao gravar: {str(e)}")
                 else:
-                    st.warning("Selecione pelo menos um aluno.")
+                    st.warning("Selecione os alunos primeiro.")
 
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):

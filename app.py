@@ -1284,11 +1284,6 @@ elif menu == "🌊 Tábua da Maré":
                             with c2[i-5]: 
                                 st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
 
-                        # Gráfico Radar
-                        st.plotly_chart(criar_grafico_mare(CATEGORIAS, valores), use_container_width=True, key=f"gen_{al}_{periodo}_{i}")
-                        
-                        obs_pedag = r.get('OBSERVAÇÕES PEDAGÓGICAS', r.get('OBSERVACOES', 'Sem registro.'))
-                        st.info(f"**Observação:** {obs_pedag}")
                 else:
                     st.info("Nenhuma avaliação registrada para este aluno na Tábua da Maré.")
     else:

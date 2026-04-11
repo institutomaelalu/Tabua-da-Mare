@@ -967,22 +967,26 @@ if modo == "🌊 Tábua da Maré (Geral)":
     ]
     MARE_LABELS = {0: "Sem registro", 1: "Maré Baixa", 2: "Maré Alta", 3: "Maré Cheia"}
 
-    # 1. Busca de dados na Aba GERAL (df_geral) para a Ficha
-    # Filtramos o df_geral pelo nome do aluno selecionado
-    aluno_info_geral = df_geral[df_geral["ALUNO"] == al_af]
+    # 1. Carregamento Seguro do df_geral (Evita NameError)
+    df_geral_temp = safe_read("GERAL")
     
-    if not aluno_info_geral.empty:
-        info_row = aluno_info_geral.iloc[0]
-        # Puxa a sala da coluna 'TURMA' conforme solicitado
-        nome_sala = info_row.get('TURMA', 'Não informada')
-        comunidade = info_row.get('COMUNIDADE', 'Não informada')
-        idade = info_row.get('IDADE', '---')
+    if not df_geral_temp.empty:
+        # Padroniza as colunas para evitar erros de busca
+        df_geral_temp.columns = [str(c).strip().upper() for c in df_geral_temp.columns]
+        aluno_info_geral = df_geral_temp[df_geral_temp["ALUNO"] == al_af]
+        
+        if not aluno_info_geral.empty:
+            info_row = aluno_info_geral.iloc[0]
+            # Puxa a sala da coluna 'TURMA'
+            nome_sala = info_row.get('TURMA', 'Não informada')
+            comunidade = info_row.get('COMUNIDADE', 'Não informada')
+            idade = info_row.get('IDADE', '---')
+        else:
+            nome_sala, comunidade, idade = "Não encontrada", "Não informada", "---"
     else:
-        nome_sala = "Não encontrada"
-        comunidade = "Não informada"
-        idade = "---"
+        nome_sala, comunidade, idade = "Erro na carga", "Não informada", "---"
 
-    # Lógica de cores baseada no nome da sala (TURMA)
+    # Definição da cor de fundo da ficha baseada na TURMA
     cor_sala_bg = "#ffffff"
     sala_upper = str(nome_sala).upper()
     if "AZUL" in sala_upper: cor_sala_bg = "#E3F2FD"
@@ -1004,7 +1008,7 @@ if modo == "🌊 Tábua da Maré (Geral)":
         </style>
     """, unsafe_allow_html=True)
 
-    # ESTRUTURA DE COLUNAS (Ficha sempre visível à esquerda)
+    # ESTRUTURA DE COLUNAS (Ficha à esquerda)
     col_ficha, col_conteudo = st.columns([1, 2.5])
     
     with col_ficha:
@@ -1031,12 +1035,13 @@ if modo == "🌊 Tábua da Maré (Geral)":
             r_mare = dados_mare.iloc[-1]
             for cat in CATEGORIAS:
                 try:
-                    val = float(r_mare.get(cat.upper(), 0))
+                    val_raw = r_mare.get(cat.upper(), 0)
+                    val = float(val_raw) if val_raw not in ["", None] else 0.0
                 except:
                     val = 0.0
                 valores_grafico.append(val)
             
-            # Se a soma das notas for > 0, consideramos que há registro
+            # Se houver qualquer nota lançada (soma > 0)
             if sum(valores_grafico) > 0:
                 possui_dados = True
 
@@ -1065,7 +1070,7 @@ if modo == "🌊 Tábua da Maré (Geral)":
             st.plotly_chart(fig_espelho, use_container_width=True, config={'displayModeBar': False})
             
         else:
-            # Mensagem caso não haja registros ou estejam vazios
+            # MENSAGEM EXATA SOLICITADA
             st.info(f"Sem novas Avaliações da Tábua da Maré de **{al_af}**")
 # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---
 elif modo == "📚 Turno Estendido":

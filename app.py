@@ -414,39 +414,36 @@ def render_grafico_alfabetizacao_individual(df_aluno):
     st.plotly_chart(fig, use_container_width=True)
     
 # --- MENU ---
-menu_options = ["👤 Matrícula", "📝 Controle de Matrícula e Apadrinhamento", "📊 Dados - Turno Estendido", "📊 Avaliação da Tábua da Maré", "📖 Turno Estendido", "📈 Indicadores pedagógicos", "🌊 Canal do Apadrinhamento", "🌊 Tábua da Maré"]
+menu_options = ["📝 Controle de Matrícula e Apadrinhamento", "📊 Dados - Turno Estendido", "📊 Avaliação da Tábua da Maré", "📖 Turno Estendido", "📈 Indicadores pedagógicos", "🌊 Canal do Apadrinhamento", "🌊 Tábua da Maré"]
 if st.session_state.perfil != "admin": menu_options = ["🌊 Canal do Apadrinhamento"]
 menu = st.sidebar.radio("Navegação", menu_options)
 
 st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Instituto</span> <span style='color:{C_AZUL}'>Mãe</span> <span style='color:{C_VERDE}'>Lalu</span></h1></div><hr>", unsafe_allow_html=True)
 
 # --- ABAS ---
-
-if menu == "👤 Matrícula":
-    # (Mantido original)
-    st.markdown(f"### 👤 Novo Cadastro")
-    with st.form("form_cad"):
-        c1, c2 = st.columns(2)
-        nome = c1.text_input("Nome Completo").strip().upper()
-        idade = c2.text_input("Idade").strip()
-        comu = c1.text_input("Comunidade").strip().upper()
-        sala = c2.selectbox("Sala Destino", list(TURMAS_CONFIG.keys()))
-        turno = c1.selectbox("Turno", ["A", "B"])
-        if st.form_submit_button("Finalizar Cadastro"):
-            if nome and idade:
-                client = get_gspread_client()
-                sh = client.open_by_key("1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4")
-                sh.worksheet(sala).append_row([nome, sala, turno, idade, comu, ""])
-                sh.worksheet("GERAL").append_row([nome, sala, turno, idade, comu, ""])
-                st.success("Cadastrado com sucesso!"); st.rerun()
-
 # Certifique-se de que na sua sidebar o texto seja EXATAMENTE: 📝 Controle de Matrícula e Apadrinhamento
 elif menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
     st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     
+    # --- CSS PARA INVERTER CORES DOS BOTÕES (Fundo Branco, Texto Colorido e Negrito) ---
+    st.markdown("""
+        <style>
+        div[data-testid="stPopover"] > button {
+            background-color: white !important;
+            color: #31333F !important; /* Cor padrão do texto */
+            font-weight: bold !important;
+            border: 1px solid #d3d3d3 !important;
+        }
+        /* Ajuste específico para o texto dos botões dentro dos popovers para ficarem com a cor do tema */
+        div[data-testid="stPopover"] p {
+            font-weight: bold !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     # --- BLOCO DE GESTÃO (BOTÕES +) ---
-    col1, col2, col3, col4 = st.columns([1, 1, 1.2, 1])
+    col1, col2, col3, col4 = st.columns([1, 1.5, 1.2, 1])
 
     # 1. MATRÍCULA REGULAR
     with col1:
@@ -458,33 +455,33 @@ elif menu == "📝 Controle de Matrícula e Apadrinhamento":
             n_turno = st.selectbox("Turno", ["A", "B"], key="reg_turno")
             n_comu = st.text_input("Comunidade")
             
-            # Cálculo de idade
             idade_calc = datetime.now().year - n_nasc.year - ((datetime.now().month, datetime.now().day) < (n_nasc.month, n_nasc.day))
             txt_idade = f"{idade_calc} ANOS"
             
-            if st.button("Confirmar Matrícula"):
+            if st.button("Confirmar Matrícula", use_container_width=True):
                 nova_linha = [n_nome.upper(), n_turno, txt_idade, n_nasc.strftime("%d/%m/%Y"), n_comu.upper(), ""]
                 conn.append_row(worksheet=n_sala, data=nova_linha)
                 st.success("Matriculado!"); st.cache_data.clear()
 
-    # 2. REGISTRO DE PADRINHO
+    # 2. REGISTRO DE PADRINHO/MADRINHA
     with col2:
-        with st.popover("🤝 Padrinho"):
+        with st.popover("🤝 Registro de Padrinho/Madrinha"):
             st.markdown("##### 🤝 Novo Apadrinhamento")
             s_busca = st.selectbox("Sala:", list(TURMAS_CONFIG.keys()), key="pad_sala")
             df_b = conn.read(worksheet=s_busca).fillna("")
-            # Filtra apenas quem não tem padrinho
+            df_b.columns = [str(c).strip().upper() for c in df_b.columns]
+            
             lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].isin(["", "-", "nan", "0"])]["ALUNO"].unique())
             
-            nome_p = st.text_input("Nome do Padrinho")
+            nome_p = st.text_input("Nome do Padrinho/Madrinha")
             al_sel = st.selectbox("Afilhado:", lista_lib)
             
-            if st.button("Confirmar Padrinho"):
+            if st.button("Confirmar Apadrinhamento", use_container_width=True):
                 idx = df_b[df_b["ALUNO"] == al_sel].index[0] + 2
                 conn.update_cell(worksheet=s_busca, row=idx, col=6, value=nome_p.upper())
                 st.success("Padrinho Registrado!"); st.cache_data.clear()
 
-    # 3. TURNO ESTENDIDO (Múltipla Seleção)
+    # 3. TURNO ESTENDIDO
     with col3:
         with st.popover("⏳ Turno Estendido"):
             st.markdown("##### ⏳ Matrícula Estendida")
@@ -494,13 +491,12 @@ elif menu == "📝 Controle de Matrícula e Apadrinhamento":
             
             selecionados = st.multiselect("Selecione os alunos:", lista_est)
             
-            if st.button("Matricular no Estendido"):
+            if st.button("Matricular no Estendido", use_container_width=True):
                 for aluno in selecionados:
-                    # Salva Nome e a Sala de Origem na aba TURNO_ESTENDIDO
                     conn.append_row(worksheet="TURNO_ESTENDIDO", data=[aluno.upper(), s_est])
                 st.success(f"{len(selecionados)} alunos adicionados!"); st.cache_data.clear()
 
-    # 4. REMOVER REGISTROS (Para testes)
+    # 4. REMOVER REGISTROS
     with col4:
         with st.popover("🗑️ Remover"):
             st.markdown("##### ⚠️ Zona de Exclusão")
@@ -508,22 +504,22 @@ elif menu == "📝 Controle de Matrícula e Apadrinhamento":
             s_del = st.selectbox("De qual sala/aba?", list(TURMAS_CONFIG.keys()) + ["TURNO_ESTENDIDO"])
             
             df_del = conn.read(worksheet=s_del).fillna("")
-            al_del = st.selectbox("Selecionar Aluno para remover registro:", sorted(df_del["ALUNO"].unique()) if not df_del.empty else [])
+            df_del.columns = [str(c).strip().upper() for c in df_del.columns]
+            al_del = st.selectbox("Selecionar Aluno:", sorted(df_del["ALUNO"].unique()) if not df_del.empty else [])
             
-            if st.button("🚨 EXCLUIR REGISTRO"):
+            if st.button("🚨 EXCLUIR REGISTRO", use_container_width=True):
                 idx_del = df_del[df_del["ALUNO"] == al_del].index[0] + 2
                 if tipo_del == "Padrinho":
                     conn.update_cell(worksheet=s_del, row=idx_del, col=6, value="")
                     st.warning("Padrinho removido.")
                 else:
-                    # Deleta a linha inteira para Matrícula ou Turno Estendido
                     conn.delete_rows(worksheet=s_del, indices=[idx_del])
-                    st.error("Registro apagado da planilha.")
+                    st.error("Registro apagado.")
                 st.cache_data.clear()
 
     st.divider()
 
-    # --- VISUALIZAÇÃO DA TABELA (Mantida conforme solicitado) ---
+    # --- RESTANTE DO CÓDIGO DE VISUALIZAÇÃO (BOTÕES DE SALA E TABELA) ---
     render_botoes_salas("btn_pad", "sel_pad")
     sala_v = st.session_state.sel_pad
     cor_h = TURMAS_CONFIG[sala_v]["cor"]

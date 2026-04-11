@@ -548,29 +548,32 @@ elif menu == "🤝 Gestão de apadrinhamento":
     else: 
         st.warning(f"A aba '{st.session_state.sel_pad}' parece estar vazia na Google Sheet.")
 
-# --- ABA: AVALIAÇÃO TÁBUA DA MARÉ ---
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
 
+    CATEGORIAS = [
+        "Atividades em grupo/Proatividade", "Interesse pelo novo", "Compartilhamento de Materiais",
+        "Clareza e desenvoltura", "Respeito às regras", "Vocabulário adequado",
+        "Leitura e Escrita", "Compreensão de comandos", "Superação de desafios", "Assiduidade"
+    ]
+
     try:
-        # Chamada simplificada usando a chave do secrets
         df_av = conn.read(worksheet="TABUA_MARE").fillna("")
     except Exception as e:
         st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()
 
-    # Renderiza os botões das salas
     render_botoes_salas("btn_aval", "sel_aval")
     
-    # Busca a lista de alunos da sala selecionada
-    alunos_na_sala = [n for n, s in st.session_state["alunos_te_dict"].items() if s == st.session_state.sel_aval]
+    # Busca alunos da sala selecionada no dicionário de matrículas
+    sala_atual = st.session_state.sel_aval
+    alunos_na_sala = [n for n, s in st.session_state.get("alunos_te_dict", {}).items() if s == sala_atual]
     
     if alunos_na_sala:
         al = st.selectbox("Selecione o Aluno", sorted(alunos_na_sala))
-        
-        # Busca dados anteriores para facilitar o preenchimento (UX de Qualidade)
         dados_anteriores = df_av[df_av["Aluno"] == al].iloc[-1] if not df_av[df_av["Aluno"] == al].empty else None
         
+        # Título solicitado com o emoji de estrela
         st.markdown("#### ⭐ 10 motivos para avaliar!")
         
         with st.form("f_av_nuvem"):
@@ -579,44 +582,29 @@ elif menu == "📊 Avaliação da Tábua da Maré":
             cE, cD = st.columns(2)
             n_l = {}
             
-            # Itera sobre as 10 categorias criando os seletores
             for i, cat in enumerate(CATEGORIAS):
-                # Define o index padrão: se já existir nota na planilha, tenta selecionar ela
                 val_anterior = dados_anteriores[cat] if dados_anteriores is not None and cat in dados_anteriores else "Maré Enchente"
-                opcoes = list(MARE_OPCOES.keys())
+                opcoes = ["Maré Baixa", "Maré Vazante", "Maré Enchente", "Maré Alta", "Maré Cheia"]
                 
                 try:
                     idx_default = opcoes.index(val_anterior)
-                except ValueError:
-                    idx_default = 2 # Maré Enchente (Padrão)
+                except:
+                    idx_default = 2
                 
-                n_l[cat] = (cE if i < 5 else cD).selectbox(
-                    cat, 
-                    opcoes, 
-                    index=idx_default,
-                    key=f"mare_s_{i}"
-                )
+                n_l[cat] = (cE if i < 5 else cD).selectbox(cat, opcoes, index=idx_default, key=f"mare_s_{i}")
             
-            obs_anterior = dados_anteriores["Observações pedagógicas"] if dados_anteriores is not None else ""
+            obs_anterior = dados_anteriores.get("Observações pedagógicas", "") if dados_anteriores is not None else ""
             obs = st.text_area("Observações pedagógicas:", value=obs_anterior)
             
             if st.form_submit_button("🚀 Enviar para Tábua da Maré"):
-                # Chamada da função de escrita para a nuvem
-                sucesso = registrar_tabua_mare(
-                    aluno=al,
-                    sala=st.session_state.sel_aval,
-                    semestre=tr,
-                    notas_dict=n_l,
-                    obs=obs
-                )
-                
+                sucesso = registrar_tabua_mare(aluno=al, sala=sala_atual, semestre=tr, notas_dict=n_l, obs=obs)
                 if sucesso:
                     st.balloons()
-                    st.success(f"Avaliação de {al} sincronizada com sucesso!")
-                    st.cache_data.clear() # Limpa o cache para atualizar gráficos imediatamente
+                    st.success(f"Avaliação de {al} sincronizada!")
+                    st.cache_data.clear()
                     st.rerun()
     else:
-        st.warning("Nenhum aluno encontrado para esta sala.")
+        st.warning(f"Nenhum aluno encontrado na {sala_atual}.")
 # --- ABA: TURNO ESTENDIDO ---
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
@@ -944,96 +932,62 @@ elif menu == "🌊 Canal do Apadrinhamento":
 
             st.markdown("---")
 
-# --- VISUALIZAÇÃO 1: GERAL (TÁBUA DA MARÉ) ---
+# --- DENTRO DO CANAL DO APADRINHAMENTO (Lógica da Tábua da Maré) ---
 if modo == "🌊 Tábua da Maré (Geral)":
-    # 0. DEFINIÇÕES GLOBAIS
+    # 1. LISTA OFICIAL
     CATEGORIAS = [
-        "Atividades em grupo/proatividade", 
-        "Interesse pelo novo", 
-        "Compartilhamento de materiais", 
-        "Clareza e Desenvoltura", 
-        "Respeito às regras"
+        "Atividades em grupo/Proatividade", "Interesse pelo novo", "Compartilhamento de Materiais",
+        "Clareza e desenvoltura", "Respeito às regras", "Vocabulário adequado",
+        "Leitura e Escrita", "Compreensão de comandos", "Superação de desafios", "Assiduidade"
     ]
     
-    # 1. EXTRAÇÃO DE DADOS DA MEMÓRIA (df_total já consolidado acima)
-    # Filtramos a linha do aluno selecionado no DataFrame que já contém todas as salas
+    # 2. BUSCA DE DADOS (df_total contém as abas das salas unificadas)
     aluno_info = df_total[df_total["ALUNO"] == al_af]
     
     if not aluno_info.empty:
-        # Pega a primeira ocorrência encontrada
         info = aluno_info.iloc[0]
-        
-        # SALA_NOME foi criado lá no início do loop (df_temp["SALA_NOME"] = nome_aba)
         aba_origem = info.get("SALA_NOME", "Não identificada")
         turno_aluno = info.get("TURMA", "")
-        
-        # Monta a string: Sala Azul - Turma A
         sala_oficial = f"{aba_origem.title()} - {turno_aluno}" if turno_aluno else aba_origem.title()
+
+        col_ficha, col_conteudo = st.columns([1, 2.3])
         
-        # Demais campos das colunas D e F
-        idade = info.get("IDADE", "---")
-        comunidade = info.get("COMUNIDADE", "Não informada")
-        padrinho_nome = info.get("PADRINHO/MADRINHA", "Sem padrinho/madrinha")
-    else:
-        # Caso de segurança se o aluno sumir do df_total
-        sala_oficial, idade, comunidade, padrinho_nome = "Não encontrada", "---", "Não informada", "Sem registro"
+        with col_ficha:
+            st.markdown(f"""
+                <div style="background-color: #f1f8ff; padding: 18px; border-radius: 12px; border: 1px solid #d1e9ff; color: black;">
+                    <h4 style="margin: 0 0 12px 0; color: #1A5276;">📋 Ficha</h4>
+                    <p style="font-size: 13px;"><b>👤 Nome:</b><br>{al_af}</p>
+                    <p style="font-size: 13px;"><b>🏫 Sala:</b><br>{sala_oficial}</p>
+                    <p style="font-size: 13px;"><b>🎂 Idade:</b> {info.get('IDADE', '---')}</p>
+                    <p style="font-size: 13px;"><b>🏡 Comunidade:</b> {info.get('COMUNIDADE', '---')}</p>
+                </div>
+            """, unsafe_allow_html=True)
 
-    # Lógica de cor baseada na sala encontrada
-    cor_sala_bg = "#ffffff"
-    sala_check = sala_oficial.upper()
-    if "AZUL" in sala_check: cor_sala_bg = "#E3F2FD"
-    elif "ROSA" in sala_check: cor_sala_bg = "#FCE4EC"
-    elif "VERDE" in sala_check: cor_sala_bg = "#E8F5E9"
-    elif "AMARELA" in sala_check: cor_sala_bg = "#FFFDE7"
-    elif "LARANJA" in sala_check: cor_sala_bg = "#FFF3E0"
-
-    # 2. LAYOUT (Ficha + Gráfico)
-    st.markdown("<style>.status-mare-final {font-size: 11px !important; font-weight: bold; text-align: center;}</style>", unsafe_allow_html=True)
-    col_ficha, col_conteudo = st.columns([1, 2.3])
-    
-    with col_ficha:
-        st.markdown(f"""
-            <div style="background-color: {cor_sala_bg}; padding: 18px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); color: black;">
-                <h4 style="margin: 0 0 12px 0; color: #1A5276; border-bottom: 2px solid rgba(0,0,0,0.1);">📋 Ficha do Aluno</h4>
-                <p style="margin: 8px 0; font-size: 13px;"><b>👤 Nome:</b><br>{al_af}</p>
-                <p style="margin: 8px 0; font-size: 13px;"><b>🏫 Sala/Turma:</b><br>{sala_oficial}</p>
-                <p style="margin: 8px 0; font-size: 13px;"><b>🎂 Idade:</b><br>{idade}</p>
-                <p style="margin: 8px 0; font-size: 13px;"><b>🏡 Comunidade:</b><br>{comunidade}</p>
-                <p style="margin: 8px 0; font-size: 13px;"><b>🤝 Padrinho/Madrinha:</b><br>{padrinho_nome}</p>
-            </div>
-        """, unsafe_allow_html=True)
-
-    with col_conteudo:
-        # Busca avaliações na aba TABUA_MARE (Variável df_aval deve estar carregada no app)
-        df_av = df_aval.copy()
-        df_av.columns = [str(c).strip().upper() for c in df_av.columns]
-        dados_mare = df_av[df_av["ALUNO"] == al_af]
-        
-        valores_grafico = []
-        if not dados_mare.empty:
-            r_m = dados_mare.iloc[-1]
-            for cat in CATEGORIAS:
-                try:
-                    v = r_m.get(cat.upper(), 0)
-                    valores_grafico.append(float(v) if v not in ["", None] else 0.0)
-                except: valores_grafico.append(0.0)
-
-        if sum(valores_grafico) > 0:
-            v_cols = st.columns(5)
-            for i, cat in enumerate(CATEGORIAS):
-                val = valores_grafico[i]
-                status_txt = "Maré Baixa" if val <= 1 else "Maré Cheia" if val >= 3 else "Maré Alta"
-                html_v = render_vasilha_mare(val, cat)
-                html_v_limpo = html_v.split('<span style="position: absolute;')[0]
-                if not html_v_limpo.endswith('</div></div>'): html_v_limpo += '</div></div>'
-                with v_cols[i % 5]:
-                    st.markdown(f'<div style="text-align: center;">{html_v_limpo}<div class="status-mare-final">{status_txt}</div></div>', unsafe_allow_html=True)
+        with col_conteudo:
+            df_av = df_aval.copy()
+            df_av.columns = [str(c).strip().upper() for c in df_av.columns]
+            dados_mare = df_av[df_av["ALUNO"] == al_af]
             
-            st.markdown("<br>", unsafe_allow_html=True)
-            fig = criar_grafico_mare(CATEGORIAS, valores_grafico)
-            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-        else:
-            st.info(f"Sem novas Avaliações da Tábua da Maré de **{al_af}**")
+            if not dados_mare.empty:
+                r_m = dados_mare.iloc[-1]
+                valores = []
+                mapa_notas = {"MARÉ BAIXA": 1, "MARÉ VAZANTE": 2, "MARÉ ENCHENTE": 3, "MARÉ ALTA": 4, "MARÉ CHEIA": 5}
+                for cat in CATEGORIAS:
+                    v = r_m.get(cat.upper(), 3)
+                    n = mapa_notas.get(v.upper(), v) if isinstance(v, str) else v
+                    valores.append(float(n))
+
+                # Linha 1 e 2 de vasilhas
+                c1 = st.columns(5); c2 = st.columns(5)
+                for i in range(5):
+                    with c1[i]: st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
+                for i in range(5, 10):
+                    with c2[i-5]: st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
+
+                st.plotly_chart(criar_grafico_mare(CATEGORIAS, valores), use_container_width=True)
+                st.info(f"**Observação Pedagógica:** {r_m.get('OBSERVAÇÕES PEDAGÓGICAS', 'Sem registro.')}")
+            else:
+                st.info("Ainda não há avaliações para este aluno.")
 # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---
 elif modo == "📚 Turno Estendido":
                 df_h = (df_alf.copy()).fillna("")
@@ -1127,18 +1081,10 @@ elif modo == "📚 Turno Estendido":
 elif menu == "🌊 Tábua da Maré":
     st.markdown(f"### 🌊 Tábua da Maré")
     
-    # 1. Lista Oficial dos 10 critérios
     CATEGORIAS = [
-        "Atividades em grupo/Proatividade",
-        "Interesse pelo novo",
-        "Compartilhamento de Materiais",
-        "Clareza e desenvoltura",
-        "Respeito às regras",
-        "Vocabulário adequado",
-        "Leitura e Escrita",
-        "Compreensão de comandos",
-        "Superação de desafios",
-        "Assiduidade"
+        "Atividades em grupo/Proatividade", "Interesse pelo novo", "Compartilhamento de Materiais",
+        "Clareza e desenvoltura", "Respeito às regras", "Vocabulário adequado",
+        "Leitura e Escrita", "Compreensão de comandos", "Superação de desafios", "Assiduidade"
     ]
     
     render_botoes_salas("btn_int", "sel_int")
@@ -1146,59 +1092,54 @@ elif menu == "🌊 Tábua da Maré":
     df_av = df_aval.copy()
     df_av.columns = [str(c).strip().upper() for c in df_av.columns]
     
+    # df_total deve ser o DataFrame que une as abas SALA AZUL, SALA VERDE, etc.
     df_s = safe_read(st.session_state.sel_int)
     
     if not df_s.empty:
         df_s.columns = [str(c).strip().upper() for c in df_s.columns]
-        alunos_sala = [str(n).replace("**", "").strip() for n in df_s["ALUNO"].unique()]
-        df_f = df_av[df_av["ALUNO"].isin(alunos_sala)]
+        alunos_sala = sorted([str(n).replace("**", "").strip() for n in df_s["ALUNO"].unique()])
         
-        if not df_f.empty:
-            for al in sorted(df_f["ALUNO"].unique()):
-                with st.expander(f"📊 {al}"):
-                    dados_aluno = df_f[df_f["ALUNO"] == al]
-                    
+        for al in alunos_sala:
+            with st.expander(f"👤 {al}"):
+                # --- FICHA CADASTRAL (O Espelho) ---
+                aluno_row = df_s[df_s["ALUNO"] == al].iloc[0]
+                turno = aluno_row.get("TURMA", "")
+                sala_full = f"{st.session_state.sel_int.title()} - {turno}" if turno else st.session_state.sel_int.title()
+                
+                col_f1, col_f2 = st.columns([1, 2])
+                with col_f1:
+                    st.markdown(f"""
+                        <div style="background-color: #f1f8ff; padding: 15px; border-radius: 10px; border: 1px solid #d1e9ff; color: black;">
+                            <p style="margin: 0; font-size: 12px;"><b>SALA/TURMA:</b><br>{sala_full}</p>
+                            <p style="margin: 8px 0 0 0; font-size: 12px;"><b>IDADE:</b> {aluno_row.get("IDADE", "---")}</p>
+                            <p style="margin: 8px 0 0 0; font-size: 12px;"><b>COMUNIDADE:</b> {aluno_row.get("COMUNIDADE", "---")}</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+                
+                # --- AVALIAÇÕES ---
+                dados_aluno = df_av[df_av["ALUNO"] == al]
+                if not dados_aluno.empty:
                     for _, r in dados_aluno.iterrows():
                         periodo = r.get("PERIODO", "Avaliação")
-                        st.markdown(f"#### 🗓️ {periodo}")
+                        st.write(f"---")
+                        st.markdown(f"**🗓️ {periodo}**")
                         
-                        # Coleta valores e observação
                         valores = []
+                        mapa_notas = {"MARÉ BAIXA": 1, "MARÉ VAZANTE": 2, "MARÉ ENCHENTE": 3, "MARÉ ALTA": 4, "MARÉ CHEIA": 5}
                         for cat in CATEGORIAS:
-                            try:
-                                v = r.get(cat.upper(), 0)
-                                valores.append(float(v) if v not in ["", None] else 0.0)
-                            except:
-                                valores.append(0.0)
-                        
-                        obs = r.get("OBSERVAÇÕES PEDAGÓGICAS", r.get("OBSERVACOES PEDAGOGICAS", "Sem observações."))
+                            v = r.get(cat.upper(), 3)
+                            n = mapa_notas.get(v.upper(), v) if isinstance(v, str) else v
+                            valores.append(float(n))
 
-                        # --- RENDERIZAÇÃO DAS 10 VASILHAS (2 linhas de 5) ---
-                        v_cols1 = st.columns(5)
+                        # Vasilhas 5x5
+                        c1 = st.columns(5)
                         for i in range(5):
-                            val = valores[i]
-                            html_v = render_vasilha_mare(val, CATEGORIAS[i])
-                            html_v_limpo = html_v.split('<span style="position: absolute;')[0]
-                            if not html_v_limpo.endswith('</div></div>'): html_v_limpo += '</div></div>'
-                            with v_cols1[i]:
-                                st.markdown(f'<div style="text-align: center;">{html_v_limpo}</div>', unsafe_allow_html=True)
-                        
-                        v_cols2 = st.columns(5)
+                            with c1[i]: st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
+                        c2 = st.columns(5)
                         for i in range(5, 10):
-                            val = valores[i]
-                            html_v = render_vasilha_mare(val, CATEGORIAS[i])
-                            html_v_limpo = html_v.split('<span style="position: absolute;')[0]
-                            if not html_v_limpo.endswith('</div></div>'): html_v_limpo += '</div></div>'
-                            with v_cols2[i-5]:
-                                st.markdown(f'<div style="text-align: center;">{html_v_limpo}</div>', unsafe_allow_html=True)
+                            with c2[i-5]: st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
 
-                        # Gráfico e Observação
-                        fig = criar_grafico_mare(CATEGORIAS, valores)
-                        st.plotly_chart(fig, use_container_width=True, key=f"tab_g_{al}_{periodo}")
-                        
-                        st.info(f"**Observações Pedagógicas:** {obs}")
-                        st.markdown("---")
-        else:
-            st.info(f"Nenhuma avaliação encontrada para os alunos da {st.session_state.sel_int}.")
-    else:
-        st.error("Não foi possível carregar a lista de alunos desta sala.")
+                        st.plotly_chart(criar_grafico_mare(CATEGORIAS, valores), use_container_width=True, key=f"gen_{al}_{periodo}")
+                        st.info(f"**Observação:** {r.get('OBSERVAÇÕES PEDAGÓGICAS', 'Sem registro.')}")
+                else:
+                    st.info("Nenhuma avaliação registrada para este aluno.")

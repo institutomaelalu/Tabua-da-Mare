@@ -560,62 +560,62 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
 
     st.divider()
 
-    # --- VISUALIZAÇÃO DA TABELA ---
+# --- VISUALIZAÇÃO DA TABELA ---
     render_botoes_salas("btn_pad", "sel_pad")
     
+    # Garantimos que a sala selecionada esteja no estado da sessão
     sala_v = st.session_state.get("sel_pad", "SALA ROSA")
     cfg_sala = TURMAS_CONFIG.get(sala_v, {"cor": "#333", "icon": "🏫"})
     cor_h = cfg_sala["cor"]
 
     try:
+        # Lendo os dados da aba correta
         df_s = conn.read(worksheet=sala_v).fillna("")
         df_s.columns = [str(c).strip().upper() for c in df_s.columns]
 
         if not df_s.empty:
-            # Filtros (Certifique-se que render_filtros retorna os valores selecionados)
+            # Filtros
             tn, cm = render_filtros(df_geral, "pad")
             df_f = df_s.copy()
             if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
             if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
 
+            # Banner informativo
             st.markdown(f"""
-                <div style="background-color: {cor_h}22; padding: 10px; border-radius: 5px; border-left: 5px solid {cor_h}; margin: 20px 0;">
+                <div style="background-color: {cor_h}22; padding: 12px; border-radius: 8px; border-left: 6px solid {cor_h}; margin: 20px 0;">
                     <span style="font-size: 16px; color: #333;">{cfg_sala['icon']} Atualmente: <b>{len(df_f)}</b> alunos na <b>{sala_v}</b></span>
                 </div>
             """, unsafe_allow_html=True)
 
-            # CONSTRUÇÃO DA TABELA HTML
+            # --- CONSTRUÇÃO DA TABELA HTML (SEM RECUO PARA EVITAR CODE BLOCK) ---
             v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
             
-            # Cabeçalho com cor dinâmica
-            table_html = f"""
-            <table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 14px; border: 1px solid #ddd;">
-                <thead>
-                    <tr style="background-color: {cor_h}; color: white; text-align: left;">
-                        {''.join([f'<th style="padding: 12px; border: 1px solid #ddd;">{c}</th>' for c in v_cols])}
-                    </tr>
-                </thead>
-                <tbody>
-            """
+            # Cabeçalho
+            # DICA: Removi espaços extras antes das tags <table> e <thead>
+            table_html = f'<table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 14px; border: 1px solid #ddd;">'
+            table_html += f'<thead style="background-color: {cor_h}; color: white; text-align: left;"><tr>'
+            for col in v_cols:
+                table_html += f'<th style="padding: 12px; border: 1px solid #ddd;">{col}</th>'
+            table_html += '</tr></thead><tbody>'
             
-            # Linhas (Zebrado)
-            for i, r in df_f.iterrows():
+            # Linhas (Loop iterando pelo DataFrame filtrado)
+            for i, (_, r) in enumerate(df_f.iterrows()):
                 bg = "#ffffff" if i % 2 == 0 else "#f9f9f9"
                 p_nome = str(r.get("PADRINHO/MADRINHA", "-")).strip()
                 if p_nome in ["", "0", "nan", "None", "-"]: p_nome = "-"
                 
-                table_html += f"""
-                <tr style="background-color: {bg};">
-                    <td style="padding: 10px; border: 1px solid #eee; font-weight: bold;">{r.get('ALUNO', '-')}</td>
-                    <td style="padding: 10px; border: 1px solid #eee; text-align: center;">{r.get('TURMA', '-')}</td>
-                    <td style="padding: 10px; border: 1px solid #eee; text-align: center;">{r.get('IDADE', '-')}</td>
-                    <td style="padding: 10px; border: 1px solid #eee;">{r.get('COMUNIDADE', '-')}</td>
-                    <td style="padding: 10px; border: 1px solid #eee; color: {cor_h if p_nome != '-' else '#999'}; font-weight: 600;">{p_nome}</td>
-                </tr>
-                """
+                table_html += f'<tr style="background-color: {bg};">'
+                table_html += f'<td style="padding: 10px; border: 1px solid #eee; font-weight: bold;">{r.get("ALUNO", "-")}</td>'
+                table_html += f'<td style="padding: 10px; border: 1px solid #eee; text-align: center;">{r.get("TURMA", "-")}</td>'
+                table_html += f'<td style="padding: 10px; border: 1px solid #eee; text-align: center;">{r.get("IDADE", "-")}</td>'
+                table_html += f'<td style="padding: 10px; border: 1px solid #eee;">{r.get("COMUNIDADE", "-")}</td>'
+                table_html += f'<td style="padding: 10px; border: 1px solid #eee; color: {cor_h if p_nome != "-" else "#999"}; font-weight: 600;">{p_nome}</td>'
+                table_html += '</tr>'
+            
             table_html += "</tbody></table>"
             
-            # AQUI ESTÁ O PONTO CRÍTICO:
+            # EXIBIÇÃO FINAL
+            # Usar apenas markdown com unsafe_allow_html
             st.markdown(table_html, unsafe_allow_html=True)
             
         else:
@@ -623,6 +623,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             
     except Exception as e:
         st.error(f"Erro ao carregar a tabela: {e}")
+
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
 

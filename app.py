@@ -37,11 +37,11 @@ sheet_id = nome_planilha
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- NOVO: MOTOR DE CACHE (ADICIONE AQUI) ---
-@st.cache_data(ttl=600)  # Mantém os dados na memória por 10 minutos
-def carregar_dados_globais(aba):
+@st.cache_data(ttl=600)
+def carregar_dados_globais(aba): # Adicionamos 'aba' aqui
     try:
-        # Lê a aba e já faz toda a limpeza de colunas uma única vez
-        df = conn.read(worksheet=aba).fillna("")
+        # ttl=None é fundamental para o cache_data funcionar
+        df = conn.read(worksheet=aba, ttl=None).fillna("")
         df.columns = [str(c).strip().upper() for c in df.columns]
         return df
     except Exception as e:
@@ -1234,8 +1234,16 @@ elif menu == "🌊 Tábua da Maré":
     df_av = df_aval.copy()
     df_av.columns = [str(c).strip().upper() for c in df_av.columns]
     
-    # Leitura segura da aba selecionada
+    # --- BUSCA SEGURA DA COLUNA SALA ---
+# Verifica qual é o nome real da coluna (evita erro se for 'Sala', 'sala' ou 'SALA')
+colunas_disponiveis = [str(c).upper() for c in df_g.columns]
+
+if "SALA" in colunas_disponiveis:
     df_s = df_g[df_g["SALA"] == st.session_state.sel_int]
+else:
+    # Se não achar a coluna SALA, tenta ler a aba individual como fazíamos antes (fallback)
+    st.warning("Coluna 'SALA' não encontrada na Base Geral. Tentando leitura direta...")
+    df_s = safe_read(st.session_state.sel_int)
     
     if not df_s.empty:
         df_s.columns = [str(c).strip().upper() for c in df_s.columns]

@@ -459,18 +459,18 @@ elif menu == "📝 Alunos matriculados":
     if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
     if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-    # 2. CABEÇALHO COM DIVISORES (Fonte 14)
+    # 2. CABEÇALHO (Fonte 13px para combinar com os dados menores)
     st.markdown(f"""
-        <div style="background-color:{cor_h}; color: white; padding: 8px; border-radius: 5px 5px 0 0; 
+        <div style="background-color:{cor_h}; color: white; padding: 8px 0; border-radius: 5px 5px 0 0; 
                     display: flex; font-weight: bold; font-size: 13px; text-transform: uppercase; align-items: center;">
-            <div style="flex: 0.5; text-align: center; border-right: 1px solid rgba(255,255,255,0.3);">ST</div>
-            <div style="flex: 3; padding-left: 10px; border-right: 1px solid rgba(255,255,255,0.3);">ALUNO</div>
-            <div style="flex: 1; text-align: center; border-right: 1px solid rgba(255,255,255,0.3);">IDADE</div>
+            <div style="flex: 0.5; text-align: center; border-right: 1px solid rgba(255,255,255,0.2);">ST</div>
+            <div style="flex: 3; padding-left: 10px; border-right: 1px solid rgba(255,255,255,0.2);">ALUNO</div>
+            <div style="flex: 1; text-align: center; border-right: 1px solid rgba(255,255,255,0.2);">IDADE</div>
             <div style="flex: 2; padding-left: 10px;">COMUNIDADE</div>
         </div>
     """, unsafe_allow_html=True)
     
-    # 3. LISTAGEM COM LINHAS VERTICAIS E HORIZONTAIS SUAVES
+    # 3. LISTAGEM COM FONTE REDUZIDA (Estilo Segunda Imagem)
     matriculados_te = st.session_state.get("alunos_te_dict", {}).keys()
 
     if not df_f.empty:
@@ -480,13 +480,13 @@ elif menu == "📝 Alunos matriculados":
             comunidade = str(r.get("COMUNIDADE", ""))
             status = "✍️📖" if nome_aluno in matriculados_te else ""
             
-            # HTML para garantir as linhas verticais entre as colunas
+            # Fonte alterada para 13px e padding reduzido para maior densidade
             st.markdown(f"""
-                <div style="display: flex; font-size: 14px; color: #31333F; padding: 8px 0; align-items: center; border-bottom: 1px solid #eeeeee;">
-                    <div style="flex: 0.5; text-align: center; border-right: 1px solid #eeeeee;">{status}</div>
-                    <div style="flex: 3; padding-left: 10px; border-right: 1px solid #eeeeee;">{nome_aluno}</div>
-                    <div style="flex: 1; text-align: center; border-right: 1px solid #eeeeee;">{idade}</div>
-                    <div style="flex: 2; padding-left: 10px;">{comunidade}</div>
+                <div style="display: flex; font-size: 13px; color: #31333F; padding: 6px 0; align-items: center; border-bottom: 1px solid #f0f0f0;">
+                    <div style="flex: 0.5; text-align: center; border-right: 1px solid #f0f0f0; min-height: 20px;">{status}</div>
+                    <div style="flex: 3; padding-left: 10px; border-right: 1px solid #f0f0f0; min-height: 20px;">{nome_aluno}</div>
+                    <div style="flex: 1; text-align: center; border-right: 1px solid #f0f0f0; min-height: 20px;">{idade}</div>
+                    <div style="flex: 2; padding-left: 10px; min-height: 20px;">{comunidade}</div>
                 </div>
             """, unsafe_allow_html=True)
     else:

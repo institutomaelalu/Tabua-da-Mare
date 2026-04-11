@@ -544,12 +544,16 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             idade_calc = datetime.now().year - n_nasc.year - ((datetime.now().month, datetime.now().day) < (n_nasc.month, n_nasc.day))
             txt_idade = f"{idade_calc} ANOS"
             
-            if st.button("Confirmar Matrícula", use_container_width=True):
-                nova_linha = [n_nome.upper(), n_turno, txt_idade, n_nasc.strftime("%d/%m/%Y"), n_comu.upper(), ""]
-                conn.append_row(worksheet=n_sala, data=nova_linha)
-                st.success(f"{n_nome.upper()} matriculado!")
-                st.cache_data.clear()
-                st.rerun()
+           # Verifique se o nome aqui (al_mat) é o mesmo que você usa no IF abaixo
+al_mat = st.selectbox("Selecione o Aluno para Matrícula:", lista_alunos_geral, key="sel_aluno_matricula")
+
+if st.button("✅ Confirmar Matrícula no Turno Estendido"):
+    if al_mat: # Agora a variável existe e o erro some
+        st.session_state.sel_te = sala_te 
+        st.session_state.aluno_pendente_te = al_mat
+        st.session_state.menu_lateral = "📖 Turno Estendido"
+        st.success(f"Encaminhando {al_mat}...")
+        st.rerun()
 
     with gestao_col2:
         with st.popover("🤝 Padrinho/Madrinha", key="pad_popover", use_container_width=True):
@@ -769,13 +773,14 @@ elif menu == "📊 Avaliação da Tábua da Maré":
         st.warning(f"Nenhum aluno encontrado na {sala_atual}. Verifique se a aba da sala na planilha tem a coluna 'ALUNO'.")
 # --- ABA: TURNO ESTENDIDO ---
 elif menu == "📖 Turno Estendido":
-    # Verifica se viemos da aba de matrícula com um aluno selecionado
-    if "aluno_pendente_te" in st.session_state:
-        al_te_default = st.session_state.aluno_pendente_te
-        # Limpamos para não ficar "preso" nesse aluno sempre
-        del st.session_state.aluno_pendente_te 
-    else:
-        al_te_default = None
+    # 1. Primeiro, carregue os dados da planilha
+    df_h = df_alf.copy() # Ou o nome da variável que você usa para ler a aba TURNO_ESTENDIDO
+    
+    # 2. Agora sim, faça a verificação
+    if "ANO" not in df_h.columns:
+        df_h["ANO"] = 2025
+    
+    # ... resto do código
 
     # --- LÓGICA DE ANOS DINÂMICOS ---
     if "Ano" not in df_h.columns:

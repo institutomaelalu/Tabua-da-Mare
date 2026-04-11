@@ -568,7 +568,7 @@ with gestao_col3:
                 else:
                     st.warning("Selecione pelo menos um aluno.")
 
-    with gestao_col4:
+with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
             st.markdown("##### ⚠️ Zona de Exclusão")
             tipo_del = st.radio("O que deseja remover?", ["Aluno (Matrícula)", "Padrinho"])

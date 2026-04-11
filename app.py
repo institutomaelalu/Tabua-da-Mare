@@ -526,26 +526,28 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
         with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
             st.markdown("##### ⏳ Matrícula Estendida")
             s_est = st.selectbox("Origem dos Alunos:", list(TURMAS_CONFIG.keys()), key="sel_est_sala")
-            df_est = conn.read(worksheet=s_est).fillna("")
-            lista_est = sorted(df_est["ALUNO"].unique())
+            
+            # 1. Lemos os alunos da sala de origem
+            df_est_leitura = conn.read(worksheet=s_est).fillna("")
+            lista_est = sorted(df_est_leitura["ALUNO"].unique())
             selecionados = st.multiselect("Selecione 1 ou mais alunos:", lista_est)
             
             if st.button("Confirmar Turno Estendido", use_container_width=True):
                 if selecionados:
                     try:
-                        # O segredo é usar o .client para acessar os comandos do gspread
+                        # --- CORREÇÃO AQUI: Acessando o cliente gspread real ---
                         sh = conn.client.open(nome_planilha)
                         ws = sh.worksheet("TURNO_ESTENDIDO")
                         
                         for aluno in selecionados:
-                            # Agora o append_row vai funcionar através do cliente real
+                            # Agora o append_row funciona porque vem do 'ws' (worksheet do gspread)
                             ws.append_row([aluno.upper(), s_est, datetime.now().strftime("%Y")])
                         
                         st.success(f"{len(selecionados)} aluno(s) adicionado(s)!")
-                        st.cache_data.clear() # Limpa o cache para a tabela atualizar
+                        st.cache_data.clear() # Limpa o cache para atualizar as tabelas
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Erro ao salvar: {e}")
+                        st.error(f"Erro técnico ao salvar: {e}")
                 else:
                     st.warning("Selecione pelo menos um aluno.")
 

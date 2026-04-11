@@ -955,29 +955,50 @@ elif menu == "🌊 Canal do Apadrinhamento":
                         """, unsafe_allow_html=True)
 
                     with col_conteudo:
-                        df_av = df_aval.copy()
-                        df_av.columns = [str(c).strip().upper() for c in df_av.columns]
-                        dados_mare = df_av[df_av["ALUNO"] == al_af]
-                        
-                        if not dados_mare.empty:
-                            r_m = dados_mare.iloc[-1]
-                            valores = []
-                            mapa_notas = {"MARÉ BAIXA": 1, "MARÉ VAZANTE": 2, "MARÉ ENCHENTE": 3, "MARÉ ALTA": 4, "MARÉ CHEIA": 5}
-                            for cat in CATEGORIAS:
-                                v = r_m.get(cat.upper(), 3)
-                                n = mapa_notas.get(str(v).upper(), v) if isinstance(v, str) else v
-                                valores.append(float(n))
-
-                            c1 = st.columns(5); c2 = st.columns(5)
-                            for i in range(5):
-                                with c1[i]: st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
-                            for i in range(5, 10):
-                                with c2[i-5]: st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
-
-                            st.plotly_chart(criar_grafico_mare(CATEGORIAS, valores), use_container_width=True)
-                            st.info(f"**Observação Pedagógica:** {r_m.get('OBSERVAÇÕES PEDAGÓGICAS', 'Sem registro.')}")
+            df_av = df_aval.copy()
+            df_av.columns = [str(c).strip().upper() for c in df_av.columns]
+            
+            # Filtra e remove linhas totalmente vazias que o pandas possa ter lido
+            dados_mare = df_av[df_av["ALUNO"] == al_af].dropna(subset=["ALUNO"])
+            
+            # --- CHECK DE EXISTÊNCIA DE REGISTRO ---
+            if not dados_mare.empty:
+                r_m = dados_mare.iloc[-1]
+                
+                # Verifica se pelo menos uma categoria tem valor (evita processar linha vazia)
+                tem_nota = any([r_m.get(cat.upper()) for cat in CATEGORIAS])
+                
+                if tem_nota:
+                    valores = []
+                    mapa_notas = {"MARÉ BAIXA": 1, "MARÉ VAZANTE": 2, "MARÉ ENCHENTE": 3, "MARÉ ALTA": 4, "MARÉ CHEIA": 5}
+                    
+                    for cat in CATEGORIAS:
+                        v = r_m.get(cat.upper(), 3)
+                        # Conversão segura
+                        if isinstance(v, str):
+                            n = mapa_notas.get(v.strip().upper(), 3)
                         else:
-                            st.info("Ainda não há avaliações da Tábua da Maré.")
+                            n = v if v and not pd.isna(v) else 3
+                        
+                        try:
+                            valores.append(float(n))
+                        except:
+                            valores.append(3.0)
+
+                    # Renderização das Vasilhas
+                    c1 = st.columns(5); c2 = st.columns(5)
+                    for i in range(5):
+                        with c1[i]: st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
+                    for i in range(5, 10):
+                        with c2[i-5]: st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
+
+                    st.plotly_chart(criar_grafico_mare(CATEGORIAS, valores), use_container_width=True)
+                    st.info(f"**Observação Pedagógica:** {r_m.get('OBSERVAÇÕES PEDAGÓGICAS', 'Sem registro.')}")
+                else:
+                    st.warning(f"🟡 O aluno {al_af} possui um registro na planilha, mas as notas ainda não foram lançadas.")
+            else:
+                # MENSAGEM AMIGÁVEL QUANDO NÃO HÁ NADA LANÇADO
+                st.info(f"ℹ️ **Nenhuma avaliação registrada.**\nAinda não foram realizados lançamentos para a Tábua da Maré deste aluno.")
 
             # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (O CÓDIGO QUE VOCÊ ENVIOU) ---
             elif modo == "📚 Turno Estendido":

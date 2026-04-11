@@ -98,34 +98,74 @@ MARE_LABELS = {
 
 # --- FUNÇÕES DE REGISTRO (ESCRITA NA NUVEM) ---
 
-def registrar_turno_estendido(aluno, sala, avaliacao_tipo, nivel, evidencias_list, obs, ano=2026):
-    """Salva dados na aba TURNO_ESTENDIDO"""
+def registrar_turno_estendido(aluno, sala, avaliacao_tipo, nivel, evidencias_list, obs, ano):
     try:
-        # Lê a aba atual
-        df_atual = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
-        evidencias_str = "; ".join(evidencias_list) if isinstance(evidencias_list, list) else evidencias_list
+        client = get_gspread_client_seguro()
+        if not client: return False
         
-        novo_registro = {
-            "DATA": datetime.now().strftime("%d/%m/%Y"),
-            "ALUNO": aluno,
-            "SALA": sala,
-            "1 AVALIAÇÃO": nivel if avaliacao_tipo == "1ª Avaliação" else "",
-            "2 AVALIAÇÃO": nivel if avaliacao_tipo == "2ª Avaliação" else "",
-            "3 AVALIAÇÃO": nivel if avaliacao_tipo == "3ª Avaliação" else "",
-            "ANO": ano,
-            "DIAGNÓSTICO": nivel,
-            "EVIDÊNCIAS": evidencias_str,
-            "OBSERVAÇÕES PEDAGÓGICAS": obs
+        sh = client.open_by_key(ID_PLANILHA)
+        wks = sh.worksheet("TURNO_ESTENDIDO")
+        
+        # 1. Lê todos os dados para localizar a linha da aluna
+        dados = wks.get_all_records()
+        df_temp = pd.DataFrame(dados)
+        
+        # 2. Localiza o índice da linha (ajustando para o cabeçalho do Google Sheets que começa em 1)
+        # Procuramos por ALUNO e ANO na mesma linha
+        linha_idx = df_temp[(df_temp['ALUNO'] == aluno) & (df_temp['ANO'] == ano)].index
+        
+        evidencias_str = ", ".join(evidencias_list) if evidencias_list else ""
+        
+        # Mapeamento de colunas baseado na sua imagem:
+        # C=1 AVALIAÇÃO, D=2 AVALIAÇÃO, E=3 AVALIAÇÃO, G=DIAGNÓSTICO
+        col_map = {
+            "1ª Avaliação": "C",
+            "2ª Avaliação": "D",
+            "3ª Avaliação": "E" # Equivale a 3ª Avaliação
         }
         
-        df_final = pd.concat([df_atual, pd.DataFrame([novo_registro])], ignore_index=True)
-        conn.update(worksheet="TURNO_ESTENDIDO", data=df_final)
-        st.cache_data.clear()
+        letra_col = col_map.get(avaliacao_tipo)
+        
+        if len(linha_idx) > 0:
+            # --- ALUNA JÁ EXISTE: ATUALIZA A LINHA ---
+            row_num = linha_idx[0] + 2 # +2 porque o pandas ignora o header e começa em 0
+            
+            # Atualiza a avaliação específica
+            wks.update(f"{letra_col}{row_num}", [[nivel]])
+            
+            # Se for a Avaliação Final, atualiza também a coluna DIAGNÓSTICO (Coluna G)
+            if avaliacao_tipo == "3ª Avaliação":
+                wks.update(f"G{row_num}", [[nivel]])
+            
+            # Atualiza Evidências (H) e Observações (I) se houver conteúdo
+            if evidencias_str:
+                wks.update(f"H{row_num}", [[evidencias_str]])
+            if obs:
+                wks.update(f"I{row_num}", [[obs]])
+                
+            # Atualiza a Data (J)
+            wks.update(f"J{row_num}", [[datetime.now().strftime("%d/%m/%Y")]])
+            
+        else:
+            # --- ALUNA NÃO EXISTE NO ANO: CRIA NOVA LINHA (Matrícula) ---
+            # Caso você tente registrar sem ela estar na planilha
+            nova_linha = [
+                aluno, sala, 
+                nivel if avaliacao_tipo == "1ª Avaliação" else "",
+                nivel if avaliacao_tipo == "2ª Avaliação" else "",
+                nivel if avaliacao_tipo == "3ª Avaliação" else "",
+                ano,
+                nivel if avaliacao_tipo == "3º Avaliação" else "", # Diagnóstico
+                evidencias_str,
+                obs,
+                datetime.now().strftime("%d/%m/%Y")
+            ]
+            wks.append_row(nova_linha)
+            
         return True
     except Exception as e:
-        st.error(f"Erro ao salvar Turno Estendido: {e}")
+        st.error(f"Erro ao salvar: {e}")
         return False
-
 def registrar_tabua_mare(aluno, sala, semestre, notas_dict, obs):
     """Salva ou atualiza dados na aba TABUA_MARE"""
     try:
@@ -199,7 +239,7 @@ def render_grafico_alfabetizacao_individual(df_aluno):
     
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=df_aluno["Avaliacao"].str.replace("Avaliação Final", "3ª Aval") + "/" + df_aluno["Ano"].astype(str),
+        x=df_aluno["Avaliacao"].str.replace("3ª Avaliação", "3ª Aval") + "/" + df_aluno["Ano"].astype(str),
         y=[MAPA_NIVEIS.get(n, 0) for n in df_aluno["Nivel"]],
         fill='tozeroy', mode='lines+markers',
         line=dict(color="#6741d9", width=3),
@@ -452,7 +492,7 @@ def render_grafico_alfabetizacao_individual(df_aluno):
     
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=df_plot["Avaliacao"].str.replace("Avaliação Final", "3ª Aval") + "/" + df_plot["Ano"].astype(str),
+        x=df_plot["Avaliacao"].str.replace("3ª Avaliação", "3ª Aval") + "/" + df_plot["Ano"].astype(str),
         y=[MAPA_NIVEIS.get(n, 0) for n in df_plot["Nivel"]],
         fill='tozeroy', 
         mode='lines+markers',

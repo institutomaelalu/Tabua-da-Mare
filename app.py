@@ -572,20 +572,49 @@ with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
             st.markdown("##### ⚠️ Zona de Exclusão")
             tipo_del = st.radio("O que deseja remover?", ["Aluno (Matrícula)", "Padrinho"])
-            s_del = st.selectbox("Localizar em:", list(TURMAS_CONFIG.keys()) + ["TURNO_ESTENDIDO"])
+            
+            # Adicionamos as salas e a aba de turno estendido
+            abas_disponiveis = list(TURMAS_CONFIG.keys()) + ["TURNO_ESTENDIDO"]
+            s_del = st.selectbox("Localizar em:", abas_disponiveis)
+            
+            # Leitura dos dados para o selectbox
             df_del = conn.read(worksheet=s_del).fillna("")
             df_del.columns = [str(c).strip().upper() for c in df_del.columns]
-            al_del = st.selectbox("Selecionar Aluno:", sorted(df_del["ALUNO"].unique()) if not df_del.empty else [])
+            
+            # Lista de alunos única e ordenada
+            lista_alunos_del = sorted(df_del["ALUNO"].unique()) if "ALUNO" in df_del.columns and not df_del.empty else []
+            al_del = st.selectbox("Selecionar Aluno:", lista_alunos_del)
             
             if st.button("🚨 EXCLUIR REGISTRO", use_container_width=True):
-                idx_del = df_del[df_del["ALUNO"] == al_del].index[0] + 2
-                if tipo_del == "Padrinho":
-                    conn.update_cell(worksheet=s_del, row=idx_del, col=6, value="")
+                if al_del:
+                    try:
+                        # 1. ACESSO AO CLIENTE REAL
+                        client = conn._instance
+                        sh = client.open(nome_planilha)
+                        ws = sh.worksheet(s_del)
+                        
+                        # 2. LOCALIZAR A LINHA (Index do pandas + 2 para bater com o Google Sheets)
+                        idx_del = df_del[df_del["ALUNO"] == al_del].index[0] + 2
+                        
+                        if tipo_del == "Padrinho":
+                            # No seu cabeçalho das salas normais, PADRINHO é a Coluna 7 (G)
+                            # Se for no GERAL é a 7. Se for nas salas coloridas, confirme a letra da coluna.
+                            # Usaremos a Coluna 7 (G) com base nos CSVs enviados.
+                            ws.update_cell(idx_del, 7, "")
+                            st.success(f"Padrinho de {al_del} removido!")
+                        else:
+                            # 3. DELETAR LINHA INTEIRA
+                            ws.delete_rows(idx_del)
+                            st.error(f"Matrícula de {al_del} excluída permanentemente!")
+                        
+                        # Limpa o cache e reinicia para atualizar as tabelas na tela
+                        st.cache_data.clear()
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"Erro ao excluir: {e}")
                 else:
-                    conn.delete_rows(worksheet=s_del, indices=[idx_del])
-                st.error("Registro removido!"); st.cache_data.clear()
-
-    st.divider()
+                    st.warning("Selecione um aluno para excluir.")
 
     # --- BOTÕES DAS SALAS (COLORIDOS) ---
     render_botoes_salas("btn_pad", "sel_pad")

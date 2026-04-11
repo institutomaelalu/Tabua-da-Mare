@@ -522,7 +522,12 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             with st.popover("🤝 Registro de Padrinho/Madrinha", key="pad_popover", use_container_width=True):
                 st.markdown("##### 🤝 Novo Apadrinhamento")
                 s_busca = st.selectbox("Selecione a Sala:", list(TURMAS_CONFIG.keys()), key="pad_sala")
-                df_b = conn.read(worksheet=s_busca).fillna("")
+                try:
+    df_b = conn.read(spreadsheet=sheet_id, worksheet=s_busca).fillna("")
+    df_b.columns = [str(c).strip().upper() for c in df_b.columns]
+except Exception as e:
+    st.error(f"A aba '{s_busca}' não foi encontrada na planilha.")
+    df_b = pd.DataFrame()
                 df_b.columns = [str(c).strip().upper() for c in df_b.columns]
                 lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].isin(["", "-", "nan", "0"])]["ALUNO"].unique())
                 nome_p = st.text_input("Nome do Padrinho/Madrinha")

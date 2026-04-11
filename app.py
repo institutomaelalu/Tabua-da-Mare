@@ -100,71 +100,68 @@ MARE_LABELS = {
 
 def registrar_turno_estendido(aluno, sala, avaliacao_tipo, nivel, evidencias_list, obs, ano):
     try:
+        # 1. Conexão
         client = get_gspread_client_seguro()
-        if not client: return False
-        
+        if not client:
+            return False
+            
         sh = client.open_by_key(ID_PLANILHA)
         wks = sh.worksheet("TURNO_ESTENDIDO")
         
-        # 1. Lê todos os dados para localizar a linha da aluna
+        # 2. Preparação dos dados
+        # Se evidencias_list vier como None ou lista, tratamos para string
+        evid_str = ", ".join(evidencias_list) if isinstance(evidencias_list, list) else ""
+        hoje = datetime.now().strftime("%d/%m/%Y")
+        
+        # 3. Lógica de Busca (Para evitar duplicados)
         dados = wks.get_all_records()
         df_temp = pd.DataFrame(dados)
         
-        # 2. Localiza o índice da linha (ajustando para o cabeçalho do Google Sheets que começa em 1)
-        # Procuramos por ALUNO e ANO na mesma linha
-        linha_idx = df_temp[(df_temp['ALUNO'] == aluno) & (df_temp['ANO'] == ano)].index
-        
-        evidencias_str = ", ".join(evidencias_list) if evidencias_list else ""
-        
-        # Mapeamento de colunas baseado na sua imagem:
-        # C=1 AVALIAÇÃO, D=2 AVALIAÇÃO, E=3 AVALIAÇÃO, G=DIAGNÓSTICO
-        col_map = {
-            "1ª Avaliação": "C",
-            "2ª Avaliação": "D",
-            "3ª Avaliação": "E" # Equivale a 3ª Avaliação
-        }
-        
-        letra_col = col_map.get(avaliacao_tipo)
-        
+        # Se a planilha não estiver vazia, procuramos o aluno
+        linha_idx = []
+        if not df_temp.empty and "ALUNO" in df_temp.columns:
+            # Procuramos apenas pelo NOME, já que o ano pode estar vindo vazio agora
+            linha_idx = df_temp[df_temp['ALUNO'] == aluno].index
+
         if len(linha_idx) > 0:
-            # --- ALUNA JÁ EXISTE: ATUALIZA A LINHA ---
-            row_num = linha_idx[0] + 2 # +2 porque o pandas ignora o header e começa em 0
+            # --- JÁ EXISTE: ATUALIZA A LINHA ---
+            row_num = linha_idx[0] + 2
             
-            # Atualiza a avaliação específica
-            wks.update(f"{letra_col}{row_num}", [[nivel]])
+            if avaliacao_tipo == "MATRÍCULA":
+                # Se for apenas matrícula, atualiza a Sala (coluna B) para garantir
+                wks.update(f"B{row_num}", [[sala]])
+            else:
+                # Se for avaliação, usa a lógica de colunas (C, D, E...)
+                col_map = {"1ª Avaliação": "C", "2ª Avaliação": "D", "Avaliação Final": "E"}
+                letra_col = col_map.get(avaliacao_tipo)
+                if letra_col:
+                    wks.update(f"{letra_col}{row_num}", [[nivel]])
+                    if avaliacao_tipo == "Avaliação Final":
+                        wks.update(f"G{row_num}", [[nivel]]) # Diagnóstico
             
-            # Se for a Avaliação Final, atualiza também a coluna DIAGNÓSTICO (Coluna G)
-            if avaliacao_tipo == "3ª Avaliação":
-                wks.update(f"G{row_num}", [[nivel]])
-            
-            # Atualiza Evidências (H) e Observações (I) se houver conteúdo
-            if evidencias_str:
-                wks.update(f"H{row_num}", [[evidencias_str]])
-            if obs:
-                wks.update(f"I{row_num}", [[obs]])
-                
-            # Atualiza a Data (J)
-            wks.update(f"J{row_num}", [[datetime.now().strftime("%d/%m/%Y")]])
+            # Atualiza campos comuns se houver dados
+            if obs: wks.update(f"I{row_num}", [[obs]])
+            if evid_str: wks.update(f"H{row_num}", [[evid_str]])
+            if ano: wks.update(f"F{row_num}", [[ano]])
             
         else:
-            # --- ALUNA NÃO EXISTE NO ANO: CRIA NOVA LINHA (Matrícula) ---
-            # Caso você tente registrar sem ela estar na planilha
+            # --- NÃO EXISTE: CRIA NOVA LINHA (Matrícula inicial) ---
+            # Ordem das colunas: A:Aluno, B:Sala, C:1ª, D:2ª, E:3ª, F:Ano, G:Diag, H:Evid, I:Obs, J:Data
             nova_linha = [
-                aluno, sala, 
-                nivel if avaliacao_tipo == "1ª Avaliação" else "",
-                nivel if avaliacao_tipo == "2ª Avaliação" else "",
-                nivel if avaliacao_tipo == "3ª Avaliação" else "",
-                ano,
-                nivel if avaliacao_tipo == "3º Avaliação" else "", # Diagnóstico
-                evidencias_str,
-                obs,
-                datetime.now().strftime("%d/%m/%Y")
+                aluno,          # A
+                sala,           # B
+                "", "", "",     # C, D, E (vazios na matrícula)
+                ano,            # F
+                "",             # G
+                evid_str,       # H
+                obs,            # I
+                hoje            # J
             ]
             wks.append_row(nova_linha)
             
         return True
     except Exception as e:
-        st.error(f"Erro ao salvar: {e}")
+        print(f"ERRO NA GRAVAÇÃO: {e}") # Isso aparece no console do terminal
         return False
 def registrar_tabua_mare(aluno, sala, semestre, notas_dict, obs):
     """Salva ou atualiza dados na aba TABUA_MARE"""

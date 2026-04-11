@@ -587,36 +587,57 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 </div>
             """, unsafe_allow_html=True)
 
-# --- CONSTRUÇÃO DA TABELA HTML REVISADA ---
-v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
+try:
+        df_s = conn.read(worksheet=sala_v).fillna("")
+        df_s.columns = [str(c).strip().upper() for c in df_s.columns]
 
-# Diminuímos o font-size para 12px ou 13px para reduzir a fonte geral
-table_html = f'<table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px; border: 1px solid #ddd;">'
-table_html += f'<thead style="background-color: {cor_h}; color: white; text-align: left;"><tr>'
+        if not df_s.empty:
+            tn, cm = render_filtros(df_geral, "pad")
+            df_f = df_s.copy()
+            if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
+            if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-for col in v_cols:
-    table_html += f'<th style="padding: 8px; border: 1px solid #ddd;">{col}</th>'
-table_html += '</tr></thead><tbody>'
+            st.markdown(f"""
+                <div style="background-color: {cor_h}22; padding: 10px; border-radius: 5px; border-left: 5px solid {cor_h}; margin: 20px 0;">
+                    <span style="font-size: 14px; color: #333;">{cfg_sala['icon']} Atualmente: <b>{len(df_f)}</b> alunos na <b>{sala_v}</b></span>
+                </div>
+            """, unsafe_allow_html=True)
 
-for i, (_, r) in enumerate(df_f.iterrows()):
-    bg = "#ffffff" if i % 2 == 0 else "#f9f9f9"
-    p_nome = str(r.get("PADRINHO/MADRINHA", "-")).strip()
-    if p_nome in ["", "0", "nan", "None", "-"]: p_nome = "-"
-    
-    table_html += f'<tr style="background-color: {bg};">'
-    table_html += f'<td style="padding: 8px; border: 1px solid #eee; font-weight: bold;">{r.get("ALUNO", "-")}</td>'
-    table_html += f'<td style="padding: 8px; border: 1px solid #eee; text-align: center;">{r.get("TURMA", "-")}</td>'
-    table_html += f'<td style="padding: 8px; border: 1px solid #eee; text-align: center;">{r.get("IDADE", "-")}</td>'
-    table_html += f'<td style="padding: 8px; border: 1px solid #eee;">{r.get("COMUNIDADE", "-")}</td>'
-    
-    # AJUSTE AQUI: Removida a cor dinâmica (cor_h). Agora usa a cor padrão da linha.
-    table_html += f'<td style="padding: 8px; border: 1px solid #eee; font-weight: 600;">{p_nome}</td>'
-    table_html += '</tr>'
+            # --- CONSTRUÇÃO DA TABELA HTML REVISADA (FONTE MENOR E COR PADRONIZADA) ---
+            v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
+            
+            # Tabela com font-size: 12px
+            table_html = f'<table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px; border: 1px solid #ddd;">'
+            table_html += f'<thead style="background-color: {cor_h}; color: white; text-align: left;"><tr>'
 
-table_html += "</tbody></table>"
+            for col in v_cols:
+                table_html += f'<th style="padding: 8px; border: 1px solid #ddd;">{col}</th>'
+            table_html += '</tr></thead><tbody>'
 
-# Renderização
-st.markdown(table_html, unsafe_allow_html=True)
+            for i, (_, r) in enumerate(df_f.iterrows()):
+                bg = "#ffffff" if i % 2 == 0 else "#f9f9f9"
+                p_nome = str(r.get("PADRINHO/MADRINHA", "-")).strip()
+                if p_nome in ["", "0", "nan", "None", "-"]: p_nome = "-"
+                
+                table_html += f'<tr style="background-color: {bg};">'
+                table_html += f'<td style="padding: 8px; border: 1px solid #eee; font-weight: bold;">{r.get("ALUNO", "-")}</td>'
+                table_html += f'<td style="padding: 8px; border: 1px solid #eee; text-align: center;">{r.get("TURMA", "-")}</td>'
+                table_html += f'<td style="padding: 8px; border: 1px solid #eee; text-align: center;">{r.get("IDADE", "-")}</td>'
+                table_html += f'<td style="padding: 8px; border: 1px solid #eee;">{r.get("COMUNIDADE", "-")}</td>'
+                # Cor padronizada (preto/cinza escuro igual às outras colunas)
+                table_html += f'<td style="padding: 8px; border: 1px solid #eee; font-weight: 600;">{p_nome}</td>'
+                table_html += '</tr>'
+
+            table_html += "</tbody></table>"
+
+            # Renderização da Tabela
+            st.markdown(table_html, unsafe_allow_html=True)
+            
+        else:
+            st.info(f"A {sala_v} ainda não possui alunos matriculados.")
+
+    except Exception as e:
+        st.error(f"Erro técnico ao carregar a tabela: {e}")
 
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")

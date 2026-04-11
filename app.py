@@ -905,18 +905,128 @@ else:
                     st.error(f"Erro técnico ao salvar: {e}")
 # --- ABA: DADOS - TURNO ESTENDIDO ---
 elif menu == "📊 Dados - Turno Estendido":
-    # (Mantenha seu st.markdown do CSS aqui...)
+    st.markdown("""
+        <style>
+            thead tr th, th {
+                color: #000000 !important;
+                -webkit-text-fill-color: #000000 !important;
+                font-weight: bold !important;
+                background-color: #f8f9fa !important;
+                text-align: center !important;
+            }
+            .mare-box {
+                display: flex; flex-direction: column; align-items: center; 
+                justify-content: center; gap: 2px; padding: 2px;
+            }
+            .mare-mini-tabela {
+                width: 35px; height: 20px; border: 1px solid #999; border-radius: 3px;
+            }
+            .mare-texto-tabela {
+                font-size: 10px; color: #555; font-weight: bold; line-height: 1;
+                text-transform: lowercase;
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
     st.markdown("### 📋 Panorama de Avaliações")
     
-    # Criamos a cópia e garantimos que os nomes das colunas batam com o que o código espera
+    # Criamos a cópia e garantimos a existência das colunas necessárias
     df_h = df_alf.copy()
     
-    # Mapeamento para garantir que o código encontre as colunas ideais
-    # Se a coluna se chamar DIAGNÓSTICO na planilha, o código vai tratar como NIVEL
+    # Padronização de colunas para evitar KeyError
     if "DIAGNÓSTICO" in df_h.columns: df_h = df_h.rename(columns={"DIAGNÓSTICO": "NIVEL"})
     if "PERÍODO" in df_h.columns: df_h = df_h.rename(columns={"PERÍODO": "AVALIACAO"})
     if "ANO" not in df_h.columns: df_h["ANO"] = 2025
+
+    # 1. SELEÇÃO DE ANO
+    if "ano_ativo_te" not in st.session_state: 
+        st.session_state.ano_ativo_te = 2025
+    
+    st.write("**Selecione o Ano:**")
+    col_anos = st.columns([0.15, 0.15, 0.7]) 
+    anos_lista = [2025, 2026]
+    cores_ano = {2025: "#2E86C1", 2026: "#28B463"} 
+
+    for i, ano_op in enumerate(anos_lista):
+        is_active = st.session_state.ano_ativo_te == ano_op
+        cor_btn = cores_ano[ano_op] if is_active else "#D5DBDB"
+        txt_cor = "white" if is_active else "#566573"
+        
+        if col_anos[i].button(f"📅 {ano_op}", key=f"btn_ano_dado_{ano_op}", use_container_width=True):
+            st.session_state.ano_ativo_te = ano_op
+            st.rerun()
+        
+        st.markdown(f"<style>div[data-testid='stHorizontalBlock'] div:nth-child({i+1}) button {{ background-color: {cor_btn} !important; color: {txt_cor} !important; border: {'2px solid black' if is_active else '1px solid #ccc'} !important; }}</style>", unsafe_allow_html=True)
+
+    ano_sel = st.session_state.ano_ativo_te
+    st.info(f"Exibindo dados consolidados de: **{ano_sel}**")
+
+    # --- LEGENDA ---
+    st.markdown("##### 📝 Legenda de Níveis")
+    cols_leg = st.columns(len(NIVEIS_ALF))
+    for i, nv in enumerate(NIVEIS_ALF):
+        cor_fundo = CORES_EXCLUSIVAS.get(nv, "#eee")
+        cor_txt = "white" if "ALFABÉTICO" in nv else "#2C3E50"
+        
+        cols_leg[i].markdown(f"""
+            <div style="background-color:{cor_fundo}; color:{cor_txt}; padding:8px 2px; border-radius:10px; 
+            text-align:center; font-size:9px; font-weight:bold; min-height:45px; display:flex; align-items:center; justify-content:center; line-height:1.1; border: 1px solid rgba(0,0,0,0.05);">
+                {nv.split(". ")[1] if ". " in nv else nv}
+            </div>
+        """, unsafe_allow_html=True)
+
+    # --- TABELA HTML ---
+    # Colunas dinâmicas conforme o ano
+    cols_header = ["Nome do Aluno", "1ª Sondagem", "2ª Sondagem", "3ª Sondagem", "STATUS MARÉ"]
+    if ano_sel == 2026: cols_header.insert(1, "Diagnóstico 2025")
+
+    html_tab = f"""<table style="width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border: 1px solid #eee;">
+        <thead><tr style="background-color: #F8F9FA;">
+        {"".join([f'<th style="padding:10px; border:1px solid #eee; font-size:12px; color:black;">{c}</th>' for c in cols_header])}
+        </tr></thead>
+        <tbody>"""
+    
+    # Lista de alunos (Pega da base de dados para garantir que todos apareçam)
+    alunos_lista = sorted(df_h["ALUNO"].unique().tolist())
+    
+    for al in alunos_lista:
+        dados_aluno_ano = df_h[(df_h["ALUNO"] == al) & (df_h["ANO"] == ano_sel)]
+        
+        html_tab += f'<tr><td style="font-weight:bold; padding:10px; border:1px solid #eee; font-size:12px;">{al}</td>'
+        
+        # Se for 2026, mostra o histórico final de 2025
+        if ano_sel == 2026:
+            d_ant = df_h[(df_h["ALUNO"] == al) & (df_h["ANO"] == 2025)]
+            if not d_ant.empty:
+                nv_final_25 = d_ant.iloc[-1]["NIVEL"]
+                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv_final_25, "#fff")}; text-align:center; font-weight:bold; font-size:10px; border:1px solid #eee;">{nv_final_25.split(". ")[1] if ". " in nv_final_25 else nv_final_25}</td>'
+            else:
+                html_tab += '<td style="text-align:center; border:1px solid #eee; color:#ccc;">-</td>'
+
+        # Colunas de Avaliações do Ano Atual
+        for etapa in ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"]:
+            r = dados_aluno_ano[dados_aluno_ano["AVALIACAO"] == etapa]
+            if not r.empty:
+                nv = r.iloc[0]["NIVEL"]
+                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv, "#fff")}; text-align:center; font-weight:bold; border:1px solid #eee; font-size:10px; padding:5px;">{nv.split(". ")[1] if ". " in nv else nv}</td>'
+            else:
+                html_tab += '<td style="border:1px solid #eee;"></td>'
+
+        # Coluna Maré
+        if not dados_aluno_ano.empty:
+            nv_atual = dados_aluno_ano.iloc[-1]["NIVEL"]
+            # Chamar sua função de maré aqui
+            status_html = f'<td style="border:1px solid #eee; text-align:center;">Sim</td>' 
+        else:
+            status_html = '<td style="border:1px solid #eee; text-align:center;">-</td>'
+            
+        html_tab += status_html + '</tr>'
+
+    st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)
+
+# 2. O FECHAMENTO FINAL (Onde o erro morre)
+else:
+    st.write("Selecione uma opção no menu lateral."
     
 elif menu == "📈 Indicadores pedagógicos":
 

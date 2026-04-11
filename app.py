@@ -460,7 +460,7 @@ elif menu == "📝 Alunos matriculados":
     if cm != "Todas":
         df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-    # --- 2. ESTATÍSTICAS (Igual ao seu padrão) ---
+    # --- 2. ESTATÍSTICAS (Padronizado) ---
     st.markdown(f"""
         <div style="background-color: #f8f9fa; padding: 12px; border-radius: 10px; border-left: 5px solid {cor_h}; margin-bottom: 20px;">
             <span style="font-size: 14px; color: #666; font-family: 'Source Sans Pro', sans-serif;">📊 <b>Estatísticas da Sala:</b></span><br>
@@ -470,58 +470,56 @@ elif menu == "📝 Alunos matriculados":
         </div>
     """, unsafe_allow_html=True)
 
-    # --- 3. SELEÇÃO PARA MATRÍCULA (Via Multiselect para não quebrar a tabela) ---
-    alunos_lista = sorted([str(n).strip() for n in df_f["ALUNO"].unique()])
-    alunos_ja_no_te = st.session_state.get("alunos_te_dict", {}).keys()
-    alunos_disponiveis = [a for a in alunos_lista if a not in alunos_ja_no_te]
+    # --- 3. SELEÇÃO PARA MATRÍCULA (Ação Funcional) ---
+    # Pegamos apenas quem não está no dicionário de matriculados
+    matriculados_nomes = st.session_state.get("alunos_te_dict", {}).keys()
+    alunos_pendentes = [nome for nome in df_f["ALUNO"].unique() if nome not in matriculados_nomes]
 
-    if alunos_disponiveis:
-        st.markdown("**Selecione os alunos para matricular em massa:**")
-        selecionados = st.multiselect("", alunos_disponiveis, placeholder="Escolha os nomes...")
+    if alunos_pendentes:
+        st.markdown("**Selecione os alunos para realizar a matrícula:**")
+        selecionados = st.multiselect("Nomes disponíveis para matrícula:", sorted(alunos_pendentes))
         
         if selecionados:
             st.markdown(f"""<style>div.stButton > button {{ background-color: {cor_h} !important; color: white !important; width: 100%; border-radius: 8px; font-weight: bold;}}</style>""", unsafe_allow_html=True)
-            if st.button(f"🚀 Matricular {len(selecionados)} aluno(s)"):
+            if st.button(f"🚀 Confirmar Matrícula de {len(selecionados)} aluno(s)"):
                 if "alunos_te_dict" not in st.session_state: st.session_state["alunos_te_dict"] = {}
                 for al in selecionados: st.session_state["alunos_te_dict"][al] = sala_atual
-                st.success("Matrícula realizada!")
+                st.success("Matrícula concluída!")
                 st.rerun()
 
     st.write("---")
 
-    # --- 4. A TABELA (CONSTRUÇÃO IGUAL À GESTÃO DE APADRINHAMENTO) ---
-    # Aqui construímos a string completa antes de dar o st.markdown
+    # --- 4. CONSTRUÇÃO DA TABELA (ESTÉTICA IGUAL À GESTÃO DE APADRINHAMENTO) ---
+    # Criamos uma única string HTML para evitar o erro de texto na tela
     tabela_html = f"""
     <table class="custom-table">
         <thead style="background-color:{cor_h}; color: white;">
             <tr>
-                <th style="width: 10%; text-align: center;">STATUS</th>
+                <th style="width: 15%; text-align: center;">STATUS</th>
                 <th style="width: 45%;">ALUNO</th>
                 <th style="width: 15%;">IDADE</th>
-                <th style="width: 30%;">COMUNIDADE</th>
+                <th style="width: 25%;">COMUNIDADE</th>
             </tr>
         </thead>
         <tbody>
     """
 
     for _, r in df_f.iterrows():
-        nome = str(r.get("ALUNO", "")).replace("**", "").strip()
-        status = "✍️📖" if nome in alunos_ja_no_te else ""
-        idade = r.get("IDADE", "")
-        comunidade = r.get("COMUNIDADE", "")
+        nome_aluno = str(r.get("ALUNO", "")).replace("**", "").strip()
+        status_icon = "✍️📖" if nome_aluno in matriculados_nomes else ""
         
         tabela_html += f"""
             <tr>
-                <td style="text-align: center;">{status}</td>
-                <td style="font-family: 'Source Sans Pro', sans-serif;">{nome}</td>
-                <td style="font-family: 'Source Sans Pro', sans-serif;">{idade}</td>
-                <td style="font-family: 'Source Sans Pro', sans-serif;">{comunidade}</td>
+                <td style="text-align: center; font-size: 16px;">{status_icon}</td>
+                <td>{nome_aluno}</td>
+                <td>{r.get("IDADE", "")}</td>
+                <td>{r.get("COMUNIDADE", "")}</td>
             </tr>
         """
 
     tabela_html += "</tbody></table>"
 
-    # IMPRESSÃO ÚNICA (Resolve o erro da Imagem 5)
+    # Renderização final do HTML (Isso garante que fique igual à Imagem 1)
     st.markdown(tabela_html, unsafe_allow_html=True)
 
 elif menu == "🤝 Gestão de apadrinhamento":

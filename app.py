@@ -548,43 +548,46 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
         with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
             st.markdown("##### ⏳ Matricular no Turno Estendido")
             
-            # Seleção do aluno vindo da base GERAL
+            # Seleção do aluno (baseado na lista da aba GERAL)
             al_mat = st.selectbox("Selecione o Aluno:", lista_alunos_geral, key="sel_aluno_matricula_te")
             
             if st.button("✅ Confirmar Matrícula", key="btn_confirmar_te"):
                 if al_mat:
                     try:
-                        # 1. Descobrimos a sala atual do aluno na aba GERAL para levar essa info junto
+                        # --- IDENTIFICAÇÃO AUTOMÁTICA DA SALA ---
+                        # Buscamos a linha do aluno no DataFrame geral para capturar a sala dele
                         info_aluno = df_geral[df_geral["ALUNO"] == al_mat]
-                        # Tentamos pegar a coluna 'SALA' ou 'TURMA' do cadastro geral
-                        sala_origem = info_aluno["SALA"].values[0] if "SALA" in df_geral.columns else "Não Informada"
                         
-                        # 2. Executa a função de gravação na planilha "TURNO_ESTENDIDO"
-                        # Nota: Ajuste os parâmetros conforme sua função registrar_turno_estendido
-                        sucesso = registrar_turno_estendido(
-                            aluno=al_mat,
-                            sala=sala_origem,
-                            avaliacao_tipo="Matrícula Inicial",
-                            nivel="1. Pré-Silábico", # Nível padrão inicial ou vazio
-                            evidencias_list=[],
-                            obs="Matriculado via Painel de Controle",
-                            ano=2026 # Ou o ano atual do seu sistema
-                        )
-                        
-                        if sucesso:
-                            st.success(f"✅ {al_mat} matriculado no Turno Estendido!")
-                            st.cache_data.clear() # Limpa o cache para a aba TE ler o novo dado
+                        if not info_aluno.empty:
+                            # Tenta pegar da coluna 'SALA' ou 'TURMA' (ajuste conforme o nome exato na sua planilha GERAL)
+                            sala_origem = info_aluno["SALA"].values[0] if "SALA" in df_geral.columns else info_aluno["TURMA"].values[0]
                             
-                            # Opcional: Redirecionar para a aba de avaliação após sucesso
-                            # st.session_state.menu_lateral = "📖 Turno Estendido" 
-                            # st.rerun()
+                            # --- ENVIO SIMPLIFICADO ---
+                            # Chamamos a função de registro enviando apenas Nome e Sala
+                            # Nível e Obs são enviados como "-" ou vazios para não "poluir" a sheet
+                            sucesso = registrar_turno_estendido(
+                                aluno=al_mat,
+                                sala=sala_origem,
+                                avaliacao_tipo="MATRÍCULA",
+                                nivel="-",           # Valor nulo para diagnóstico
+                                evidencias_list=[],  # Lista vazia
+                                obs="-",             # Valor nulo para observação
+                                ano=2026
+                            )
+                            
+                            if sucesso:
+                                st.success(f"✅ {al_mat} ({sala_origem}) matriculado!")
+                                st.cache_data.clear()
+                                st.rerun()
+                            else:
+                                st.error("Falha ao salvar na planilha.")
                         else:
-                            st.error("Erro ao salvar na planilha. Verifique a conexão.")
+                            st.error("Aluno não encontrado na base Geral para identificar a sala.")
                             
                     except Exception as e:
                         st.error(f"Erro ao processar matrícula: {e}")
                 else:
-                    st.warning("Selecione um aluno válido.")
+                    st.warning("Selecione um aluno.")
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
             st.radio("Remover:", ["Aluno", "Padrinho"])

@@ -1125,19 +1125,59 @@ elif modo == "📚 Turno Estendido":
                             </span>
                         </div>""", unsafe_allow_html=True)
 elif menu == "🌊 Tábua da Maré":
-    # (Mantido original)
     st.markdown(f"### 🌊 Tábua da Maré")
+    
+    # 1. Definições locais para evitar NameError
+    CATEGORIAS = [
+        "Atividades em grupo/proatividade", 
+        "Interesse pelo novo", 
+        "Compartilhamento de materiais", 
+        "Clareza e Desenvoltura", 
+        "Respeito às regras"
+    ]
+    
+    # Renderiza os botões das salas (Azul, Verde, etc)
     render_botoes_salas("btn_int", "sel_int")
+    
+    # 2. Carga de dados
     df_av = df_aval.copy()
+    # Padroniza colunas das avaliações para evitar erro de Case Sensitive
+    df_av.columns = [str(c).strip().upper() for c in df_av.columns]
+    
     df_s = safe_read(st.session_state.sel_int)
+    
     if not df_s.empty:
+        df_s.columns = [str(c).strip().upper() for c in df_s.columns]
+        # Pega a lista de alunos da sala selecionada
         alunos_sala = [str(n).replace("**", "").strip() for n in df_s["ALUNO"].unique()]
-        df_f = df_av[df_av["Aluno"].isin(alunos_sala)]
+        
+        # Filtra as avaliações apenas para os alunos desta sala
+        df_f = df_av[df_av["ALUNO"].isin(alunos_sala)]
+        
         if not df_f.empty:
-            for al in sorted(df_f["Aluno"].unique()):
+            # Ordena e itera pelos alunos
+            for al in sorted(df_f["ALUNO"].unique()):
                 with st.expander(f"📊 {al}"):
-                    for _, r in df_f[df_f["Aluno"] == al].iterrows():
-                        st.write(f"**{r['Periodo']}**")
-                        st.plotly_chart(criar_grafico_mare(CATEGORIAS, [float(r[c]) for c in CATEGORIAS]), key=f"g_{al}_{r['Periodo']}")
-        else: st.info("Nenhuma avaliação lançada para esta sala.")
-    else: st.error("Erro ao carregar dados da sala.")
+                    dados_aluno = df_f[df_f["ALUNO"] == al]
+                    
+                    for _, r in dados_aluno.iterrows():
+                        # Busca o período (Coluna PERIODO ou DATA)
+                        periodo = r.get("PERIODO", "Avaliação")
+                        st.write(f"**{periodo}**")
+                        
+                        # Extrai os valores das categorias para o gráfico
+                        valores = []
+                        for c in CATEGORIAS:
+                            try:
+                                val = r.get(c.upper(), 0)
+                                valores.append(float(val) if val not in ["", None] else 0.0)
+                            except:
+                                valores.append(0.0)
+                        
+                        # Renderiza o gráfico
+                        fig = criar_grafico_mare(CATEGORIAS, valores)
+                        st.plotly_chart(fig, use_container_width=True, key=f"g_indiv_{al}_{periodo}")
+        else: 
+            st.info("Nenhuma avaliação lançada para os alunos desta sala.")
+    else: 
+        st.error("Erro ao carregar os dados dos alunos desta sala.")

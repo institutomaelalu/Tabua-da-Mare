@@ -823,13 +823,13 @@ if st.session_state.get("sel_te") not in salas_te:
 render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_te)
     
     # --- SELEÇÃO DE ALUNO (Linha 825) ---
-    # 1. Garante que esta linha comece no mesmo nível do 'if' ou 'elif' acima
-    al_te = df_alf[df_alf["SALA"] == st.session_state.sel_te]["ALUNO"].unique().tolist()
+# 1. Garante que esta linha comece no mesmo nível do 'if' ou 'elif' acima
+al_te = df_alf[df_alf["SALA"] == st.session_state.sel_te]["ALUNO"].unique().tolist()
     
-    if not al_te:
+if not al_te:
         st.warning("Selecione a sala ou matricule alunos nesta turma.")
         al = None
-    else:
+else:
         al = st.selectbox("Aluno:", sorted(al_te))
         
         # --- O SEGREDO DO HISTÓRICO POR ANO ---

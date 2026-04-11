@@ -414,183 +414,183 @@ def render_grafico_alfabetizacao_individual(df_aluno):
     st.plotly_chart(fig, use_container_width=True)
     
 # --- MENU ---
-menu_options = ["👤 Matrícula", "📝 Alunos matriculados", "📊 Dados - Turno Estendido", "🤝 Gestão de apadrinhamento", "📊 Avaliação da Tábua da Maré", "📖 Turno Estendido", "📈 Indicadores pedagógicos", "🌊 Canal do Apadrinhamento", "🌊 Tábua da Maré"]
+menu_options = ["📝 Controle de Matrícula e Apadrinhamento", "📊 Dados - Turno Estendido", "📊 Avaliação da Tábua da Maré", "📖 Turno Estendido", "📈 Indicadores pedagógicos", "🌊 Canal do Apadrinhamento", "🌊 Tábua da Maré"]
 if st.session_state.perfil != "admin": menu_options = ["🌊 Canal do Apadrinhamento"]
 menu = st.sidebar.radio("Navegação", menu_options)
 
 st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Instituto</span> <span style='color:{C_AZUL}'>Mãe</span> <span style='color:{C_VERDE}'>Lalu</span></h1></div><hr>", unsafe_allow_html=True)
 
 # --- ABAS ---
-
-if menu == "👤 Matrícula":
-    # (Mantido original)
-    st.markdown(f"### 👤 Novo Cadastro")
-    with st.form("form_cad"):
-        c1, c2 = st.columns(2)
-        nome = c1.text_input("Nome Completo").strip().upper()
-        idade = c2.text_input("Idade").strip()
-        comu = c1.text_input("Comunidade").strip().upper()
-        sala = c2.selectbox("Sala Destino", list(TURMAS_CONFIG.keys()))
-        turno = c1.selectbox("Turno", ["A", "B"])
-        if st.form_submit_button("Finalizar Cadastro"):
-            if nome and idade:
-                client = get_gspread_client()
-                sh = client.open_by_key("1MBAvQB5xGhE7OAHGWdFPvGfwqzP9SpiaIW4OEl2Mgk4")
-                sh.worksheet(sala).append_row([nome, sala, turno, idade, comu, ""])
-                sh.worksheet("GERAL").append_row([nome, sala, turno, idade, comu, ""])
-                st.success("Cadastrado com sucesso!"); st.rerun()
-
-elif menu == "📝 Alunos matriculados":
-    st.markdown("### 📋 Quadro de Alunos Matriculados")
+if menu == "📝 Controle de Matrícula e Apadrinhamento":
+    st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
+    st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     
-    # 1. BOTÕES DE SALA E FILTROS
-    render_botoes_salas("btn_mat", "sel_mat")
-    sala_atual = st.session_state.sel_mat
-    cor_h = TURMAS_CONFIG[sala_atual]["cor"]
-    
-    df_s = conn.read(worksheet=sala_atual).fillna("")
-    df_s.columns = [str(c).strip().upper() for c in df_s.columns]
-    
-    df_g_aux = conn.read(worksheet="GERAL").fillna("")
-    df_g_aux.columns = [str(c).strip().upper() for c in df_g_aux.columns]
-    tn, cm = render_filtros(df_g_aux, "mat")
-    
-    df_f = df_s.copy()
-    if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
-    if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
+    # Configuração de Cores (Identidade Visual)
+    cor_rosa, cor_amarela, cor_verde, cor_azul, cor_lavanda = "#F783AC", "#FFE066", "#A9E34B", "#99E9F2", "#D0BFFF"
 
-    # 2. CSS ENCAPSULADO (Garante a fonte apenas aqui)
-    estilo_tabela = f"""
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;700&display=swap');
-
-        .container-lista {{
-            font-family: 'Source Sans Pro', sans-serif !important;
+   # --- CSS PARA INVERSÃO DE CORES (ULTRA-ESPECÍFICO E CORRIGIDO) ---
+    st.markdown(f"""
+        <style>
+        /* 1. BOTÕES DE GESTÃO (Popovers Superiores) - FUNDO BRANCO E TEXTO COLORIDO */
+        div[data-testid="stPopover"] > button {{
+            background-color: white !important;
+            background-image: none !important; /* Remove o gradiente colorido original */
+            border-radius: 8px;
+            transition: 0.3s;
+            height: 3.2rem;
+            box-shadow: none !important;
         }}
-        .tab-matriculados {{
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-            color: #31333F;
-        }}
-        .tab-matriculados thead th {{
-            background-color: {cor_h};
-            color: white !important;
-            padding: 12px;
-            text-align: left;
-            font-weight: bold;
-            text-transform: uppercase;
-        }}
-        .tab-matriculados td {{
-            padding: 12px;
-            border-bottom: 1px solid #f0f0f0;
-        }}
-        .status-col {{ width: 8%; text-align: center; }}
-        .aluno-col {{ width: 52%; }}
-        .idade-col {{ width: 15%; }}
-        .comu-col {{ width: 25%; }}
-    </style>
-    """
-
-    # 3. CONSTRUÇÃO DO CORPO DA TABELA
-    # Lista de matriculados no Turno Estendido (para o ícone)
-    matriculados_te = st.session_state.get("alunos_te_dict", {}).keys()
-
-    corpo_tabela = ""
-    for _, r in df_f.iterrows():
-        nome = str(r.get("ALUNO", "")).replace("**", "").strip()
-        idade = str(r.get("IDADE", ""))
-        comunidade = str(r.get("COMUNIDADE", ""))
-        status = "✍️📖" if nome in matriculados_te else ""
         
-        corpo_tabela += f"""
-        <tr>
-            <td class="status-col">{status}</td>
-            <td class="aluno-col">{nome}</td>
-            <td class="idade-col">{idade}</td>
-            <td class="comu-col">{comunidade}</td>
-        </tr>
-        """
+        /* Aplica bordas e cores de texto específicas para cada botão */
+        div[key="mat_popover"] > button {{ color: {cor_rosa} !important; border: 2px solid {cor_rosa} !important; }}
+        div[key="pad_popover"] > button {{ color: {cor_amarela} !important; border: 2px solid {cor_amarela} !important; }}
+        div[key="est_popover"] > button {{ color: {cor_verde} !important; border: 2px solid {cor_verde} !important; }}
+        div[key="del_popover"] > button {{ color: {cor_azul} !important; border: 2px solid {cor_azul} !important; }}
 
-    # 4. MONTAGEM FINAL
-    html_final = f"""
-    {estilo_tabela}
-    <div class="container-lista">
-        <table class="tab-matriculados">
-            <thead>
-                <tr>
-                    <th class="status-col">STATUS</th>
-                    <th class="aluno-col">ALUNO</th>
-                    <th class="idade-col">IDADE</th>
-                    <th class="comu-col">COMUNIDADE</th>
-                </tr>
-            </thead>
-            <tbody>
-                {corpo_tabela}
-            </tbody>
-        </table>
-    </div>
-    """
+        /* Garante que o texto dentro dos popovers (botão branco) seja Negrito e colorido */
+        div[data-testid="stPopover"] button p {{
+            font-weight: 800 !important;
+            color: inherit !important; /* Herda a cor definida acima */
+        }}
 
-    # 5. EXIBIÇÃO
-    if not df_f.empty:
-        st.markdown(html_final, unsafe_allow_html=True)
-    else:
-        st.info("Nenhum aluno encontrado para os filtros selecionados.")
-elif menu == "🤝 Gestão de apadrinhamento":
-    st.markdown(f"### 🤝 Gestão de Apadrinhamento")
+        /* 2. BOTÕES DE SELEÇÃO DE SALA (Inferiores) - COLORIDOS COM TEXTO BRANCO EM NEGRITO */
+        /* O prefixo 'btn_pad' deve bater com o que você usa na função render_botoes_salas */
+        div[key^="btn_pad"] > button {{
+            color: white !important;
+            border: none !important;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1) !important;
+        }}
+        
+        /* FORÇANDO NEGRITO NOS BOTÕES DE SALA (Caminho completo do elemento) */
+        div[key^="btn_pad"] button div[data-testid="stMarkdownContainer"] p {{
+            font-weight: 900 !important;
+            color: white !important;
+            -webkit-text-stroke: 0.5px white; /* Reforço visual do negrito */
+        }}
+
+        /* Cores de fundo específicas para as salas */
+        div[key$="SALA ROSA"] > button {{ background-color: {cor_rosa} !important; }}
+        div[key$="SALA AMARELA"] > button {{ background-color: {cor_amarela} !important; }}
+        div[key$="SALA VERDE"] > button {{ background-color: {cor_verde} !important; }}
+        div[key$="SALA AZUL"] > button {{ background-color: {cor_azul} !important; }}
+        div[key$="CIRAND. MUNDO"] > button {{ background-color: {cor_lavanda} !important; }}
+
+        /* Efeito de hover para manter o padrão visual */
+        div[key^="btn_pad"] > button:hover {{
+            filter: brightness(0.9);
+            color: white !important;
+        }}
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- BLOCO DE GESTÃO ---
+    gestao_col1, gestao_col2, gestao_col3, gestao_col4 = st.columns([1, 2.2, 1.3, 0.9])
+
+    with gestao_col1:
+        with st.popover("➕ Matrícula", key="mat_popover", use_container_width=True):
+            st.markdown("##### 📝 Nova Matrícula")
+            n_nome = st.text_input("Nome do Aluno")
+            n_nasc = st.date_input("Nascimento", format="DD/MM/YYYY")
+            n_sala = st.selectbox("Sala Destino", list(TURMAS_CONFIG.keys()), key="reg_sala")
+            n_turno = st.selectbox("Turno", ["A", "B"], key="reg_turno")
+            n_comu = st.text_input("Comunidade")
+            
+            idade_calc = datetime.now().year - n_nasc.year - ((datetime.now().month, datetime.now().day) < (n_nasc.month, n_nasc.day))
+            txt_idade = f"{idade_calc} ANOS"
+            
+            if st.button("Confirmar Matrícula", use_container_width=True):
+                nova_linha = [n_nome.upper(), n_turno, txt_idade, n_nasc.strftime("%d/%m/%Y"), n_comu.upper(), ""]
+                conn.append_row(worksheet=n_sala, data=nova_linha)
+                st.success(f"{n_nome.upper()} matriculado!"); st.cache_data.clear()
+
+    with gestao_col2:
+        with st.popover("🤝 Registro de Padrinho/Madrinha", key="pad_popover", use_container_width=True):
+            st.markdown("##### 🤝 Novo Apadrinhamento")
+            s_busca = st.selectbox("Selecione a Sala:", list(TURMAS_CONFIG.keys()), key="pad_sala")
+            df_b = conn.read(worksheet=s_busca).fillna("")
+            df_b.columns = [str(c).strip().upper() for c in df_b.columns]
+            lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].isin(["", "-", "nan", "0"])]["ALUNO"].unique())
+            
+            nome_p = st.text_input("Nome do Padrinho/Madrinha")
+            al_sel = st.selectbox("Escolha o Afilhado:", lista_lib)
+            
+            if st.button("Confirmar Apadrinhamento", use_container_width=True):
+                idx = df_b[df_b["ALUNO"] == al_sel].index[0] + 2
+                conn.update_cell(worksheet=s_busca, row=idx, col=6, value=nome_p.upper())
+                st.success("Registro concluído!"); st.cache_data.clear()
+
+    with gestao_col3:
+        with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
+            st.markdown("##### ⏳ Matrícula Estendida")
+            s_est = st.selectbox("Origem dos Alunos:", list(TURMAS_CONFIG.keys()), key="sel_est_sala")
+            df_est = conn.read(worksheet=s_est).fillna("")
+            lista_est = sorted(df_est["ALUNO"].unique())
+            selecionados = st.multiselect("Selecione 1 ou mais alunos:", lista_est)
+            
+            if st.button("Confirmar Turno Estendido", use_container_width=True):
+                for aluno in selecionados:
+                    conn.append_row(worksheet="TURNO_ESTENDIDO", data=[aluno.upper(), s_est])
+                st.success("Alunos atualizados!"); st.cache_data.clear()
+
+    with gestao_col4:
+        with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
+            st.markdown("##### ⚠️ Zona de Exclusão")
+            tipo_del = st.radio("O que deseja remover?", ["Aluno (Matrícula)", "Padrinho"])
+            s_del = st.selectbox("Localizar em:", list(TURMAS_CONFIG.keys()) + ["TURNO_ESTENDIDO"])
+            df_del = conn.read(worksheet=s_del).fillna("")
+            df_del.columns = [str(c).strip().upper() for c in df_del.columns]
+            al_del = st.selectbox("Selecionar Aluno:", sorted(df_del["ALUNO"].unique()) if not df_del.empty else [])
+            
+            if st.button("🚨 EXCLUIR REGISTRO", use_container_width=True):
+                idx_del = df_del[df_del["ALUNO"] == al_del].index[0] + 2
+                if tipo_del == "Padrinho":
+                    conn.update_cell(worksheet=s_del, row=idx_del, col=6, value="")
+                else:
+                    conn.delete_rows(worksheet=s_del, indices=[idx_del])
+                st.error("Registro removido!"); st.cache_data.clear()
+
+    st.divider()
+
+    # --- BOTÕES DAS SALAS (COLORIDOS) ---
     render_botoes_salas("btn_pad", "sel_pad")
+    
+    # Garantia de que há uma sala selecionada
+    if "sel_pad" not in st.session_state:
+        st.session_state.sel_pad = "SALA ROSA"
+    
+    sala_v = st.session_state.sel_pad
+    cor_h = TURMAS_CONFIG[sala_v]["cor"]
 
-    # --- CONEXÃO COM GOOGLE SHEETS ---
-    # 1. Busca a base geral para os filtros (Turno/Comunidade)
+    # --- VISUALIZAÇÃO DOS DADOS ---
     df_g = conn.read(worksheet="GERAL").fillna("")
-    df_g.columns = [str(c).strip().upper() for c in df_g.columns]
-
-    # 2. Busca a aba específica da sala selecionada (ex: "SALA ROSA")
-    # O st.session_state.sel_pad contém o nome da sala vindo do botão
-    df_s = conn.read(worksheet=st.session_state.sel_pad).fillna("")
+    df_s = conn.read(worksheet=sala_v).fillna("")
     df_s.columns = [str(c).strip().upper() for c in df_s.columns]
 
     if not df_s.empty:
-        # Renderiza os filtros usando a base geral
         tn, cm = render_filtros(df_g, "pad")
-        
-        # Filtra os dados da sala selecionada
-        # Note: No arquivo da sala a coluna de turno chama-se "TURMA"
         df_f = df_s.copy()
-        if tn != "Todos":
-            df_f = df_f[df_f["TURMA"] == tn]
-        if cm != "Todas":
-            df_f = df_f[df_f["COMUNIDADE"] == cm]
+        if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
+        if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-        cor_h = TURMAS_CONFIG[st.session_state.sel_pad]["cor"]
-        
-        # Colunas conforme a estrutura do seu arquivo CSV
-        v_cols = ["ALUNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
-        
-        # Montagem da Tabela HTML
-        html = f'<table class="custom-table"><thead style="background-color:{cor_h}"><tr>' + "".join([f'<th>{c}</th>' for c in v_cols]) + '</tr></thead><tbody>'
-        
+        t_turno = f" - {tn}" if tn != "Todos" else ""
+        st.markdown(f"""
+            <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; border-left: 4px solid {cor_h}; margin: 10px 0 20px 0;">
+                <span style="font-size: 14px; color: #555;">📍 Atualmente temos <b>{len(df_f)}</b> alunos matriculados na <b>{sala_v}{t_turno}</b></span>
+            </div>
+        """, unsafe_allow_html=True)
+
+        v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
+        st.markdown(f"""<style>
+            .custom-table {{ font-size: 13px !important; width: 100%; border-collapse: collapse; }}
+            .custom-table thead th {{ background-color: {cor_h} !important; color: white !important; padding: 10px; text-align: left; }}
+            .custom-table td {{ padding: 8px 10px; border-bottom: 1px solid #f0f0f0; border-right: 1px solid #f0f0f0; }}
+        </style>""", unsafe_allow_html=True)
+
+        html = f'<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in v_cols]) + '</tr></thead><tbody>'
         for _, r in df_f.iterrows():
-            # Limpeza do nome do aluno
-            n_l = str(r.get("ALUNO", "")).replace("**", "").strip()
-            idade = str(r.get("IDADE", ""))
-            comunidade = str(r.get("COMUNIDADE", ""))
-            padrinho = str(r.get("PADRINHO/MADRINHA", ""))
-            
-            # Se o padrinho estiver vazio ou for "nan", mostramos vazio para ficar limpo
-            padrinho_texto = padrinho if padrinho.lower() not in ["nan", "", "none", "0"] else ""
-            
-            html += f'<tr><td>{n_l}</td><td>{idade}</td><td>{comunidade}</td><td>{padrinho_texto}</td></tr>'
-        
+            p_txt = str(r.get('PADRINHO/MADRINHA','')) if str(r.get('PADRINHO/MADRINHA','')) not in ['nan','', '0', '-'] else '-'
+            html += f"<tr><td>{r['ALUNO']}</td><td style='text-align:center'>{r['TURMA']}</td><td>{r['IDADE']}</td><td>{r['COMUNIDADE']}</td><td>{p_txt}</td></tr>"
         st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
-        
-        # Rodapé com contagem (estilo R&D)
-        st.caption(f"Total exibido: {len(df_f)} alunos na {st.session_state.sel_pad}")
-        
-    else: 
-        st.warning(f"A aba '{st.session_state.sel_pad}' parece estar vazia na Google Sheet.")
-
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
 

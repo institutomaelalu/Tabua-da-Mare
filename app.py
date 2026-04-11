@@ -441,50 +441,46 @@ if menu == "👤 Matrícula":
                 st.success("Cadastrado com sucesso!"); st.rerun()
 
 elif menu == "📝 Alunos matriculados":
-    st.markdown(f"### 📋 Quadro de Alunos Matriculados")
+    st.markdown("### 📋 Quadro de Alunos Matriculados")
     
-    # 1. BOTÕES DE SELEÇÃO DE SALA
+    # 1. SELEÇÃO DE SALA E FILTROS (Funcionalidade Original)
     render_botoes_salas("btn_mat", "sel_mat")
-    
     sala_atual = st.session_state.sel_mat
     cor_h = TURMAS_CONFIG[sala_atual]["cor"]
     
-    # 2. CARREGAMENTO E FILTRAGEM
     df_s = conn.read(worksheet=sala_atual).fillna("")
     df_s.columns = [str(c).strip().upper() for c in df_s.columns]
     
-    # Filtros de Turma e Comunidade (conforme seu app original)
+    # Filtros de Turma e Comunidade
     df_g_aux = conn.read(worksheet="GERAL").fillna("")
     df_g_aux.columns = [str(c).strip().upper() for c in df_g_aux.columns]
     tn, cm = render_filtros(df_g_aux, "mat")
     
     df_f = df_s.copy()
-    if tn != "Todos":
-        df_f = df_f[df_f["TURMA"] == tn]
-    if cm != "Todas":
-        df_f = df_f[df_f["COMUNIDADE"] == cm]
+    if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
+    if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-    # 3. ESTATÍSTICAS (Estilo inline para não afetar o resto do app)
-    st.markdown(f"""
-        <div style="background-color: #f8f9fa; padding: 12px; border-radius: 10px; border-left: 5px solid {cor_h}; margin-bottom: 20px; font-family: 'Source Sans Pro', sans-serif;">
-            <span style="font-size: 14px; color: #666; font-weight: bold;">📊 Estatísticas da Sala:</span><br>
-            <span style="font-size: 15px; color: #31333F;">
-                👥 Total na <b>{sala_atual}</b>: {len(df_s)} alunos | 🔍 No filtro atual: <b>{len(df_f)}</b> alunos
-            </span>
-        </div>
-    """, unsafe_allow_html=True)
+    # Lista de matriculados no Turno Estendido (para o ícone de status)
+    matriculados_te = st.session_state.get("alunos_te_dict", {}).keys()
 
-    # 4. CONSTRUÇÃO DA TABELA HTML (Estética idêntica à Gestão de Apadrinhamento)
-    # Definimos o estilo apenas para esta tabela específica (.tabela-alunos)
+    # 2. CONSTRUÇÃO DA TABELA HTML COM ESTILO ENCAPSULADO
+    # O uso do ID #tabela-matriculados impede que a fonte mude no resto do app
     html_tabela = f"""
     <style>
-        .tabela-alunos {{
+        @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;700&display=swap');
+
+        #container-matriculados {{
+            font-family: 'Source Sans Pro', sans-serif !important;
+            margin-top: 20px;
+        }}
+        
+        .tabela-estilizada {{
             width: 100%;
             border-collapse: collapse;
-            font-family: 'Source Sans Pro', sans-serif;
             color: #31333F;
         }}
-        .tabela-alunos thead th {{
+        
+        .tabela-estilizada thead th {{
             background-color: {cor_h};
             color: white;
             padding: 12px;
@@ -494,43 +490,51 @@ elif menu == "📝 Alunos matriculados":
             font-weight: bold;
             border: none;
         }}
-        .tabela-alunos td {{
+        
+        .tabela-estilizada td {{
             padding: 12px;
             border-bottom: 1px solid #eeeeee;
             font-size: 14px;
-            vertical-align: middle;
+            font-family: 'Source Sans Pro', sans-serif !important;
         }}
-        .tabela-alunos tr:hover {{
-            background-color: #fcfcfc;
-        }}
+
+        .status-col {{ text-align: center; width: 10%; }}
+        .aluno-col {{ width: 50%; }}
+        .idade-col {{ width: 15%; }}
+        .comu-col {{ width: 25%; }}
     </style>
-    <table class="tabela-alunos">
-        <thead>
-            <tr>
-                <th style="width: 60%;">ALUNO</th>
-                <th style="width: 15%;">IDADE</th>
-                <th style="width: 25%;">COMUNIDADE</th>
-            </tr>
-        </thead>
-        <tbody>
+
+    <div id="container-matriculados">
+        <table class="tabela-estilizada">
+            <thead>
+                <tr>
+                    <th class="status-col">STATUS</th>
+                    <th class="aluno-col">ALUNO</th>
+                    <th class="idade-col">IDADE</th>
+                    <th class="comu-col">COMUNIDADE</th>
+                </tr>
+            </thead>
+            <tbody>
     """
 
     for _, r in df_f.iterrows():
         nome = str(r.get("ALUNO", "")).replace("**", "").strip()
         idade = str(r.get("IDADE", ""))
         comunidade = str(r.get("COMUNIDADE", ""))
+        status = "✍️📖" if nome in matriculados_te else ""
         
         html_tabela += f"""
             <tr>
-                <td>{nome}</td>
-                <td>{idade}</td>
-                <td>{comunidade}</td>
+                <td class="status-col">{status}</td>
+                <td class="aluno-col">{nome}</td>
+                <td class="idade-col">{idade}</td>
+                <td class="comu-col">{comunidade}</td>
             </tr>
         """
 
-    html_tabela += "</tbody></table>"
+    html_tabela += "</tbody></table></div>"
 
-    # 5. RENDERIZAÇÃO
+    # 3. RENDERIZAÇÃO ÚNICA
     st.markdown(html_tabela, unsafe_allow_html=True)
 elif menu == "🤝 Gestão de apadrinhamento":
     st.markdown(f"### 🤝 Gestão de Apadrinhamento")

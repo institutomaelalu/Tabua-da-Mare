@@ -577,24 +577,23 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             lista_est = sorted(df_est_leitura["ALUNO"].unique())
             selecionados = st.multiselect("Selecione os alunos:", lista_est)
             
-            if st.button("Confirmar Turno Estendido", use_container_width=True):
-                if selecionados:
-                    try:
-                        # USANDO A FUNÇÃO SEGURA
-                        gc = get_gspread_client(conn)
-                        sh = gc.open(nome_planilha)
-                        ws = sh.worksheet("TURNO_ESTENDIDO")
-                        
-                        ano_atual = datetime.now().strftime("%Y")
-                        for aluno in selecionados:
-                            linha = [aluno.upper(), s_est, "", "", "", ano_atual, "", "", ""]
-                            ws.append_row(linha)
-                            
-                        st.success(f"{len(selecionados)} aluno(s) adicionado(s)!")
-                        st.cache_data.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro no Google Sheets: {e}")
+# --- BLOCO DE MATRÍCULA NO TURNO ESTENDIDO ---
+if st.button("✅ Confirmar Matrícula no Turno Estendido", use_container_width=True):
+    if al_mat: # Verifica se um aluno foi selecionado
+        # 1. Definimos o aluno selecionado para a próxima aba
+        st.session_state.sel_te = sala_te  # Sincroniza a sala
+        st.session_state.aluno_pendente_te = al_mat # Passa o nome do aluno
+        
+        # 2. Mudamos o menu lateral programaticamente
+        st.session_state.menu_lateral = "📖 Turno Estendido"
+        
+        st.success(f"Aluno {al_mat} encaminhado para avaliação!")
+        
+        # 3. Limpamos o cache e recarregamos na nova aba
+        st.cache_data.clear()
+        st.rerun()
+    else:
+        st.error("Por favor, selecione um aluno antes de confirmar.")
 
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):

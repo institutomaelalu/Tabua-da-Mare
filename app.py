@@ -5,6 +5,10 @@ import numpy as np
 import os
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
+
+nome_planilha = "APP_IMLA"
+sheet_id = nome_planilha
+
 # 1. CONFIGURAÇÃO E ESTILO (Sempre o primeiro comando Streamlit)
 st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 # --- 1. ESTABELECER CONEXÃO (OBRIGATÓRIO SER AQUI) ---

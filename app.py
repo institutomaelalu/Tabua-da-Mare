@@ -846,7 +846,7 @@ elif menu == "📖 Turno Estendido":
             
             obs = st.text_area("Observações Adicionais:")
             
-if st.form_submit_button("🚀 Salvar na Planilha Google"):
+            if st.form_submit_button("🚀 Salvar na Planilha Google"):
                 try:
                     client = get_gspread_client_seguro()
                     if client:

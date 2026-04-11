@@ -536,8 +536,8 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 if selecionados:
                     try:
                         # --- CORREÇÃO AQUI: Acessando o cliente gspread real ---
-                        sh = conn.client.open(nome_planilha)
-                        ws = sh.worksheet("TURNO_ESTENDIDO")
+                        sh = client.open(nome_planilha)
+                        ws = sh.worksheet("TURNO_ESTENDIDO"))
                         
                         for aluno in selecionados:
                             # Agora o append_row funciona porque vem do 'ws' (worksheet do gspread)

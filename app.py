@@ -595,40 +595,46 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                         st.rerun()
 
     with gestao_col3:
-        with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
-            st.markdown("##### ⏳ Matricular no Turno Estendido")
+    with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
+        st.markdown("##### ⏳ Matricular no Turno Estendido")
+        
+        # Filtro de segurança
+        lista_disponivel_te = [a for a in lista_alunos_geral if a not in set_matriculados_te]
+        
+        if lista_disponivel_te:
+            al_mat = st.selectbox("Selecione o Aluno:", lista_disponivel_te, key="sel_aluno_final")
             
-            # FILTRO: Mostra apenas quem está na base GERAL e ainda NÃO está no Turno Estendido
-            lista_disponivel_te = [a for a in lista_alunos_geral if a not in set_matriculados_te]
-            
-            if lista_disponivel_te:
-                al_mat = st.selectbox("Selecione o Aluno:", lista_disponivel_te, key="sel_aluno_matricula_te")
-                
-                if st.button("✅ Confirmar Matrícula", key="btn_confirmar_te"):
+            # O BOTÃO PRECISA ESTAR EXATAMENTE AQUI
+            if st.button("✅ Confirmar Matrícula", key="btn_confirmar_final"):
+                try:
+                    # Busca a sala do aluno na base geral
                     info_aluno = df_geral[df_geral["ALUNO"] == al_mat]
+                    
                     if not info_aluno.empty:
-                        # Identifica a sala de origem para o registro
                         col_sala = "SALA" if "SALA" in df_geral.columns else "TURMA"
                         sala_origem = info_aluno[col_sala].values[0]
                         
-                        # EXECUÇÃO: Registra APENAS Aluno e Sala na aba Turno Estendido
-                        # Os demais campos vão vazios para serem preenchidos na mesma linha depois
+                        # Chamada da função com os parâmetros exatos
                         sucesso = registrar_turno_estendido(
                             aluno=al_mat, 
                             sala=sala_origem, 
                             avaliacao_tipo="MATRÍCULA", 
                             nivel="", 
                             evidencias_list=[], 
-                            obs="Matrícula via Controle.", 
-                            ano="" # Ano fica vazio para preenchimento posterior
+                            obs="Vínculo inicial", 
+                            ano="" # Conforme solicitado, ano vazio nesta etapa
                         )
                         
                         if sucesso:
-                            st.success(f"✅ {al_mat} vinculado ao Turno Estendido!")
-                            st.cache_data.clear()
-                            st.rerun()
-            else:
-                st.info("Todos os alunos da base já estão vinculados ao Turno Estendido.")
+                            st.success(f"Sucesso! {al_mat} vinculado.")
+                            st.cache_data.clear() # Limpa o cache para o livrinho 📖 aparecer
+                            st.rerun() # Atualiza a tela
+                        else:
+                            st.error("A função de gravação retornou Falso. Verifique o console.")
+                except Exception as e:
+                    st.error(f"Erro crítico no botão: {e}")
+        else:
+            st.info("Nenhum aluno pendente.")
 
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):

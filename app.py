@@ -746,95 +746,58 @@ elif menu == "📊 Avaliação da Tábua da Maré":
     else:
         st.warning(f"Nenhum aluno encontrado na {sala_atual}. Verifique se a aba da sala na planilha tem a coluna 'ALUNO'.")
 # --- ABA: TURNO ESTENDIDO ---
-elif menu == "📖 Turno Estendido":
-    st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
+    elif menu == "📖 Turno Estendido":
+        st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
+        try:
+            # Carrega os dados da aba TURNO_ESTENDIDO
+            df_h = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
+            df_h.columns = [str(c).strip().upper() for c in df_h.columns]
+        except Exception as e:
+            st.error(f"Erro ao conectar com a planilha: {e}")
+            st.stop()
 
-    try:
-        df_h = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
-        df_h.columns = [str(c).strip().upper() for c in df_h.columns]
-    except Exception as e:
-        st.error(f"Erro ao conectar com a planilha: {e}")
-        st.stop()
+        # Condição: Só exibe os controles se houver alunos matriculados/registrados
+        if not df_h.empty and "ALUNO" in df_h.columns:
+            
+            # 1. BOTÕES DE SELEÇÃO DE SALAS (Igual às outras abas)
+            # Removemos o parâmetro 'salas_permitidas' para mostrar todas as salas (Rosa, Azul, Verde, etc)
+            render_botoes_salas("btn_te", "sel_te")
+            sala_v = st.session_state.get("sel_te", "SALA ROSA")
+            
+            # 2. SELEÇÃO DE ANO (Mantendo sua lógica de histórico)
+            if "lista_anos_te" not in st.session_state:
+                st.session_state.lista_anos_te = sorted(df_h["ANO"].unique().tolist()) if "ANO" in df_h.columns else [2026]
+            if "ano_registro_te" not in st.session_state:
+                st.session_state.ano_registro_te = 2026
 
-    # --- LÓGICA DE RECONHECIMENTO DE ALUNOS ---
-    if not df_h.empty and "ALUNO" in df_h.columns and "SALA" in df_h.columns:
-        dict_alunos_te = pd.Series(df_h.SALA.values, index=df_h.ALUNO.values).to_dict()
-        salas_te_disponiveis = sorted(list(set(dict_alunos_te.values())))
-    else:
-        st.warning("Nenhum aluno matriculado no Turno Estendido.")
-        st.stop()
+            cols_anos = st.columns(len(st.session_state.lista_anos_te) + 1)
+            for i, ano in enumerate(st.session_state.lista_anos_te):
+                is_active = st.session_state.ano_registro_te == ano
+                if cols_anos[i].button(f"📅 {ano}", key=f"year_te_{ano}", use_container_width=True):
+                    st.session_state.ano_registro_te = ano
+                    st.rerun()
 
-    # --- IDENTIDADE VISUAL DOS BOTÕES DE ANO ---
-    if "ANO" not in df_h.columns: df_h["ANO"] = 2026
-    df_h["ANO"] = pd.to_numeric(df_h["ANO"], errors='coerce').fillna(2026).astype(int)
-    anos_na_planilha = sorted(df_h["ANO"].unique().tolist())
-    
-    if "lista_anos_te" not in st.session_state:
-        st.session_state.lista_anos_te = anos_na_planilha if anos_na_planilha else [2025, 2026]
-    if "ano_registro_te" not in st.session_state: 
-        st.session_state.ano_registro_te = st.session_state.lista_anos_te[-1]
+            st.markdown(f"Exibindo dados de: <b style='color:#6741d9'>{st.session_state.ano_registro_te}</b>", unsafe_allow_html=True)
+            st.divider()
 
-    st.write("**Ano da Avaliação:**")
-    cols_anos = st.columns([0.12] * len(st.session_state.lista_anos_te) + [0.08, 0.6])
-    
-    # Cores baseadas na identidade visual da segunda imagem (Pastel + Borda Forte)
-    estilo_anos = {
-        2025: {"bg": "#E8F4F8", "border": "#2E86C1"},
-        2026: {"bg": "#E8F8F5", "border": "#28B463"},
-        2027: {"bg": "#FEF5E7", "border": "#E67E22"}
-    }
+            # 3. FILTRAGEM DE ALUNOS DA SALA SELECIONADA
+            # Mapeia Aluno -> Sala conforme registrado na planilha do Turno Estendido
+            dict_alunos_te = pd.Series(df_h.SALA.values, index=df_h.ALUNO.values).to_dict()
+            alunos_na_sala = [n for n, s in dict_alunos_te.items() if str(s).strip().upper() == str(sala_v).strip().upper()]
 
-    for i, ano in enumerate(st.session_state.lista_anos_te):
-        is_active = st.session_state.ano_registro_te == ano
-        design = estilo_anos.get(ano, {"bg": "#F4F6F7", "border": "#566573"})
+            if alunos_na_sala:
+                al_sel = st.selectbox("Selecione o Aluno para Avaliação:", sorted(alunos_na_sala))
+                
+                # --- O RESTANTE DO SEU CÓDIGO DE FORMULÁRIO/HISTÓRICO SEGUE AQUI ---
+                # (Trilha de diagnóstico, formulário de registro, etc)
+                
+            else:
+                st.info(f"Não há alunos do Turno Estendido registrados na **{sala_v}** para o ano selecionado.")
         
-        # Se ativo: fundo escuro (cor da borda). Se inativo: fundo pastel.
-        cor_fundo = design["border"] if is_active else design["bg"]
-        cor_texto = "white" if is_active else design["border"]
-        cor_borda = design["border"]
-
-        if cols_anos[i].button(f"{ano}", key=f"btn_te_ano_{ano}", use_container_width=True):
-            st.session_state.ano_registro_te = ano
-            st.rerun()
-        
-        # CSS para tornar os botões "Pílulas" idênticos aos da segunda imagem
-        st.markdown(f"""
-            <style>
-            div[data-testid="stHorizontalBlock"] div:nth-child({i+1}) button {{
-                background-color: {cor_fundo} !important;
-                color: {cor_texto} !important;
-                border: 2px solid {cor_borda} !important;
-                border-radius: 20px !important;
-                font-weight: bold !important;
-                height: 38px !important;
-                box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
-            }}
-            </style>
-        """, unsafe_allow_html=True)
-
-    with cols_anos[len(st.session_state.lista_anos_te)].popover("➕"):
-        novo = st.number_input("Ano:", 2024, 2100, st.session_state.lista_anos_te[-1]+1)
-        if st.button("Confirmar"):
-            st.session_state.lista_anos_te.append(novo)
-            st.session_state.lista_anos_te.sort()
-            st.rerun()
-
-    st.markdown(f"Registrando para: <b style='color:#28B463'>{st.session_state.ano_registro_te}</b>", unsafe_allow_html=True)
-    st.divider()
-
-    # --- SELEÇÃO DE SALA E ALUNO (IDENTIDADE VISUAL DA SALA) ---
-    if salas_te_disponiveis:
-        # Usa a função global que cria os botões coloridos de Rosa, Amarela, Verde, Azul...
-        render_botoes_salas("btn_te_aba", "sel_te_aba", salas_permitidas=salas_te_disponiveis)
-        
-        # Define sala_v baseada na seleção dos botões coloridos
-        sala_v = st.session_state.get("sel_te_aba", salas_te_disponiveis[0])
-        
-        alunos_filtro = [n for n, s in dict_alunos_te.items() if s == sala_v]
-        
-        st.write(f"Filtrando alunos da **{sala_v}**:")
-        al_sel = st.selectbox("Selecione o Aluno para Avaliação:", sorted(alunos_filtro))
-        
+        else:
+            # Caso a planilha esteja vazia, os botões não aparecem e exibe o aviso
+            st.warning("Nenhum aluno matriculado no Turno Estendido até o momento.")
+            st.info("Para matricular um aluno, vá na aba 'Controle de Matrícula e Apadrinhamento'.")        
         # Histórico para a trilha
         dados_al = df_h[df_h["ALUNO"] == al_sel]
         diag_rec = dados_al.iloc[-1] if not dados_al.empty else None

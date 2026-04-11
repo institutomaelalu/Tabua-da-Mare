@@ -769,14 +769,13 @@ elif menu == "📊 Avaliação da Tábua da Maré":
         st.warning(f"Nenhum aluno encontrado na {sala_atual}. Verifique se a aba da sala na planilha tem a coluna 'ALUNO'.")
 # --- ABA: TURNO ESTENDIDO ---
 elif menu == "📖 Turno Estendido":
-    st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
-
-    try:
-        # Chamada simplificada usando a chave do secrets
-        df_h = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
-    except Exception as e:
-        st.error(f"Erro ao conectar com a planilha: {e}")
-        st.stop()
+    # Verifica se viemos da aba de matrícula com um aluno selecionado
+    if "aluno_pendente_te" in st.session_state:
+        al_te_default = st.session_state.aluno_pendente_te
+        # Limpamos para não ficar "preso" nesse aluno sempre
+        del st.session_state.aluno_pendente_te 
+    else:
+        al_te_default = None
 
     # --- LÓGICA DE ANOS DINÂMICOS ---
     if "Ano" not in df_h.columns:

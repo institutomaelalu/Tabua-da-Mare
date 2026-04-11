@@ -557,23 +557,44 @@ elif menu == "📊 Avaliação da Tábua da Maré":
         "Leitura e Escrita", "Compreensão de comandos", "Superação de desafios", "Assiduidade"
     ]
 
+    # 1. Leitura da Planilha de Avaliações (para puxar dados anteriores)
     try:
         df_av = conn.read(worksheet="TABUA_MARE").fillna("")
+        # Padroniza colunas para evitar erros de busca
+        df_av.columns = [str(c).strip().title() for c in df_av.columns]
     except Exception as e:
         st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()
 
     render_botoes_salas("btn_aval", "sel_aval")
-    
-    # Busca alunos da sala selecionada no dicionário de matrículas
     sala_atual = st.session_state.sel_aval
-    alunos_na_sala = [n for n, s in st.session_state.get("alunos_te_dict", {}).items() if s == sala_atual]
+
+    # 2. BUSCA DINÂMICA DE ALUNOS (Melhoria de Robustez)
+    # Tentamos primeiro pelo dicionário do Turno Estendido, 
+    # se estiver vazio, buscamos no st.session_state.df_total (se você tiver ele global)
+    # ou direto da aba da sala selecionada.
     
+    dict_te = st.session_state.get("alunos_te_dict", {})
+    alunos_na_sala = [n for n, s in dict_te.items() if str(s).strip().upper() == str(sala_atual).strip().upper()]
+
+    # Caso o dicionário TE falhe, tentamos ler a aba da sala diretamente
+    if not alunos_na_sala:
+        try:
+            df_temp = conn.read(worksheet=sala_atual).fillna("")
+            df_temp.columns = [str(c).strip().upper() for c in df_temp.columns]
+            alunos_na_sala = sorted(df_temp["ALUNO"].unique().tolist())
+        except:
+            alunos_na_sala = []
+
     if alunos_na_sala:
         al = st.selectbox("Selecione o Aluno", sorted(alunos_na_sala))
-        dados_anteriores = df_av[df_av["Aluno"] == al].iloc[-1] if not df_av[df_av["Aluno"] == al].empty else None
         
-        # Título solicitado com o emoji de estrela
+        # 3. PUXAR DADOS ANTERIORES (Para facilitar o preenchimento)
+        # Filtramos pelo nome do aluno na aba de avaliações
+        col_busca_aluno = "Aluno" if "Aluno" in df_av.columns else df_av.columns[0]
+        historico_aluno = df_av[df_av[col_busca_aluno].astype(str).str.upper() == al.upper()]
+        dados_anteriores = historico_aluno.iloc[-1] if not historico_aluno.empty else None
+        
         st.markdown("#### ⭐ 10 motivos para avaliar!")
         
         with st.form("f_av_nuvem"):
@@ -582,29 +603,53 @@ elif menu == "📊 Avaliação da Tábua da Maré":
             cE, cD = st.columns(2)
             n_l = {}
             
+            opcoes = ["Maré Baixa", "Maré Vazante", "Maré Enchente", "Maré Alta", "Maré Cheia"]
+
             for i, cat in enumerate(CATEGORIAS):
-                val_anterior = dados_anteriores[cat] if dados_anteriores is not None and cat in dados_anteriores else "Maré Enchente"
-                opcoes = ["Maré Baixa", "Maré Vazante", "Maré Enchente", "Maré Alta", "Maré Cheia"]
+                # Busca a nota anterior ou define o padrão "Maré Enchente" (3)
+                val_anterior = "Maré Enchente"
+                if dados_anteriores is not None:
+                    # Tenta buscar pela coluna exata (case-insensitive)
+                    for col_av in dados_anteriores.index:
+                        if col_av.strip().lower() == cat.strip().lower():
+                            val_anterior = dados_anteriores[col_av]
+                            break
                 
+                # Garante que o valor anterior existe nas opções para não dar erro no index
                 try:
-                    idx_default = opcoes.index(val_anterior)
+                    # Se o valor for numérico (1-5), converte para o texto correspondente
+                    if str(val_anterior).isdigit():
+                        idx_default = int(val_anterior) - 1
+                    else:
+                        idx_default = opcoes.index(val_anterior)
                 except:
-                    idx_default = 2
+                    idx_default = 2 # Default: Maré Enchente
                 
                 n_l[cat] = (cE if i < 5 else cD).selectbox(cat, opcoes, index=idx_default, key=f"mare_s_{i}")
             
-            obs_anterior = dados_anteriores.get("Observações pedagógicas", "") if dados_anteriores is not None else ""
+            # Recupera observação anterior
+            obs_col = "Observações Pedagógicas" 
+            obs_anterior = ""
+            if dados_anteriores is not None:
+                for col_av in dados_anteriores.index:
+                    if "OBSERV" in col_av.upper():
+                        obs_anterior = dados_anteriores[col_av]
+                        break
+
             obs = st.text_area("Observações pedagógicas:", value=obs_anterior)
             
             if st.form_submit_button("🚀 Enviar para Tábua da Maré"):
-                sucesso = registrar_tabua_mare(aluno=al, sala=sala_atual, semestre=tr, notas_dict=n_l, obs=obs)
-                if sucesso:
-                    st.balloons()
-                    st.success(f"Avaliação de {al} sincronizada!")
-                    st.cache_data.clear()
-                    st.rerun()
+                if al:
+                    sucesso = registrar_tabua_mare(aluno=al, sala=sala_atual, semestre=tr, notas_dict=n_l, obs=obs)
+                    if sucesso:
+                        st.balloons()
+                        st.success(f"Avaliação de {al} sincronizada!")
+                        st.cache_data.clear()
+                        st.rerun()
+                else:
+                    st.error("Por favor, selecione um aluno.")
     else:
-        st.warning(f"Nenhum aluno encontrado na {sala_atual}.")
+        st.warning(f"Nenhum aluno encontrado na {sala_atual}. Verifique se a aba da sala na planilha tem a coluna 'ALUNO'.")
 # --- ABA: TURNO ESTENDIDO ---
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)

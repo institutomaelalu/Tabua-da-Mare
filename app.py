@@ -747,7 +747,6 @@ elif menu == "📊 Avaliação da Tábua da Maré":
         st.warning(f"Nenhum aluno encontrado na {sala_atual}. Verifique se a aba da sala na planilha tem a coluna 'ALUNO'.")
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
-
     try:
         # 1. Leitura dos dados da aba Turno Estendido
         df_h = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")

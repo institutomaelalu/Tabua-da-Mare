@@ -746,58 +746,76 @@ elif menu == "📊 Avaliação da Tábua da Maré":
     else:
         st.warning(f"Nenhum aluno encontrado na {sala_atual}. Verifique se a aba da sala na planilha tem a coluna 'ALUNO'.")
 # --- ABA: TURNO ESTENDIDO ---
-elif menu == "📖 Turno Estendido":
+    elif menu == "📖 Turno Estendido":
         st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
         
         try:
-            # Carrega os dados da aba TURNO_ESTENDIDO
-            df_h = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
-            df_h.columns = [str(c).strip().upper() for c in df_h.columns]
+            # Carrega os dados diretamente da aba TURNO_ESTENDIDO
+            df_te = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
+            df_te.columns = [str(c).strip().upper() for c in df_te.columns]
         except Exception as e:
-            st.error(f"Erro ao conectar com a planilha: {e}")
+            st.error(f"Erro ao conectar com a planilha 'TURNO_ESTENDIDO': {e}")
             st.stop()
 
-        # Verifica se há dados
-        if df_h.empty or "ALUNO" not in df_h.columns:
-            st.warning("Nenhum aluno matriculado no Turno Estendido até o momento.")
-            st.info("Para matricular um aluno, vá na aba 'Controle de Matrícula e Apadrinhamento'.")
+        if df_te.empty:
+            st.warning("A aba 'TURNO_ESTENDIDO' está vazia. Registre os alunos na planilha para prosseguir.")
             st.stop()
 
-        # 1. BOTÕES DE SELEÇÃO DE SALAS (Interface padronizada)
-        render_botoes_salas("btn_te", "sel_te")
-        sala_v = st.session_state.get("sel_te", "SALA ROSA")
-        
-        # 2. SELEÇÃO DE ANO
-        if "lista_anos_te" not in st.session_state:
-            st.session_state.lista_anos_te = sorted(df_h["ANO"].unique().tolist()) if "ANO" in df_h.columns else [2026]
-        
-        if "ano_registro_te" not in st.session_state:
-            st.session_state.ano_registro_te = 2026
+        # --- SELETOR DE ANO E SALA ---
+        col_sala, col_ano = st.columns([3, 1])
 
-        cols_anos = st.columns(len(st.session_state.lista_anos_te) + 1)
-        for i, ano in enumerate(st.session_state.lista_anos_te):
-            if cols_anos[i].button(f"📅 {ano}", key=f"year_te_{ano}", use_container_width=True):
-                st.session_state.ano_registro_te = ano
-                st.rerun()
+        with col_ano:
+            # Gerencia a lista de anos (Padrão 2025, 2026 + o que houver na planilha)
+            anos_na_planilha = []
+            if "ANO" in df_te.columns:
+                anos_na_planilha = [int(a) for a in df_te["ANO"].unique() if str(a).isdigit()]
+            
+            anos_opcoes = sorted(list(set([2025, 2026] + anos_na_planilha)))
+            
+            # Seletor compacto
+            ano_sel = st.selectbox("📅 Ano", anos_opcoes, index=anos_opcoes.index(2026) if 2026 in anos_opcoes else 0)
+            st.session_state.ano_registro_te = ano_sel
 
-        st.markdown(f"Exibindo dados de: <b style='color:#6741d9'>{st.session_state.ano_registro_te}</b>", unsafe_allow_html=True)
+            # Opção para registrar novo ano (Ex: 2027)
+            with st.expander("➕ Novo"):
+                novo_ano_input = st.text_input("Ano:", placeholder="2027", key="input_novo_ano_te")
+                if st.button("Definir"):
+                    if novo_ano_input.isdigit():
+                        st.session_state.ano_registro_te = int(novo_ano_input)
+                        st.rerun()
+
+        with col_sala:
+            # 1. Filtra as salas que REALMENTE existem na aba TURNO_ESTENDIDO
+            salas_disponiveis = sorted(df_te["SALA"].unique().tolist())
+            salas_disponiveis = [s for s in salas_disponiveis if s != ""] # Remove vazios
+            
+            # Renderiza apenas os botões das salas que possuem alunos registrados
+            render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_disponiveis)
+            sala_v = st.session_state.get("sel_te", salas_disponiveis[0] if salas_disponiveis else "SALA ROSA")
+
         st.divider()
 
-        # 3. FILTRAGEM DE ALUNOS
-        # Filtra os alunos que pertencem à sala selecionada
-        alunos_na_sala = df_h[df_h["SALA"].str.upper() == sala_v.upper()]["ALUNO"].unique().tolist()
+        # --- FILTRAGEM DE ALUNOS ---
+        # Filtra os alunos que pertencem à sala e ao ano selecionados
+        mask = (df_te["SALA"].str.upper() == sala_v.upper())
+        if "ANO" in df_te.columns:
+            mask &= (df_te["ANO"].astype(str) == str(st.session_state.ano_registro_te))
+            
+        alunos_filtrados = df_te[mask]["ALUNO"].unique().tolist()
 
-        if not alunos_na_sala:
-            st.info(f"Não há alunos do Turno Estendido registrados na **{sala_v}**.")
+        if not alunos_filtrados:
+            st.info(f"Nenhum aluno encontrado para **{sala_v}** no ano **{st.session_state.ano_registro_te}**.")
             st.stop()
 
-        al_sel = st.selectbox("Selecione o Aluno para Avaliação:", sorted(alunos_na_sala))
+        al_sel = st.selectbox("Selecione o Aluno:", sorted(alunos_filtrados))
 
-        # --- 4. HISTÓRICO E TRILHA (Só executa se houver aluno selecionado) ---
-        dados_al = df_h[df_h["ALUNO"] == al_sel]
+        # --- HISTÓRICO E TRILHA ---
+        # Pega o registro mais recente deste aluno para mostrar o nível atual
+        dados_al = df_te[df_te["ALUNO"] == al_sel].sort_index()
         diag_rec = dados_al.iloc[-1] if not dados_al.empty else None
         nivel_atual = diag_rec["DIAGNÓSTICO"] if diag_rec is not None else ""
 
+        # Visual da Trilha
         st.markdown("""<style>
             .trilha-te { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 15px 0; overflow-x: auto; }
             .box-te { padding: 8px; border-radius: 12px; text-align: center; font-size: 10px; font-weight: bold; min-width: 95px; height: 42px; display: flex; align-items: center; justify-content: center; line-height: 1.1; }
@@ -813,7 +831,7 @@ elif menu == "📖 Turno Estendido":
             if i < len(NIVEIS_ALF)-1: ht += '<span style="color:#ccc">→</span>'
         st.markdown(ht + '</div>', unsafe_allow_html=True)
 
-        # --- 5. FORMULÁRIO DE REGISTRO ---
+        # --- FORMULÁRIO DE REGISTRO ---
         try:
             idx_in = NIVEIS_ALF.index(nivel_atual) if nivel_atual in NIVEIS_ALF else 0
         except:
@@ -823,8 +841,8 @@ elif menu == "📖 Turno Estendido":
 
         with st.form("form_te_save"):
             etapa = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
-            
             st.write("**Evidências observadas:**")
+            
             evidencias = EVIDENCIAS_POR_NIVEL.get(novo_nivel, [])
             e_cols = st.columns(3)
             selecionados = [ev for i, ev in enumerate(evidencias) if e_cols[i%3].checkbox(ev, key=f"ev_te_{al_sel}_{i}")]
@@ -844,7 +862,7 @@ elif menu == "📖 Turno Estendido":
                     ano=int(st.session_state.ano_registro_te)
                 )
                 if sucesso:
-                    st.success(f"Avaliação de {al_sel} salva!")
+                    st.success(f"Avaliação de {al_sel} salva com sucesso!")
                     st.cache_data.clear()
                     st.rerun()
 # --- ABA: DADOS - TURNO ESTENDIDO (ATUALIZADO COM CORES E LEGENDA) ---

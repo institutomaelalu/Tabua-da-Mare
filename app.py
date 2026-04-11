@@ -6,15 +6,22 @@ import os
 import gspread
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
-def get_gspread_client(connection):
-    """Tenta encontrar o cliente gspread dentro da conexão GSheets do Streamlit"""
-    if hasattr(connection, "_instance"):
-        instance = connection._instance
-        # Tenta .client (comum no st-gsheets) ou retorna a própria instância
-        if hasattr(instance, "client"):
-            return instance.client
-        return instance
-    return connection
+def get_gspread_client_seguro():
+    import gspread
+    from google.oauth2.service_account import Credentials
+    
+    # ESTAS LINHAS SÃO CRÍTICAS:
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    
+    # Carrega as credenciais do seu st.secrets
+    creds = Credentials.from_service_account_info(
+        st.secrets["connections"]["gsheets"], 
+        scopes=scopes
+    )
+    return gspread.authorize(creds)
 
 nome_planilha = "APP_IMLA"
 sheet_id = nome_planilha
@@ -529,39 +536,39 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             lista_est = sorted(df_est_leitura["ALUNO"].unique())
             selecionados = st.multiselect("Selecione os alunos:", lista_est)
             
-        if st.button("Confirmar Matrícula no Turno Estendido"):
-            if selecionados:
-                try:
-                    # 1. Conexão Direta (Evita erro 200)
-                    import gspread
-                    from google.oauth2.service_account import Credentials
-                    creds = Credentials.from_service_account_info(st.secrets["connections"]["gsheets"])
-                    client = gspread.authorize(creds)
-                    sh = client.open_by_key("1Zj8u67oAWKgYRd2uOkGssdaxXnwdsKsZBDxeLChnBr4")
-                    ws = sh.worksheet("TURNO_ESTENDIDO")
-                    
-                    # 2. Verificar quem realmente precisa de nova linha
-                    alunos_existentes = df_alf["ALUNO"].tolist()
-                    novas_linhas = []
-                    ano_atual = str(datetime.now().year)
-        
-                    for aluno in selecionados:
-                        aluno_up = aluno.upper()
-                        # Só adiciona se o aluno não estiver na planilha OU se você quiser criar um novo ano
-                        if aluno_up not in alunos_existentes:
-                            linha = [aluno_up, s_est, "", "", "", ano_atual, "", "", ""]
-                            novas_linhas.append(linha)
-                    
-                    if novas_linhas:
-                        ws.append_rows(novas_linhas, value_input_option='RAW')
-                        st.success(f"✅ {len(novas_linhas)} novos alunos matriculados!")
-                    else:
-                        st.info("Estes alunos já constam no Turno Estendido.")
-                    
-                    st.cache_data.clear()
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao acessar Google Sheets: {e}")
+if st.button("Confirmar Matrícula no Turno Estendido"):
+    if selecionados:
+        try:
+            client = get_gspread_client_seguro()
+            sh = client.open_by_key("1Zj8u67oAWKgYRd2uOkGssdaxXnwdsKsZBDxeLChnBr4")
+            ws = sh.worksheet("TURNO_ESTENDIDO")
+            
+            # --- AJUSTE DE INTELIGÊNCIA AQUI ---
+            # 1. Pega os nomes que já estão na planilha
+            nomes_na_planilha = df_alf["ALUNO"].astype(str).str.upper().tolist()
+            
+            novas_linhas = []
+            ano_atual = str(datetime.now().year)
+
+            for aluno in selecionados:
+                aluno_up = aluno.upper().strip()
+                # SÓ ADICIONA SE NÃO EXISTIR NA PLANILHA
+                if aluno_up not in nomes_na_planilha:
+                    # [ALUNO, SALA, 1 AVAL, 2 AVAL, 3 AVAL, ANO, DIAGNÓSTICO, EVIDÊNCIAS, OBS]
+                    linha = [aluno_up, s_est, "", "", "", ano_atual, "", "", ""]
+                    novas_linhas.append(linha)
+            
+            if novas_linhas:
+                ws.append_rows(novas_linhas, value_input_option='RAW')
+                st.success(f"✅ {len(novas_linhas)} novos alunos adicionados!")
+            else:
+                st.info("Todos os selecionados já possuem cadastro no Turno Estendido.")
+            
+            st.cache_data.clear()
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"Erro técnico: {e}")
 
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):

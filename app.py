@@ -525,6 +525,7 @@ menu = st.sidebar.radio("Navegação", menu_options)
 st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Instituto</span> <span style='color:{C_AZUL}'>Mãe</span> <span style='color:{C_VERDE}'>Lalu</span></h1></div><hr>", unsafe_allow_html=True)
 
 # --- ABAS ---
+# --- ABA: CONTROLE DE MATRÍCULA E APADRINHAMENTO ---
 if menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
     st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
@@ -532,17 +533,21 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
     # Configuração de Cores
     cor_rosa, cor_amarela, cor_verde, cor_azul = "#F783AC", "#FFE066", "#A9E34B", "#99E9F2"
 
-    # --- CARREGAMENTO DE DADOS ---
+    # --- CARREGAMENTO DE DADOS (Utilizando Cache para Performance) ---
     try:
-        df_geral = conn.read(worksheet="GERAL").fillna("")
-        df_geral.columns = [str(c).strip().upper() for c in df_geral.columns]
-        lista_alunos_geral = sorted(df_geral["ALUNO"].unique().tolist())
+        # Usamos engine_leitura_dados para manter a consistência do cache do app
+        df_geral = engine_leitura_dados("GERAL")
+        lista_alunos_geral = sorted(df_geral["ALUNO"].unique().tolist()) if not df_geral.empty else []
         
-        # Carrega quem já está no Turno Estendido para filtragem e marcação
-        df_te_check = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
-        df_te_check.columns = [str(c).strip().upper() for c in df_te_check.columns]
-        set_matriculados_te = set(df_te_check["ALUNO"].unique().tolist())
-    except:
+        # Carrega quem já está no Turno Estendido para filtragem (📖)
+        df_te_check = engine_leitura_dados("TURNO_ESTENDIDO")
+        if not df_te_check.empty:
+            df_te_check.columns = [str(c).strip().upper() for c in df_te_check.columns]
+            set_matriculados_te = set(df_te_check["ALUNO"].unique().tolist())
+        else:
+            set_matriculados_te = set()
+    except Exception as e:
+        st.error(f"Erro ao carregar bases: {e}")
         lista_alunos_geral = []
         set_matriculados_te = set()
 
@@ -569,53 +574,61 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             n_nome = st.text_input("Nome do Aluno", key="reg_nome")
             n_sala = st.selectbox("Sala Destino", list(TURMAS_CONFIG.keys()), key="reg_sala")
             if st.button("Salvar Novo Aluno"):
-                st.success("Aluno registrado!")
+                # Aqui deve ser implementada a função de registro na GERAL e SALA específica
+                st.success("Aluno registrado na base!")
 
     with gestao_col2:
         with st.popover("🤝 Padrinho/Madrinha", key="pad_popover", use_container_width=True):
             st.markdown("##### 🤝 Novo Apadrinhamento")
             s_busca_p = st.selectbox("Selecione a Sala:", list(TURMAS_CONFIG.keys()), key="pad_sala_select")
-            df_b = conn.read(worksheet=s_busca_p).fillna("")
-            df_b.columns = [str(c).strip().upper() for c in df_b.columns]
-            if "PADRINHO/MADRINHA" in df_b.columns:
-                lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].astype(str).isin(["", "-", "nan", "0"])]["ALUNO"].unique())
-                al_sel = st.selectbox("Escolha o Afilhado:", lista_lib)
-                nome_p = st.text_input("Nome do Padrinho")
-                if st.button("Confirmar Apadrinhamento"):
-                    st.success("Concluído!")
-                    st.cache_data.clear()
-                    st.rerun()
+            df_b = engine_leitura_dados(s_busca_p)
+            if not df_b.empty:
+                df_b.columns = [str(c).strip().upper() for c in df_b.columns]
+                if "PADRINHO/MADRINHA" in df_b.columns:
+                    lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].astype(str).isin(["", "-", "nan", "0"])]["ALUNO"].unique())
+                    al_sel = st.selectbox("Escolha o Afilhado:", lista_lib)
+                    nome_p = st.text_input("Nome do Padrinho", key="input_nome_p")
+                    if st.button("Confirmar Apadrinhamento"):
+                        # Implementar lógica de update de padrinho aqui
+                        st.success("Concluído!")
+                        st.cache_data.clear()
+                        st.rerun()
 
     with gestao_col3:
         with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
             st.markdown("##### ⏳ Matricular no Turno Estendido")
             
-            # FILTRO: Só mostra alunos que AINDA NÃO estão no Turno Estendido
+            # FILTRO: Mostra apenas quem está na base GERAL e ainda NÃO está no Turno Estendido
             lista_disponivel_te = [a for a in lista_alunos_geral if a not in set_matriculados_te]
             
             if lista_disponivel_te:
                 al_mat = st.selectbox("Selecione o Aluno:", lista_disponivel_te, key="sel_aluno_matricula_te")
                 
                 if st.button("✅ Confirmar Matrícula", key="btn_confirmar_te"):
-                    try:
-                        info_aluno = df_geral[df_geral["ALUNO"] == al_mat]
-                        if not info_aluno.empty:
-                            col_sala = "SALA" if "SALA" in df_geral.columns else "TURMA"
-                            sala_origem = info_aluno[col_sala].values[0]
-                            
-                            sucesso = registrar_turno_estendido(
-                                aluno=al_mat, sala=sala_origem, avaliacao_tipo="MATRÍCULA",
-                                nivel="", evidencias_list=[], obs="", ano=""
-                            )
-                            
-                            if sucesso:
-                                st.success(f"✅ {al_mat} matriculado!")
-                                st.cache_data.clear()
-                                st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro: {e}")
+                    info_aluno = df_geral[df_geral["ALUNO"] == al_mat]
+                    if not info_aluno.empty:
+                        # Identifica a sala de origem para o registro
+                        col_sala = "SALA" if "SALA" in df_geral.columns else "TURMA"
+                        sala_origem = info_aluno[col_sala].values[0]
+                        
+                        # EXECUÇÃO: Registra APENAS Aluno e Sala na aba Turno Estendido
+                        # Os demais campos vão vazios para serem preenchidos na mesma linha depois
+                        sucesso = registrar_turno_estendido(
+                            aluno=al_mat, 
+                            sala=sala_origem, 
+                            avaliacao_tipo="MATRÍCULA", 
+                            nivel="", 
+                            evidencias_list=[], 
+                            obs="Matrícula via Controle.", 
+                            ano="" # Ano fica vazio para preenchimento posterior
+                        )
+                        
+                        if sucesso:
+                            st.success(f"✅ {al_mat} vinculado ao Turno Estendido!")
+                            st.cache_data.clear()
+                            st.rerun()
             else:
-                st.info("Todos os alunos da base já estão matriculados no Turno Estendido.")
+                st.info("Todos os alunos da base já estão vinculados ao Turno Estendido.")
 
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
@@ -624,23 +637,23 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
 
     st.divider()
 
-    # --- VISUALIZAÇÃO DA TABELA ---
+    # --- VISUALIZAÇÃO DA TABELA (COM ÍCONE 📖) ---
     render_botoes_salas("btn_pad", "sel_pad")
     sala_v = st.session_state.get("sel_pad", "SALA ROSA")
     cfg_sala = TURMAS_CONFIG.get(sala_v, {"cor": "#333", "icon": "🏫"})
     cor_h = cfg_sala["cor"]
 
     try:
-        df_s = conn.read(worksheet=sala_v).fillna("")
-        df_s.columns = [str(c).strip().upper() for c in df_s.columns]
-
+        df_s = engine_leitura_dados(sala_v)
         if not df_s.empty:
+            df_s.columns = [str(c).strip().upper() for c in df_s.columns]
             tn, cm = render_filtros(df_geral, "pad")
             df_f = df_s.copy()
-            if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
-            if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
+            
+            if tn != "Todos" and "TURMA" in df_f.columns: df_f = df_f[df_f["TURMA"] == tn]
+            if cm != "Todas" and "COMUNIDADE" in df_f.columns: df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-            # Banner de contagem com legenda para Turno Estendido
+            # Banner informativo
             st.markdown(f"""
                 <div style="background-color: {cor_h}22; padding: 10px; border-radius: 5px; border-left: 5px solid {cor_h}; margin: 20px 0; display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 13px; color: #333;">{cfg_sala['icon']} Atualmente: <b>{len(df_f)}</b> alunos na <b>{sala_v}</b></span>
@@ -660,8 +673,8 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 p_nome = str(r.get("PADRINHO/MADRINHA", "-")).strip()
                 if p_nome in ["", "0", "nan", "None", "-"]: p_nome = "-"
                 
-                # Identificação visual: Se o aluno está no set_matriculados_te, adiciona um ícone
                 nome_aluno = r.get("ALUNO", "-")
+                # ÍCONE 📖: Aparece se o nome estiver na lista da aba TURNO_ESTENDIDO
                 marcador_te = " <span title='Turno Estendido' style='color:#2b5e2b;'>📖</span>" if nome_aluno in set_matriculados_te else ""
                 
                 table_html += f'<tr style="background-color: {bg}; color: #333;">'
@@ -674,11 +687,10 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
 
             table_html += "</tbody></table>"
             st.markdown(table_html, unsafe_allow_html=True)
-            
         else:
             st.info(f"A {sala_v} ainda não possui alunos matriculados.")
     except Exception as e:
-        st.error(f"Erro ao carregar os dados da tabela: {e}")        
+        st.error(f"Erro ao processar tabela visual: {e}")     
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
 

@@ -587,7 +587,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 </div>
             """, unsafe_allow_html=True)
 
-            # --- CONSTRUÇÃO DA TABELA HTML REVISADA ---
+# --- CONSTRUÇÃO DA TABELA HTML REVISADA ---
 v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
 
 # Diminuímos o font-size para 12px ou 13px para reduzir a fonte geral

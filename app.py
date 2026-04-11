@@ -707,24 +707,18 @@ elif menu == "📊 Dados - Turno Estendido":
     
     df_h = df_alf.copy()
 
-    if "Ano" not in df_h.columns:
-        df_h["Ano"] = 2025
-        # --- AJUSTE DE COMPATIBILIDADE (R&D) ---
-        # 1. Fazemos uma cópia limpa
+    # Garante que a coluna ANO existe e sincroniza com a nuvem
+    if "ANO" not in df_h.columns:
+        df_h["ANO"] = 2025
         df_save = df_h.copy()
-        
-        # 2. Convertemos todos os nomes de colunas para strings puras (resolve o AttributeError)
-        df_save.columns = [str(c) for c in df_save.columns]
-        
-        # 3. Convertemos todos os dados para strings ou tipos básicos, removendo objetos do Pandas
+        df_save.columns = [str(c).upper() for c in df_save.columns]
         df_save = df_save.astype(str)
-        
-        # 4. Agora enviamos para a nuvem
         conn.update(worksheet="TURNO_ESTENDIDO", data=df_save)
 
     # 1. SELEÇÃO DE ANO
     st.write("Selecione o Ano:")
-    if "ano_ativo_te" not in st.session_state: st.session_state.ano_ativo_te = 2025
+    if "ano_ativo_te" not in st.session_state: 
+        st.session_state.ano_ativo_te = 2025
     
     col_anos = st.columns([0.15, 0.15, 0.7]) 
     anos = [2025, 2026]
@@ -744,12 +738,11 @@ elif menu == "📊 Dados - Turno Estendido":
     ano_sel = st.session_state.ano_ativo_te
     st.markdown(f"**Exibindo dados de: {ano_sel}**")
 
-# --- 1. LEGENDA DE NÍVEIS (VERSÃO PASTEL) ---
+    # --- 1. LEGENDA DE NÍVEIS ---
     st.markdown("##### 📝 Legenda de Níveis")
     cols_leg = st.columns(len(NIVEIS_ALF))
     for i, nv in enumerate(NIVEIS_ALF):
         cor_fundo = CORES_EXCLUSIVAS.get(nv, "#eee")
-        # Usando a nova função de cor de texto automática
         cor_txt = get_text_color(nv) 
         
         cols_leg[i].markdown(f"""
@@ -759,7 +752,7 @@ elif menu == "📊 Dados - Turno Estendido":
             </div>
         """, unsafe_allow_html=True)
 
-    # --- 2. TABELA GERAL ---
+    # --- 2. FUNÇÃO AUXILIAR MARÉ ---
     def get_status_mare_html(nv_atual, hist):
         pct, txt = 85, "maré baixa"
         if nv_atual == "7. Alfabético Ortográfico": pct, txt = 15, "maré cheia"
@@ -777,40 +770,35 @@ elif menu == "📊 Dados - Turno Estendido":
     cols_header = ["Nome do Aluno", "1ª Sondagem", "2ª Sondagem", "3ª Sondagem", "STATUS MARÉ"]
     if ano_sel == 2026: cols_header.insert(1, "Diagnóstico Atual")
 
-    # Estilização da tabela para combinar com o visual pastel
     html_tab = f"""<table style="width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border: 1px solid #eee; color: #2C3E50;">
         <thead><tr style="background-color: #F8F9FA;">{"".join([f'<th style="padding:12px; border:1px solid #eee; font-size:12px;">{c}</th>' for c in cols_header])}</tr></thead>
         <tbody>"""
     
-    alunos_te = sorted(st.session_state["alunos_te_dict"].keys())
+    alunos_te = sorted(st.session_state.get("alunos_te_dict", {}).keys())
     
     for al in alunos_te:
-        dados_ano = df_h[(df_h["Aluno"] == al) & (df_h["Ano"] == ano_sel)]
+        dados_ano = df_h[(df_h["ALUNO"] == al) & (df_h["ANO"] == ano_sel)]
         html_tab += f'<tr><td style="font-weight:bold; padding:10px; border:1px solid #eee; font-size:12px;">{al}</td>'
         
-        # Coluna Diagnóstico Atual (2026)
         if ano_sel == 2026:
-            d_ant = df_h[(df_h["Aluno"] == al) & (df_h["Ano"] == 2025) & (df_h["Avaliacao"] == "Avaliação Final")]
+            d_ant = df_h[(df_h["ALUNO"] == al) & (df_h["ANO"] == 2025) & (df_h["AVALIACAO"] == "Avaliação Final")]
             if not d_ant.empty:
-                nv = d_ant["Nivel"].iloc[0]
-                # APLICAÇÃO DA COR PASTEL E TEXTO ESCURO
+                nv = d_ant["NIVEL"].iloc[0]
                 html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv)}; color:{get_text_color(nv)}; text-align:center; font-weight:bold; font-size:10px; border:1px solid #eee; padding:8px;">{nv.split(". ")[1]}</td>'
             else: 
                 html_tab += '<td style="text-align:center; border:1px solid #eee; color:#ccc;">-</td>'
 
-        # Colunas das Avaliações do Ano
         for etapa in ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"]:
-            r = dados_ano[dados_ano["Avaliacao"] == etapa]
+            r = dados_ano[dados_ano["AVALIACAO"] == etapa]
             if not r.empty:
-                nv = r["Nivel"].iloc[0]
-                # APLICAÇÃO DA COR PASTEL E TEXTO ESCURO
+                nv = r["NIVEL"].iloc[0]
                 html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv)}; color:{get_text_color(nv)}; text-align:center; font-weight:bold; border:1px solid #eee; font-size:11px; padding:8px;">{nv.split(". ")[1]}</td>'
             else: 
                 html_tab += '<td style="border:1px solid #eee;"></td>'
 
         status_html = '<td style="border:1px solid #eee; text-align:center;">-</td>'
         if not dados_ano.empty:
-            status_html = f'<td style="border:1px solid #eee; background:#FDFDFD;">{get_status_mare_html(dados_ano["Nivel"].iloc[-1], dados_ano["Nivel"].tolist())}</td>'
+            status_html = f'<td style="border:1px solid #eee; background:#FDFDFD;">{get_status_mare_html(dados_ano["NIVEL"].iloc[-1], dados_ano["NIVEL"].tolist())}</td>'
         html_tab += status_html + '</tr>'
     
     st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)

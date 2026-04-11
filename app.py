@@ -33,30 +33,26 @@ ID_PLANILHA = "1Zj8u67oAWKgYRd2uOkGssdaxXnwdsKsZBDxeLChnBr4"
 nome_planilha = "APP_IMLA"
 sheet_id = nome_planilha
 
-# 1. CONFIGURAÇÃO E ESTILO (Sempre o primeiro comando Streamlit)
-st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
-# --- 1. ESTABELECER CONEXÃO (OBRIGATÓRIO SER AQUI) ---
+# --- 1. ESTABELECER CONEXÃO ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. CARREGAMENTO INICIAL ---
-try:
-    # 1. Base Geral de Alunos
-    df_g = conn.read(worksheet="GERAL").fillna("")
-    df_g.columns = [str(c).strip().upper() for c in df_g.columns]
-    
-    # 2. Base do Turno Estendido (Substitui o ALF_FILE)
-    df_alf = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
-    df_alf.columns = [str(c).strip().upper() for c in df_alf.columns]
+# --- NOVO: MOTOR DE CACHE (ADICIONE AQUI) ---
+@st.cache_data(ttl=600)  # Mantém os dados na memória por 10 minutos
+def carregar_dados_globais(aba):
+    try:
+        # Lê a aba e já faz toda a limpeza de colunas uma única vez
+        df = conn.read(worksheet=aba).fillna("")
+        df.columns = [str(c).strip().upper() for c in df.columns]
+        return df
+    except Exception as e:
+        st.error(f"Erro ao carregar a aba {aba}: {e}")
+        return pd.DataFrame()
 
-    # 3. Base da Tábua da Maré (Substitui o AVAL_FILE)
-    df_aval = conn.read(worksheet="TABUA_MARE").fillna("")
-    df_aval.columns = [str(c).strip().upper() for c in df_aval.columns]
-    
-except Exception as e:
-    st.error(f"Erro ao carregar dados da nuvem: {e}")
-    df_g = pd.DataFrame(columns=["ALUNO", "TURNO", "COMUNIDADE", "SALA"])
-    df_alf = pd.DataFrame(columns=["ALUNO", "SALA", "ANO", "AVALIAÇÃO", "DIAGNÓSTICO"])
-    df_aval = pd.DataFrame(columns=["ALUNO", "SEMESTRE"] + CATEGORIAS)
+# --- 2. CARREGAMENTO INICIAL (SUBSTITUA O SEU POR ESTE) ---
+# Agora, em vez de ler direto, chamamos o motor
+df_g = carregar_dados_globais("GERAL")
+df_alf = carregar_dados_globais("TURNO_ESTENDIDO")
+df_aval = carregar_dados_globais("TABUA_MARE")
 
 # --- 3. FUNÇÕES DE FILTRO (Ajustadas para os novos nomes) ---
 def render_filtros(df_geral, key_suffix):
@@ -747,7 +743,8 @@ elif menu == "📊 Avaliação da Tábua da Maré":
         st.warning(f"Nenhum aluno encontrado na {sala_atual}. Verifique se a aba da sala na planilha tem a coluna 'ALUNO'.")
 # --- ABA: TURNO ESTENDIDO ---
 elif menu == "📖 Turno Estendido":
-    st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
+    # Em vez de ler direto do conn, usa o motor de cache
+    df_logica = carregar_dados_globais("TURNO_ESTENDIDO")
 
     try:
         # 1. LEITURA FRESH

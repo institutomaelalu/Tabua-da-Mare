@@ -1242,24 +1242,41 @@ elif menu == "🌊 Tábua da Maré":
         "Leitura e Escrita", "Compreensão de comandos", "Superação de desafios", "Assiduidade"
     ]
     
+    # Renderiza os botões das salas (SALA ROSA, SALA AZUL, etc.)
     render_botoes_salas("btn_int", "sel_int")
     
+    # Proteção: Se não houver sala selecionada, interrompe
+    if "sel_int" not in st.session_state:
+        st.info("Selecione uma sala para visualizar os dados.")
+        st.stop()
+
     df_av = df_aval.copy()
     df_av.columns = [str(c).strip().upper() for c in df_av.columns]
     
-    # df_total deve ser o DataFrame que une as abas SALA AZUL, SALA VERDE, etc.
+    # Leitura segura da aba selecionada
     df_s = safe_read(st.session_state.sel_int)
     
     if not df_s.empty:
         df_s.columns = [str(c).strip().upper() for c in df_s.columns]
-        alunos_sala = sorted([str(n).replace("**", "").strip() for n in df_s["ALUNO"].unique()])
+        
+        # Limpeza dos nomes dos alunos para evitar erros de busca
+        alunos_sala = sorted([str(n).replace("**", "").strip() for n in df_s["ALUNO"].dropna().unique()])
         
         for al in alunos_sala:
             with st.expander(f"👤 {al}"):
-                # --- FICHA CADASTRAL (O Espelho) ---
-                aluno_row = df_s[df_s["ALUNO"] == al].iloc[0]
+                # --- PROTEÇÃO CONTRA INDEXERROR ---
+                filtro_aluno = df_s[df_s["ALUNO"].str.strip() == al.strip()]
+                
+                if filtro_aluno.empty:
+                    st.warning("Dados cadastrais não encontrados para este aluno.")
+                    continue
+                
+                aluno_row = filtro_aluno.iloc[0]
+                
+                # --- FICHA CADASTRAL ---
                 turno = aluno_row.get("TURMA", "")
-                sala_full = f"{st.session_state.sel_int.title()} - {turno}" if turno else st.session_state.sel_int.title()
+                sala_nome = st.session_state.sel_int.replace("SALA ", "").title()
+                sala_full = f"{sala_nome} - {turno}" if turno else sala_nome
                 
                 col_f1, col_f2 = st.columns([1, 2])
                 with col_f1:
@@ -1271,8 +1288,9 @@ elif menu == "🌊 Tábua da Maré":
                         </div>
                     """, unsafe_allow_html=True)
                 
-                # --- AVALIAÇÕES ---
-                dados_aluno = df_av[df_av["ALUNO"] == al]
+                # --- AVALIAÇÕES (HISTÓRICO) ---
+                dados_aluno = df_av[df_av["ALUNO"].str.strip() == al.strip()]
+                
                 if not dados_aluno.empty:
                     for _, r in dados_aluno.iterrows():
                         periodo = r.get("PERIODO", "Avaliação")
@@ -1280,21 +1298,41 @@ elif menu == "🌊 Tábua da Maré":
                         st.markdown(f"**🗓️ {periodo}**")
                         
                         valores = []
-                        mapa_notas = {"MARÉ BAIXA": 1, "MARÉ VAZANTE": 2, "MARÉ ENCHENTE": 3, "MARÉ ALTA": 4, "MARÉ CHEIA": 5}
+                        mapa_notas = {
+                            "MARÉ BAIXA": 1, "MARÉ VAZANTE": 2, 
+                            "MARÉ ENCHENTE": 3, "MARÉ ALTA": 4, "MARÉ CHEIA": 5
+                        }
+                        
                         for cat in CATEGORIAS:
-                            v = r.get(cat.upper(), 3)
-                            n = mapa_notas.get(v.upper(), v) if isinstance(v, str) else v
+                            # Busca o valor da categoria em maiúsculo
+                            v = r.get(cat.upper(), 1) # Default 1 se não encontrar
+                            
+                            # Converte texto para número se necessário
+                            if isinstance(v, str):
+                                n = mapa_notas.get(v.strip().upper(), 1)
+                            else:
+                                n = v if v else 1
                             valores.append(float(n))
 
-                        # Vasilhas 5x5
+                        # Exibição Visual (Vasilhas)
+                        # Primeira linha (5 categorias)
                         c1 = st.columns(5)
                         for i in range(5):
-                            with c1[i]: st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
+                            with c1[i]: 
+                                st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
+                        
+                        # Segunda linha (5 categorias)
                         c2 = st.columns(5)
                         for i in range(5, 10):
-                            with c2[i-5]: st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
+                            with c2[i-5]: 
+                                st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
 
-                        st.plotly_chart(criar_grafico_mare(CATEGORIAS, valores), use_container_width=True, key=f"gen_{al}_{periodo}")
-                        st.info(f"**Observação:** {r.get('OBSERVAÇÕES PEDAGÓGICAS', 'Sem registro.')}")
+                        # Gráfico Radar
+                        st.plotly_chart(criar_grafico_mare(CATEGORIAS, valores), use_container_width=True, key=f"gen_{al}_{periodo}_{i}")
+                        
+                        obs_pedag = r.get('OBSERVAÇÕES PEDAGÓGICAS', r.get('OBSERVACOES', 'Sem registro.'))
+                        st.info(f"**Observação:** {obs_pedag}")
                 else:
-                    st.info("Nenhuma avaliação registrada para este aluno.")
+                    st.info("Nenhuma avaliação registrada para este aluno na Tábua da Maré.")
+    else:
+        st.warning(f"A aba '{st.session_state.sel_int}' está vazia ou não foi encontrada.")

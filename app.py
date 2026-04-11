@@ -529,43 +529,42 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             lista_est = sorted(df_est_leitura["ALUNO"].unique())
             selecionados = st.multiselect("Selecione os alunos:", lista_est)
             
-            if st.button("Confirmar Matrícula no Turno Estendido"):
-                if selecionados:
-                    try:
-                        # 1. Autenticação Direta
-                        import gspread
-                        from google.oauth2.service_account import Credentials
-                        
-                        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-                        creds = Credentials.from_service_account_info(st.secrets["connections"]["gsheets"], scopes=scope)
-                        client = gspread.authorize(creds)
-                        
-                        # 2. Abrir a planilha (DICA: Use o ID se o Nome falhar)
-                        # O ID é aquela sequência de letras e números na URL da sua planilha
-                        sh = client.open("APP_IMLA") 
-                        ws = sh.worksheet("TURNO_ESTENDIDO")
-                        
-                        ano_atual = datetime.now().strftime("%Y")
-                        
-                        # 3. Preparar as linhas para inserção em lote (mais rápido e seguro)
-                        novas_linhas = []
-                        for aluno in selecionados:
-                            # [ALUNO, SALA, 1 AVAL, 2 AVAL, 3 AVAL, ANO, DIAGNÓSTICO, EVIDÊNCIAS, OBS]
-                            linha = [aluno.upper(), s_est, "", "", "", ano_atual, "", "", ""]
-                            novas_linhas.append(linha)
-                        
-                        # 4. Enviar tudo de uma vez
-                        ws.append_rows(novas_linhas)
-                        
-                        st.success(f"✅ {len(selecionados)} aluno(s) matriculado(s)!")
-                        st.cache_data.clear()
-                        st.rerun()
-            
-                    except Exception as e:
-                        # Se o erro persistir, ele vai mostrar o detalhe técnico real aqui
-                        st.error(f"Erro técnico ao gravar: {str(e)}")
-                else:
-                    st.warning("Selecione os alunos primeiro.")
+        if st.button("Confirmar Matrícula no Turno Estendido"):
+            if selecionados:
+                try:
+                    import gspread
+                    from google.oauth2.service_account import Credentials
+                    
+                    # 1. Autenticação Direta e Limpa
+                    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+                    creds = Credentials.from_service_account_info(st.secrets["connections"]["gsheets"], scopes=scope)
+                    client = gspread.authorize(creds)
+                    
+                    # 2. Abrir pelo ID (Substitua pela sua chave real se o nome continuar dando erro)
+                    # sh = client.open_by_key("1Zj8u67oAWKgYRd2uOkGssdaxXnwdsKsZBDxeLChnBr4") 
+                    sh = client.open("APP_IMLA") # Se o nome estiver 100% correto
+                    ws = sh.worksheet("TURNO_ESTENDIDO")
+                    
+                    ano_atual = datetime.now().strftime("%Y")
+                    
+                    # 3. Montar a lista de linhas (Apenas Aluno e Sala, o resto vazio)
+                    novas_linhas = []
+                    for aluno in selecionados:
+                        # [ALUNO, SALA, 1 AVAL, 2 AVAL, 3 AVAL, ANO, DIAGNÓSTICO, EVIDÊNCIAS, OBS]
+                        linha = [aluno.upper(), s_est, "", "", "", ano_atual, "", "", ""]
+                        novas_linhas.append(linha)
+                    
+                    # 4. Gravação em lote (Single Hit)
+                    # O plural 'append_rows' evita o erro de Response 200 do gspread
+                    ws.append_rows(novas_linhas, value_input_option='RAW')
+                    
+                    st.success(f"✅ {len(selecionados)} aluno(s) registrados!")
+                    st.cache_data.clear()
+                    st.rerun()
+        
+                except Exception as e:
+                    # Captura o erro e mostra de forma limpa
+                    st.error(f"Não foi possível gravar. Detalhe: {str(e)}")
 
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):

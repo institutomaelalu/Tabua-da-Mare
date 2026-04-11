@@ -955,41 +955,30 @@ if modo == "🌊 Tábua da Maré (Geral)":
         "Respeito às regras"
     ]
     
-    # 1. BUSCA DE DADOS DIRETAMENTE NAS ABAS DAS SALAS
-    sala_oficial = "Não encontrada"
-    idade = "---"
-    comunidade = "Não informada"
-    padrinho_nome = "Sem padrinho/madrinha"
+    # 1. EXTRAÇÃO DE DADOS DA MEMÓRIA (df_total já consolidado acima)
+    # Filtramos a linha do aluno selecionado no DataFrame que já contém todas as salas
+    aluno_info = df_total[df_total["ALUNO"] == al_af]
     
-    # Varremos as abas das salas (Azul, Rosa, Verde, Amarela, Cirand. Mundo)
-    abas_salas = ["SALA AZUL", "SALA ROSA", "SALA VERDE", "SALA AMARELA", "CIRAND. MUNDO"]
-    
-    for aba in abas_salas:
-        df_sala = safe_read(aba)
-        if not df_sala.empty:
-            df_sala.columns = [str(c).strip().upper() for c in df_sala.columns]
-            # O aluno selecionado (al_af) está sempre na Coluna A (ALUNO)
-            aluno_row = df_sala[df_sala["ALUNO"] == al_af]
-            
-            if not aluno_row.empty:
-                info = aluno_row.iloc[0]
-                
-                # Identificação da Sala e Turma (Nome da Aba + Coluna C)
-                # Formato: Sala Azul - Turma A
-                turno = info.get("TURMA", "")
-                sala_oficial = f"{aba.title()} - {turno}" if turno else aba.title()
-                
-                # Idade (Coluna D) e Comunidade (Coluna F)
-                idade = info.get("IDADE", "---")
-                comunidade = info.get("COMUNIDADE", "Não informada")
-                
-                # Padrinho/Madrinha
-                padrinho_nome = info.get("PADRINHO/MADRINHA", "Sem padrinho/madrinha")
-                
-                # Uma vez encontrado, paramos a busca
-                break
+    if not aluno_info.empty:
+        # Pega a primeira ocorrência encontrada
+        info = aluno_info.iloc[0]
+        
+        # SALA_NOME foi criado lá no início do loop (df_temp["SALA_NOME"] = nome_aba)
+        aba_origem = info.get("SALA_NOME", "Não identificada")
+        turno_aluno = info.get("TURMA", "")
+        
+        # Monta a string: Sala Azul - Turma A
+        sala_oficial = f"{aba_origem.title()} - {turno_aluno}" if turno_aluno else aba_origem.title()
+        
+        # Demais campos das colunas D e F
+        idade = info.get("IDADE", "---")
+        comunidade = info.get("COMUNIDADE", "Não informada")
+        padrinho_nome = info.get("PADRINHO/MADRINHA", "Sem padrinho/madrinha")
+    else:
+        # Caso de segurança se o aluno sumir do df_total
+        sala_oficial, idade, comunidade, padrinho_nome = "Não encontrada", "---", "Não informada", "Sem registro"
 
-    # Lógica de cor da ficha baseada no nome da aba encontrada
+    # Lógica de cor baseada na sala encontrada
     cor_sala_bg = "#ffffff"
     sala_check = sala_oficial.upper()
     if "AZUL" in sala_check: cor_sala_bg = "#E3F2FD"
@@ -998,7 +987,7 @@ if modo == "🌊 Tábua da Maré (Geral)":
     elif "AMARELA" in sala_check: cor_sala_bg = "#FFFDE7"
     elif "LARANJA" in sala_check: cor_sala_bg = "#FFF3E0"
 
-    # 2. LAYOUT DA FICHA E CONTEÚDO
+    # 2. LAYOUT (Ficha + Gráfico)
     st.markdown("<style>.status-mare-final {font-size: 11px !important; font-weight: bold; text-align: center;}</style>", unsafe_allow_html=True)
     col_ficha, col_conteudo = st.columns([1, 2.3])
     
@@ -1015,7 +1004,7 @@ if modo == "🌊 Tábua da Maré (Geral)":
         """, unsafe_allow_html=True)
 
     with col_conteudo:
-        # Busca avaliações na aba TABUA_MARE
+        # Busca avaliações na aba TABUA_MARE (Variável df_aval deve estar carregada no app)
         df_av = df_aval.copy()
         df_av.columns = [str(c).strip().upper() for c in df_av.columns]
         dados_mare = df_av[df_av["ALUNO"] == al_af]
@@ -1041,9 +1030,8 @@ if modo == "🌊 Tábua da Maré (Geral)":
                     st.markdown(f'<div style="text-align: center;">{html_v_limpo}<div class="status-mare-final">{status_txt}</div></div>', unsafe_allow_html=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
-            fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
-            fig_espelho.update_layout(height=350, margin=dict(l=5, r=5, t=30, b=0))
-            st.plotly_chart(fig_espelho, use_container_width=True, config={'displayModeBar': False})
+            fig = criar_grafico_mare(CATEGORIAS, valores_grafico)
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
         else:
             st.info(f"Sem novas Avaliações da Tábua da Maré de **{al_af}**")
 # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---

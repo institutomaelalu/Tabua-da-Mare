@@ -428,26 +428,28 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
     # Configuração de Cores (Identidade Visual)
     cor_rosa, cor_amarela, cor_verde, cor_azul, cor_lavanda = "#F783AC", "#FFE066", "#A9E34B", "#99E9F2", "#D0BFFF"
 
-   # --- CSS PARA INVERSÃO DE CORES DEFINITIVO ---
+   # --- CSS PARA INVERSÃO DE CORES (ULTRA-ESPECÍFICO) ---
     st.markdown(f"""
         <style>
-        /* 1. BOTÕES DE GESTÃO (Popovers Superiores) - FORÇAR FUNDO BRANCO */
+        /* 1. BOTÕES DE GESTÃO (Popovers Superiores) - FORÇAR BRANCO TOTAL */
         div[data-testid="stPopover"] > button {{
             background-color: white !important;
+            background-image: none !important; /* Remove gradientes do tema */
             border-radius: 8px;
             transition: 0.3s;
-            height: 3rem;
+            height: 3.2rem;
+            box-shadow: none !important;
         }}
         
-        /* Cores específicas para os textos e bordas dos popovers */
+        /* Cores específicas para texto e bordas dos botões brancos */
         div[key="mat_popover"] > button {{ color: {cor_rosa} !important; border: 2px solid {cor_rosa} !important; }}
         div[key="pad_popover"] > button {{ color: {cor_amarela} !important; border: 2px solid {cor_amarela} !important; }}
         div[key="est_popover"] > button {{ color: {cor_verde} !important; border: 2px solid {cor_verde} !important; }}
         div[key="del_popover"] > button {{ color: {cor_azul} !important; border: 2px solid {cor_azul} !important; }}
 
-        /* Forçar o texto dentro dos popovers a ser negrito */
-        div[data-testid="stPopover"] p {{
-            font-weight: 900 !important;
+        /* Texto em Negrito para os Popovers */
+        div[data-testid="stPopover"] button p {{
+            font-weight: 800 !important;
             color: inherit !important;
         }}
 
@@ -455,11 +457,13 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
         div[key^="btn_pad"] > button {{
             color: white !important;
             border: none !important;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1) !important;
         }}
         
-        /* Forçar negrito no texto dos botões das salas */
-        div[key^="btn_pad"] p {{
-            font-weight: 900 !important;
+        /* O SEGREDO DO NEGRITO: Mirar no parágrafo dentro do botão de sala */
+        div[key^="btn_pad"] button div[data-testid="stMarkdownContainer"] p {{
+            font-weight: 800 !important;
+            color: white !important;
         }}
 
         /* Cores de fundo dos botões de sala */
@@ -469,10 +473,10 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
         div[key$="SALA AZUL"] > button {{ background-color: {cor_azul} !important; }}
         div[key$="CIRAND. MUNDO"] > button {{ background-color: {cor_lavanda} !important; }}
 
-        /* Efeito Hover para botões de sala */
-        div[key^="btn_pad"] > button:hover {{
-            opacity: 0.8;
-            color: white !important;
+        /* Hover para os botões brancos (Gestão) */
+        div[data-testid="stPopover"] > button:hover {{
+            filter: brightness(0.95);
+            background-color: #fdfdfd !important;
         }}
         </style>
     """, unsafe_allow_html=True)

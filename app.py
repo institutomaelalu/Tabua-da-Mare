@@ -887,33 +887,58 @@ elif menu == "📈 Indicadores pedagógicos":
 elif menu == "🌊 Canal do Apadrinhamento":
     st.markdown(f"### 🤝 Canal do Apadrinhamento")
     
-    # Unindo as turmas
-    df_total = pd.concat([safe_read(s) for s in TURMAS_CONFIG.keys()], ignore_index=True)
+    # --- 1. UNIÃO DAS TURMAS (CONEXÃO GOOGLE SHEETS) ---
+    lista_salas = []
+    # TURMAS_CONFIG.keys() deve conter: "SALA ROSA", "SALA AMARELA", etc.
+    for nome_aba in TURMAS_CONFIG.keys():
+        try:
+            # Puxa cada aba individualmente do Google Sheets
+            df_temp = conn.read(worksheet=nome_aba).fillna("")
+            # Padroniza colunas para MAIÚSCULO (Segurança R&D)
+            df_temp.columns = [str(c).strip().upper() for c in df_temp.columns]
+            # Adiciona metadado da sala para filtros posteriores
+            df_temp["SALA_NOME"] = nome_aba
+            lista_salas.append(df_temp)
+        except Exception as e:
+            # Se uma aba falhar, o app continua tentando as outras
+            continue
     
-    # --- SEGURANÇA R&D: PADRONIZAÇÃO DE COLUNAS ---
-    df_total.columns = [str(c).strip().upper() for c in df_total.columns]
+    if not lista_salas:
+        st.error("⚠️ Não foi possível carregar os dados das salas do Google Sheets. Verifique a conexão.")
+        st.stop()
 
-    # Verifica se a coluna existe para evitar KeyError
-    if "PADRINHO/MADRINHA" in df_total.columns:
-        padrinhos_lista = sorted([p for p in df_total["PADRINHO/MADRINHA"].unique() if str(p).strip() not in ["", "0", "nan", "None"]])
+    # Consolida todas as salas num único DataFrame
+    df_total = pd.concat(lista_salas, ignore_index=True)
+    
+    # --- 2. IDENTIFICAÇÃO DO PADRINHO ---
+    col_padrinho = "PADRINHO/MADRINHA"
+    
+    if col_padrinho in df_total.columns:
+        # Gera lista única de padrinhos removendo valores vazios ou nulos
+        padrinhos_lista = sorted([
+            str(p).strip() for p in df_total[col_padrinho].unique() 
+            if str(p).strip() not in ["", "0", "nan", "None", "NaN"]
+        ])
     else:
         padrinhos_lista = ["Nenhum Padrinho Encontrado"]
 
-    # Define o padrinho selecionado (Removida a linha duplicada que causava erro)
-    if st.session_state.perfil == "padrinho":
-        p_sel = st.session_state.nome_usuario
+    # Lógica de Perfil (Padrinho Logado ou Simulação Admin)
+    if st.session_state.get("perfil") == "padrinho":
+        p_sel = st.session_state.get("nome_usuario", "")
     else:
-        p_sel = st.selectbox("Simular Padrinho:", padrinhos_lista)
+        p_sel = st.selectbox("👤 Selecionar Padrinho (Visualização Admin):", padrinhos_lista)
     
     if p_sel and p_sel != "Nenhum Padrinho Encontrado":
-        # Filtra os afilhados
-        afils = df_total[df_total["PADRINHO/MADRINHA"].astype(str).str.upper() == p_sel.upper()]
+        # Filtra os afilhados vinculados ao padrinho selecionado
+        afils = df_total[df_total[col_padrinho].astype(str).str.upper() == p_sel.upper()]
         
         if not afils.empty:
+            # Seletor de Afilhado (Usa a coluna ALUNO em maiúsculo)
             lista_nomes = sorted([str(n).replace("**", "").strip() for n in afils["ALUNO"].unique()])
-            al_af = st.selectbox("Selecione seu afilhado:", lista_nomes)
+            al_af = st.selectbox("👶 Selecione seu afilhado:", lista_nomes)
             
-            # Verifica se participa do turno estendido
+            # --- 3. VERIFICAÇÃO DE MATRÍCULA NO TURNO ESTENDIDO ---
+            # Verifica se o aluno está no dicionário de matrículas do session_state
             is_turno = al_af in st.session_state.get("alunos_te_dict", {})
             modo = "🌊 Tábua da Maré (Geral)"
 
@@ -923,7 +948,7 @@ elif menu == "🌊 Canal do Apadrinhamento":
                     <span style="font-size: 18px;">✨ <b>O seu afilhado, {al_af}, participa do nosso Turno Estendido!</b></span><br>
                     <p style="margin-top: 10px; line-height: 1.5; font-size: 14px;">
                         Essa é uma ação do nosso Projeto <b>"Vamos Dar a Meia Volta e Alfabetizar"</b>, 
-                        voltado para a intensificação do processo de desenvolvimento das habilidades de leitura e escrita das nossas crianças.
+                        voltado para a intensificação do desenvolvimento da leitura e escrita.
                     </p>
                 </div>""", unsafe_allow_html=True)
                 modo = st.radio("O que deseja visualizar?", ["🌊 Tábua da Maré (Geral)", "📚 Turno Estendido"], horizontal=True)

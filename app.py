@@ -529,7 +529,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             
             if st.button("Confirmar Turno Estendido", use_container_width=True):
                 for aluno in selecionados:
-                    conn.append_row(worksheet="TURNO_ESTENDIDO", data=[aluno.upper(), s_est])
+                    conn.append_row(spreadsheet=nome_planilha, worksheet=n_sala, data=nova_linha
                 st.success("Alunos atualizados!"); st.cache_data.clear()
 
     with gestao_col4:

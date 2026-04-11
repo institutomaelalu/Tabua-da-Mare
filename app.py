@@ -504,37 +504,41 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 st.cache_data.clear()
                 st.rerun()
 
-    with gestao_col3:
-        with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
-            st.markdown("##### ⏳ Matrícula Estendida")
-            s_est = st.selectbox("Origem dos Alunos:", list(TURMAS_CONFIG.keys()), key="sel_est_sala")
-            df_est_leitura = conn.read(worksheet=s_est).fillna("")
-            lista_est = sorted(df_est_leitura["ALUNO"].unique())
-            selecionados = st.multiselect("Selecione os alunos:", lista_est)
-            
-            if st.button("Confirmar Turno Estendido", use_container_width=True):
-                if selecionados:
-                    try:
-                        client = conn._instance 
-                        sh = client.open(nome_planilha)
-                        ws = sh.worksheet("TURNO_ESTENDIDO")
-                        ano_atual = datetime.now().strftime("%Y")
-                        for aluno in selecionados:
-                            linha_para_salvar = [aluno.upper(), s_est, "", "", "", ano_atual, "", "", ""]
-                            ws.append_row(linha_para_salvar)
-                        st.success(f"{len(selecionados)} aluno(s) adicionado(s)!")
-                        st.cache_data.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro: {e}")
-                else:
-                    st.warning("Selecione um aluno.")
+        with gestao_col3:
+            with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
+                st.markdown("##### ⏳ Matrícula Estendida")
+                s_est = st.selectbox("Origem dos Alunos:", list(TURMAS_CONFIG.keys()), key="sel_est_sala")
+                df_est_leitura = conn.read(worksheet=s_est).fillna("")
+                lista_est = sorted(df_est_leitura["ALUNO"].unique())
+                selecionados = st.multiselect("Selecione os alunos:", lista_est)
+                
+                if st.button("Confirmar Turno Estendido", use_container_width=True):
+                    if selecionados:
+                        try:
+                            # CORREÇÃO AQUI: Acessando .client dentro de ._instance
+                            client_gspread = conn._instance.client 
+                            sh = client_gspread.open(nome_planilha)
+                            ws = sh.worksheet("TURNO_ESTENDIDO")
+                            
+                            ano_atual = datetime.now().strftime("%Y")
+                            for aluno in selecionados:
+                                linha_para_salvar = [aluno.upper(), s_est, "", "", "", ano_atual, "", "", ""]
+                                ws.append_row(linha_para_salvar)
+                                
+                            st.success(f"{len(selecionados)} aluno(s) adicionado(s)!")
+                            st.cache_data.clear()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro técnico: {e}")
+                    else:
+                        st.warning("Selecione um aluno.")
 
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
             st.markdown("##### ⚠️ Zona de Exclusão")
             tipo_del = st.radio("Remover:", ["Aluno (Matrícula)", "Padrinho"])
             s_del = st.selectbox("Local:", list(TURMAS_CONFIG.keys()) + ["TURNO_ESTENDIDO"])
+            
             df_del = conn.read(worksheet=s_del).fillna("")
             df_del.columns = [str(c).strip().upper() for c in df_del.columns]
             lista_del = sorted(df_del["ALUNO"].unique()) if "ALUNO" in df_del.columns else []
@@ -543,19 +547,25 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             if st.button("🚨 EXCLUIR", use_container_width=True):
                 if al_del:
                     try:
-                        client = conn._instance
-                        ws = client.open(nome_planilha).worksheet(s_del)
+                        # CORREÇÃO AQUI: Acessando .client dentro de ._instance
+                        client_gspread = conn._instance.client
+                        sh = client_gspread.open(nome_planilha)
+                        ws = sh.worksheet(s_del)
+                        
                         idx_del = df_del[df_del["ALUNO"] == al_del].index[0] + 2
+                        
                         if tipo_del == "Padrinho":
+                            # Coluna 7 é a coluna G (Padrinhos)
                             ws.update_cell(idx_del, 7, "")
                             st.success("Padrinho removido!")
                         else:
                             ws.delete_rows(idx_del)
                             st.error("Registro excluído!")
+                            
                         st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Erro: {e}")
+                        st.error(f"Erro ao excluir: {e}")
 
     st.divider()
 

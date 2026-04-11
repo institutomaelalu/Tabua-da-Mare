@@ -16,16 +16,14 @@ def get_gspread_client_seguro():
         "https://www.googleapis.com/auth/drive"
     ]
     
-    # Tenta carregar as credenciais do segredo do Streamlit
+@st.cache_data(ttl=600)
+def engine_leitura_dados(aba): # <-- O nome agora é este
     try:
-        creds = Credentials.from_service_account_info(
-            st.secrets["connections"]["gsheets"], 
-            scopes=scopes
-        )
-        return gspread.authorize(creds)
+        df = conn.read(worksheet=aba, ttl=None).fillna("")
+        df.columns = [str(c).strip().upper() for c in df.columns]
+        return df
     except Exception as e:
-        st.error(f"Erro nas credenciais: {e}")
-        return None
+        return pd.DataFrame()
 
 # ID da sua planilha (extraído do seu histórico)
 ID_PLANILHA = "1Zj8u67oAWKgYRd2uOkGssdaxXnwdsKsZBDxeLChnBr4"

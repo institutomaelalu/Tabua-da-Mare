@@ -830,7 +830,7 @@ elif menu == "📖 Turno Estendido":
         with st.form("form_te_unificado_v3"):
             # Ano e Etapa conforme solicitado
             ano_form = st.selectbox("Ano Letivo da Avaliação:", [2026, 2025])
-            etapa_av = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
+            etapa_av = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "3ª Avaliação "])
             
             st.divider()
             
@@ -961,7 +961,7 @@ elif menu == "📊 Dados - Turno Estendido":
         html_tab += f'<tr><td style="font-weight:bold; padding:10px; border:1px solid #eee; font-size:12px;">{al}</td>'
         
         if ano_sel == 2026:
-            d_ant = df_h[(df_h["ALUNO"] == al) & (df_h["ANO"] == 2025) & (df_h["AVALIACAO"] == "Avaliação Final")]
+            d_ant = df_h[(df_h["ALUNO"] == al) & (df_h["ANO"] == 2025) & (df_h["AVALIACAO"] == "3ª Avaliação")]
             if not d_ant.empty:
                 nv = d_ant["NIVEL"].iloc[0]
                 html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv)}; color:{get_text_color(nv)}; text-align:center; font-weight:bold; font-size:10px; border:1px solid #eee; padding:8px;">{nv.split(". ")[1]}</td>'

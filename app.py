@@ -745,6 +745,7 @@ elif menu == "📊 Avaliação da Tábua da Maré":
                     st.error("Por favor, selecione um aluno.")
     else:
         st.warning(f"Nenhum aluno encontrado na {sala_atual}. Verifique se a aba da sala na planilha tem a coluna 'ALUNO'.")
+# --- ABA: TURNO ESTENDIDO ---
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
 

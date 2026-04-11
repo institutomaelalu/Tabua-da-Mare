@@ -447,78 +447,89 @@ elif menu == "📝 Alunos matriculados":
     sala_atual = st.session_state.sel_mat
     cor_h = TURMAS_CONFIG[sala_atual]["cor"]
     
-    # 1. CSS PARA CORRIGIR O CHECKBOX E A FONTE (O segredo está aqui)
-    st.markdown(f"""
-        <style>
-            /* 1. Força a fonte Source Sans Pro 14px igual à imagem de referência */
-            [data-testid="stMarkdownContainer"] p {{
-                font-family: 'Source Sans Pro', sans-serif !important;
-                font-size: 14px !important;
-                color: #31333F !important;
-                margin: 0px !important;
-            }}
-            /* 2. Mata o espaço vazio do checkbox que causa o erro visual */
-            div[data-testid="stCheckbox"] label span {{
-                display: none !important;
-            }}
-            div[data-testid="stCheckbox"] {{
-                margin-top: -5px !important;
-                display: flex;
-                justify-content: center;
-            }}
-        </style>
-    """, unsafe_allow_html=True)
-
-    # --- CARREGAMENTO E FILTRAGEM ---
-    df_g = conn.read(worksheet="GERAL").fillna("")
-    df_g.columns = [str(c).strip().upper() for c in df_g.columns]
+    # --- 1. CARREGAMENTO E FILTRAGEM ---
     df_s = conn.read(worksheet=sala_atual).fillna("")
     df_s.columns = [str(c).strip().upper() for c in df_s.columns]
-    tn, cm = render_filtros(df_g, "mat")
     
-    df_f = df_s.copy()
-    if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
-    if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
-
-    # --- CABEÇALHO PADRONIZADO ---
-    st.markdown(f"""
-        <div style="background-color:{cor_h}; color: white; padding: 12px; border-radius: 5px 5px 0 0; display: flex; font-weight: bold; font-size: 14px; text-transform: uppercase; font-family: 'Source Sans Pro', sans-serif;">
-            <div style="flex: 0.8; text-align: center;">SEL.</div>
-            <div style="flex: 3;">ALUNO</div>
-            <div style="flex: 1;">IDADE</div>
-            <div style="flex: 2;">COMUNIDADE</div>
-        </div>
-    """, unsafe_allow_html=True)
+    # Identificar quem já está matriculado no Turno Estendido
+    matriculados_te = st.session_state.get("alunos_te_dict", {}).keys()
     
-    selecionados = []
-
-    # --- LISTAGEM COM ALINHAMENTO CORRIGIDO ---
-    for i, r in df_f.iterrows():
-        c0, c1, c2, c3 = st.columns([0.8, 3, 1, 2])
-        
-        n_l = str(r.get("ALUNO", "")).replace("**", "").strip()
-        
-        with c0:
-            if n_l in st.session_state.get("alunos_te_dict", {}): 
-                st.markdown('<p style="text-align:center;">✍️📖</p>', unsafe_allow_html=True)
-            else:
-                # Checkbox agora limpo pelo CSS lá de cima
-                if st.checkbox("", key=f"m_{sala_atual}_{i}"): 
-                    selecionados.append(n_l)
-        
-        with c1: st.markdown(f'<p>{n_l}</p>', unsafe_allow_html=True)
-        with c2: st.markdown(f'<p>{r.get("IDADE", "")}</p>', unsafe_allow_html=True)
-        with c3: st.markdown(f'<p>{r.get("COMUNIDADE", "")}</p>', unsafe_allow_html=True)
-        
-        st.markdown('<hr style="margin:8px 0; border:0; border-bottom: 1px solid #f0f0f0;">', unsafe_allow_html=True)
-
-    # --- BOTÃO DE MATRÍCULA ---
+    # --- 2. ARTIFÍCIO DE ENVIO (Multiselect) ---
+    st.markdown(f"##### 🚀 Enviar para Turno Estendido")
+    # Apenas alunos da sala atual que ainda não foram enviados
+    alunos_disponiveis = [nome for nome in df_s["ALUNO"].unique() if nome not in matriculados_te]
+    
+    selecionados = st.multiselect(
+        "Selecione os alunos abaixo para matricular em massa:",
+        options=sorted(alunos_disponiveis),
+        help="Busque pelo nome e selecione todos que deseja enviar."
+    )
+    
     if selecionados:
-        st.markdown(f"""<style> div.stButton > button {{ background-color: {cor_h} !important; color: white !important; width: 100%; font-weight: bold; }} </style>""", unsafe_allow_html=True)
-        if st.button(f"🚀 Confirmar Matrícula de {len(selecionados)} aluno(s)"):
+        st.markdown(f"""<style>div.stButton > button {{ background-color: {cor_h} !important; color: white !important; font-weight: bold; width: 100%; border-radius: 8px; }}</style>""", unsafe_allow_html=True)
+        if st.button(f"Confirmar Matrícula de {len(selecionados)} aluno(s)"):
             if "alunos_te_dict" not in st.session_state: st.session_state["alunos_te_dict"] = {}
             for al in selecionados: st.session_state["alunos_te_dict"][al] = sala_atual
+            st.success("Alunos enviados com sucesso!")
             st.rerun()
+
+    st.write("---")
+
+    # --- 3. TABELA COM FORMATAÇÃO IDÊNTICA À GESTÃO ---
+    # Construímos a tabela como uma string única de HTML
+    tabela_html = f"""
+    <style>
+        .tabela-suave {{
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Source Sans Pro', sans-serif;
+            color: #31333F;
+        }}
+        .tabela-suave thead th {{
+            background-color: {cor_h};
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-size: 14px;
+            text-transform: uppercase;
+        }}
+        .tabela-suave td {{
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }}
+    </style>
+    <table class="tabela-suave">
+        <thead>
+            <tr>
+                <th style="width: 10%; text-align: center;">STATUS</th>
+                <th style="width: 50%;">ALUNO</th>
+                <th style="width: 15%;">IDADE</th>
+                <th style="width: 25%;">COMUNIDADE</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+
+    for _, r in df_s.iterrows():
+        nome = str(r.get("ALUNO", "")).replace("**", "").strip()
+        status = "✍️📖" if nome in matriculados_te else ""
+        idade = r.get("IDADE", "")
+        comunidade = r.get("COMUNIDADE", "")
+        
+        tabela_html += f"""
+            <tr>
+                <td style="text-align: center;">{status}</td>
+                <td>{nome}</td>
+                <td>{idade}</td>
+                <td>{comunidade}</td>
+            </tr>
+        """
+
+    tabela_html += "</tbody></table>"
+    
+    # Renderiza a tabela de uma vez só (Garante a fonte bonita)
+    st.markdown(tabela_html, unsafe_allow_html=True)
 elif menu == "🤝 Gestão de apadrinhamento":
     st.markdown(f"### 🤝 Gestão de Apadrinhamento")
     render_botoes_salas("btn_pad", "sel_pad")

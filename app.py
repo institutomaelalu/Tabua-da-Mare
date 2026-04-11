@@ -460,7 +460,7 @@ elif menu == "📝 Alunos matriculados":
     if cm != "Todas":
         df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-    # --- 2. ESTATÍSTICAS (Padronizado) ---
+    # --- 2. ESTATÍSTICAS ---
     st.markdown(f"""
         <div style="background-color: #f8f9fa; padding: 12px; border-radius: 10px; border-left: 5px solid {cor_h}; margin-bottom: 20px;">
             <span style="font-size: 14px; color: #666; font-family: 'Source Sans Pro', sans-serif;">📊 <b>Estatísticas da Sala:</b></span><br>
@@ -470,27 +470,26 @@ elif menu == "📝 Alunos matriculados":
         </div>
     """, unsafe_allow_html=True)
 
-    # --- 3. SELEÇÃO PARA MATRÍCULA (Ação Funcional) ---
-    # Pegamos apenas quem não está no dicionário de matriculados
+    # --- 3. SELEÇÃO PARA MATRÍCULA (FUNCIONALIDADE) ---
     matriculados_nomes = st.session_state.get("alunos_te_dict", {}).keys()
-    alunos_pendentes = [nome for nome in df_f["ALUNO"].unique() if nome not in matriculados_nomes]
+    alunos_disponiveis = [n for n in df_f["ALUNO"].unique() if n not in matriculados_nomes]
 
-    if alunos_pendentes:
-        st.markdown("**Selecione os alunos para realizar a matrícula:**")
-        selecionados = st.multiselect("Nomes disponíveis para matrícula:", sorted(alunos_pendentes))
+    if alunos_disponiveis:
+        st.markdown("**Selecione os alunos para matricular:**")
+        selecionados = st.multiselect("", sorted(alunos_disponiveis), placeholder="Escolha os nomes para ação em massa...")
         
         if selecionados:
             st.markdown(f"""<style>div.stButton > button {{ background-color: {cor_h} !important; color: white !important; width: 100%; border-radius: 8px; font-weight: bold;}}</style>""", unsafe_allow_html=True)
             if st.button(f"🚀 Confirmar Matrícula de {len(selecionados)} aluno(s)"):
                 if "alunos_te_dict" not in st.session_state: st.session_state["alunos_te_dict"] = {}
                 for al in selecionados: st.session_state["alunos_te_dict"][al] = sala_atual
-                st.success("Matrícula concluída!")
+                st.success("Matrícula realizada com sucesso!")
                 st.rerun()
 
     st.write("---")
 
-    # --- 4. CONSTRUÇÃO DA TABELA (ESTÉTICA IGUAL À GESTÃO DE APADRINHAMENTO) ---
-    # Criamos uma única string HTML para evitar o erro de texto na tela
+    # --- 4. CONSTRUÇÃO DA TABELA PADRONIZADA (ESTÉTICA IGUAL À GESTÃO) ---
+    # Geramos o HTML completo em uma string para evitar quebras de renderização
     tabela_html = f"""
     <table class="custom-table">
         <thead style="background-color:{cor_h}; color: white;">
@@ -505,13 +504,13 @@ elif menu == "📝 Alunos matriculados":
     """
 
     for _, r in df_f.iterrows():
-        nome_aluno = str(r.get("ALUNO", "")).replace("**", "").strip()
-        status_icon = "✍️📖" if nome_aluno in matriculados_nomes else ""
+        nome_limpo = str(r.get("ALUNO", "")).replace("**", "").strip()
+        status = "✍️📖" if nome_limpo in matriculados_nomes else ""
         
         tabela_html += f"""
             <tr>
-                <td style="text-align: center; font-size: 16px;">{status_icon}</td>
-                <td>{nome_aluno}</td>
+                <td style="text-align: center; font-size: 16px;">{status}</td>
+                <td style="font-weight: 500;">{nome_limpo}</td>
                 <td>{r.get("IDADE", "")}</td>
                 <td>{r.get("COMUNIDADE", "")}</td>
             </tr>
@@ -519,7 +518,7 @@ elif menu == "📝 Alunos matriculados":
 
     tabela_html += "</tbody></table>"
 
-    # Renderização final do HTML (Isso garante que fique igual à Imagem 1)
+    # Renderização final do HTML padronizado
     st.markdown(tabela_html, unsafe_allow_html=True)
 
 elif menu == "🤝 Gestão de apadrinhamento":

@@ -750,16 +750,15 @@ elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
 
     try:
-        # Leitura e padronização para evitar KeyError
+        # Leitura e padronização rigorosa
         df_h = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
-        # Criamos uma versão com nomes de colunas padronizados para lógica interna
         df_logica = df_h.copy()
         df_logica.columns = [str(c).strip().upper() for c in df_logica.columns]
         
-        # Identificar qual o nome da coluna de diagnóstico (pode ser NIVEL ou DIAGNÓSTICO)
-        col_diag = "NIVEL" if "NIVEL" in df_logica.columns else "DIAGNÓSTICO" if "DIAGNÓSTICO" in df_logica.columns else None
+        # Identifica a coluna de diagnóstico (NIVEL ou DIAGNÓSTICO)
+        col_diag = next((c for c in ["NIVEL", "DIAGNÓSTICO"] if c in df_logica.columns), None)
 
-        # Reconstrução do dicionário de alunos
+        # Atualiza dicionário de alunos em tempo real
         if not df_logica.empty and "ALUNO" in df_logica.columns and "SALA" in df_logica.columns:
             dict_alunos_te = pd.Series(df_logica.SALA.values, index=df_logica.ALUNO.values).to_dict()
             st.session_state["alunos_te_dict"] = dict_alunos_te
@@ -770,7 +769,7 @@ elif menu == "📖 Turno Estendido":
         st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()
 
-    # --- 1. BOTÕES DE ANO (IGUAL À ABA DE DADOS: CORES FORTES + BORDA PRETA) ---
+    # --- 1. BOTÕES DE ANO (PADRÃO DADOS) ---
     if "ano_registro_te" not in st.session_state: 
         st.session_state.ano_registro_te = 2026
 
@@ -781,37 +780,29 @@ elif menu == "📖 Turno Estendido":
 
     for i, ano in enumerate(anos_ref):
         is_active = (st.session_state.ano_registro_te == ano)
-        cor_fundo = cores_ano[ano] if is_active else "#D5DBDB"
-        cor_txt = "white" if is_active else "#566573"
+        cor_f = cores_ano[ano] if is_active else "#D5DBDB"
+        cor_t = "white" if is_active else "#566573"
         
         if col_anos[i].button(f"📅 {ano}", key=f"btn_te_ano_{ano}", use_container_width=True):
             st.session_state.ano_registro_te = ano
             st.rerun()
         
-        # Injeção de CSS para garantir a identidade visual (Borda preta no ativo)
-        st.markdown(f"""
-            <style>
-            div[data-testid='stHorizontalBlock'] div:nth-child({i+1}) button {{ 
-                background-color: {cor_fundo} !important; 
-                color: {cor_txt} !important; 
-                border: {'2px solid black' if is_active else '1px solid #ccc'} !important;
-                font-weight: bold !important;
-                border-radius: 4px !important;
-            }}
-            </style>
-        """, unsafe_allow_html=True)
+        st.markdown(f"""<style>div[data-testid='stHorizontalBlock'] div:nth-child({i+1}) button {{ 
+            background-color: {cor_f} !important; color: {cor_t} !important; 
+            border: {'2px solid black' if is_active else '1px solid #ccc'} !important;
+            font-weight: bold !important; }}</style>""", unsafe_allow_html=True)
 
     st.divider()
 
-    # --- 2. BOTÕES DAS SALAS (RECUPERANDO A IDENTIDADE COLORIDA) ---
+    # --- 2. BOTÕES DAS SALAS (USANDO SUA FUNÇÃO DO TOPO) ---
     salas_te = sorted(list(set(dict_alunos_te.values())))
     
     if salas_te:
-        if "sel_te_aba" not in st.session_state:
+        if "sel_te_aba" not in st.session_state or st.session_state.sel_te_aba not in salas_te:
             st.session_state.sel_te_aba = salas_te[0]
         
-        # Chama a função padrão que você já usa nas outras abas
-        render_botoes_salas("btn_te_sala_v3", "sel_te_aba", salas_permitidas=salas_te)
+        # Chama sua função oficial de componentes
+        render_botoes_salas("btn_te_comp", "sel_te_aba", salas_permitidas=salas_te)
         
         sala_atual = st.session_state.sel_te_aba
         alunos_sala = [n for n, s in dict_alunos_te.items() if s == sala_atual]
@@ -819,33 +810,16 @@ elif menu == "📖 Turno Estendido":
         if alunos_sala:
             aluno_sel = st.selectbox("Selecione o Aluno:", sorted(alunos_sala))
             
-            # Busca histórico para destacar na legenda (Usando a coluna flexível identificada)
+            # --- 3. LEGENDA DE NÍVEIS (USANDO SUA FUNÇÃO DO TOPO) ---
+            # Para destacar o nível atual sem mudar sua função global, 
+            # mostramos o nível atual em um badge antes da legenda
             df_al = df_logica[(df_logica["ALUNO"] == aluno_sel) & (df_logica["ANO"].astype(str).str.contains(str(st.session_state.ano_registro_te)))]
-            ultimo_nv = ""
-            if not df_al.empty and col_diag:
-                ultimo_nv = df_al[col_diag].iloc[-1]
-
-            # --- 3. LEGENDA DE NÍVEIS (CORES VIVAS + DESTAQUE BORDA PRETA) ---
-            st.markdown("##### 📝 Legenda de Níveis")
-            cols_leg = st.columns(len(NIVEIS_ALF))
+            ultimo_nv = df_al[col_diag].iloc[-1] if not df_al.empty and col_diag else "Nenhum"
             
-            for i, nv in enumerate(NIVEIS_ALF):
-                is_current = (ultimo_nv == nv)
-                cor_fundo_nv = CORES_EXCLUSIVAS.get(nv, "#eee")
-                cor_txt_nv = get_text_color(nv) 
-                
-                # Layout idêntico ao da aba de dados, mas com lógica de destaque
-                # Retirado o tom pastel (opacidade 1.0) para o ativo
-                borda_destaque = "3px solid #000000" if is_current else "1px solid rgba(0,0,0,0.1)"
-                opacidade_viva = "1.0" if is_current else "0.4"
-                
-                cols_leg[i].markdown(f"""
-                    <div style="background-color:{cor_fundo_nv}; color:{cor_txt_nv}; padding:8px 2px; border-radius:10px; 
-                    text-align:center; font-size:10px; font-weight:bold; min-height:55px; display:flex; align-items:center; 
-                    justify-content:center; line-height:1.1; border: {borda_destaque}; opacity: {opacidade_viva};">
-                        {nv.split(". ")[1]}
-                    </div>
-                """, unsafe_allow_html=True)
+            st.markdown(f"Diagnóstico atual: <span class='sala-badge' style='background:{C_ROXO}'>{ultimo_nv}</span>", unsafe_allow_html=True)
+            
+            # Chama sua função oficial de legenda
+            render_legenda_niveis()
 
             st.markdown("---")
 
@@ -856,13 +830,13 @@ elif menu == "📖 Turno Estendido":
                 
             novo_nv = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_ini)
 
-            with st.form("f_te_final_v4"):
+            with st.form("f_te_final_comp"):
                 etapa_av = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
                 evs = EVIDENCIAS_POR_NIVEL.get(novo_nv, [])
                 
                 st.write(f"**Evidências observadas para {novo_nv}:**")
                 c_ev = st.columns(3)
-                selecionadas = [ev for i, ev in enumerate(evs) if c_ev[i%3].checkbox(ev, key=f"chk_te_{i}")]
+                selecionadas = [ev for i, ev in enumerate(evs) if c_ev[i%3].checkbox(ev, key=f"chk_te_f_{i}")]
                 
                 obs_txt = st.text_area("Observações Adicionais:")
                 
@@ -882,9 +856,9 @@ elif menu == "📖 Turno Estendido":
                         st.cache_data.clear()
                         st.rerun()
         else:
-            st.info(f"Nenhum aluno encontrado na sala {sala_atual}.")
+            st.info(f"Nenhum aluno encontrado na {sala_atual}.")
     else:
-        st.warning("Lista de alunos do Turno Estendido não carregada. Verifique se a aba 'TURNO_ESTENDIDO' possui as colunas 'ALUNO' e 'SALA'.")
+        st.warning("Verifique as colunas ALUNO e SALA na aba TURNO_ESTENDIDO.")
 # --- ABA: DADOS - TURNO ESTENDIDO (ATUALIZADO COM CORES E LEGENDA) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("""

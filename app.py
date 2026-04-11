@@ -596,7 +596,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
 
     with gestao_col3:
         with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
-        st.markdown("##### ⏳ Matricular no Turno Estendido")
+            st.markdown("##### ⏳ Matricular no Turno Estendido")
         
         # Filtro de segurança
         lista_disponivel_te = [a for a in lista_alunos_geral if a not in set_matriculados_te]

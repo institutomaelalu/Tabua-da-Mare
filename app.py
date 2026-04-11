@@ -854,7 +854,7 @@ elif menu == "📖 Turno Estendido":
                     st.rerun()
     else:
         st.warning("Nenhum aluno encontrado.")
-# --- ABA: DADOS - TURNO ESTENDIDO ---
+# --- ABA: DADOS - TURNO ESTENDIDO (REVISADO) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("""
         <style>
@@ -867,100 +867,84 @@ elif menu == "📊 Dados - Turno Estendido":
 
     st.markdown("### 📋 Panorama de Avaliações")
     
-    # 1. LEITURA PROTEGIDA (Usa o motor de cache que definimos no topo)
-    # Certifique-se que df_alf é carregado por: carregar_dados_globais("TURNO_ESTENDIDO")
+    # 1. LEITURA VIA MOTOR DE CACHE
     df_h = engine_leitura_dados("TURNO_ESTENDIDO")
 
     if df_h.empty:
-        st.warning("Nenhum dado encontrado na aba Turno Estendido.")
+        st.warning("Aba TURNO_ESTENDIDO não encontrada ou vazia.")
         st.stop()
-
-    # Sincronização de colunas (Garante que ANO e AVALIACAO/ETAPA existam para o filtro)
-    if "ANO" not in df_h.columns:
-        df_h["ANO"] = 2025
-    
-    # Mapeamento de coluna de avaliação (pode ser ETAPA ou AVALIACAO no Sheets)
-    col_etapa = next((c for c in ["AVALIACAO", "ETAPA", "TIPO"] if c in df_h.columns), "AVALIACAO")
 
     # 2. SELEÇÃO DE ANO
     if "ano_ativo_te" not in st.session_state: 
         st.session_state.ano_ativo_te = 2025
     
     col_anos = st.columns([0.15, 0.15, 0.7]) 
-    anos = [2025, 2026]
-    for i, ano in enumerate(anos):
-        if col_anos[i].button(f"📅 {ano}", key=f"btn_ano_d_{ano}", use_container_width=True):
+    for i, ano in enumerate([2025, 2026]):
+        if col_anos[i].button(f"📅 {ano}", key=f"btn_pan_{ano}", use_container_width=True):
             st.session_state.ano_ativo_te = ano
             st.rerun()
 
     ano_sel = st.session_state.ano_ativo_te
     st.info(f"📅 Exibindo Panorama de: **{ano_sel}**")
 
-    # --- 3. FUNÇÃO AUXILIAR MARÉ ---
-    def get_status_mare_html(nv_atual, hist):
-        pct, txt = 85, "maré baixa"
-        if "7." in str(nv_atual): pct, txt = 15, "maré cheia"
-        elif len(hist) >= 2:
-            n_at = MAPA_NIVEIS.get(nv_atual, 0)
-            n_ant = MAPA_NIVEIS.get(hist[-2], 0)
-            if n_at > n_ant: pct, txt = 45, "maré enchente"
-            elif n_at < n_ant: pct, txt = 70, "maré vazante"
-        
-        return f'''
-        <div class="mare-box">
-            <div class="mare-mini-tabela" style="background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%); clip-path: path('M 0 4 Q 10 0 20 4 T 40 4 L 40 20 L 0 20 Z');"></div>
-            <span class="mare-texto-tabela">{txt}</span>
-        </div>'''
-
-    # --- 4. CONSTRUÇÃO DA TABELA HTML ---
+    # --- 3. CABEÇALHOS DA TABELA ---
+    # Conforme sua planilha: 1 AVALIAÇÃO, 2 AVALIAÇÃO, 3 AVALIAÇÃO
     cols_header = ["Nome do Aluno", "1ª Sondagem", "2ª Sondagem", "3ª Sondagem", "STATUS MARÉ"]
-    if ano_sel == 2026: cols_header.insert(1, "Diagnóstico Atual")
+    if ano_sel == 2026: 
+        # Em 2026, o diagnóstico é a 3ª avaliação de 2025
+        cols_header.insert(1, "Diagnóstico (2025)")
 
-    html_tab = f"""<table style="width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border: 1px solid #eee; color: #2C3E50;">
-        <thead><tr style="background-color: #F8F9FA;">{"".join([f'<th style="padding:12px; border:1px solid #eee; font-size:12px;">{c}</th>' for c in cols_header])}</tr></thead>
+    html_tab = f"""<table style="width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border: 1px solid #eee;">
+        <thead><tr style="background-color: #F8F9FA;">{"".join([f'<th style="padding:12px; border:1px solid #eee; font-size:12px; color:black;">{c}</th>' for c in cols_header])}</tr></thead>
         <tbody>"""
     
-    # Puxa a lista de alunos do dicionário que criamos no carregamento inicial
-    alunos_te = sorted(st.session_state.get("alunos_te_dict", {}).keys())
-    
-    if not alunos_te:
-        # Fallback caso o dicionário não esteja pronto
-        alunos_te = sorted(df_h["ALUNO"].unique()) if "ALUNO" in df_h.columns else []
+    # Lista de alunos única
+    alunos_lista = sorted(df_h["ALUNO"].unique()) if "ALUNO" in df_h.columns else []
 
-    for al in alunos_te:
-        # Filtro em memória (Rápido)
-        dados_aluno = df_h[df_h["ALUNO"] == al]
-        dados_ano = dados_aluno[dados_aluno["ANO"].astype(str) == str(ano_sel)]
+    for al in alunos_lista:
+        # Filtra a linha do aluno para o ano selecionado
+        dados_aluno_ano = df_h[(df_h["ALUNO"] == al) & (df_h["ANO"].astype(str) == str(ano_sel))]
         
-        html_tab += f'<tr><td style="font-weight:bold; padding:10px; border:1px solid #eee; font-size:12px;">{al}</td>'
+        # Se não houver dados para este aluno neste ano, pulamos para o próximo
+        if dados_aluno_ano.empty:
+            continue
+
+        linha = dados_aluno_ano.iloc[0]
+        html_tab += f'<tr><td style="font-weight:bold; padding:10px; border:1px solid #eee; font-size:12px; color:#2C3E50;">{al}</td>'
         
-        # Coluna Diagnóstico Atual (Apenas para 2026)
+        # --- LÓGICA DIAGNÓSTICO 2026 ---
         if ano_sel == 2026:
-            d_ant = dados_aluno[(dados_aluno["ANO"].astype(str) == "2025") & (dados_aluno[col_etapa] == "Avaliação Final")]
-            if not d_ant.empty:
-                nv = d_ant["NIVEL"].iloc[0]
-                txt_nv = nv.split(". ")[1] if ". " in nv else nv
-                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv, "#eee")}; color:{get_text_color(nv)}; text-align:center; font-weight:bold; font-size:10px; border:1px solid #eee; padding:8px;">{txt_nv}</td>'
-            else: 
-                html_tab += '<td style="text-align:center; border:1px solid #eee; color:#ccc;">-</td>'
+            # Busca a avaliação final de 2025 para servir de diagnóstico
+            dados_2025 = df_h[(df_h["ALUNO"] == al) & (df_h["ANO"].astype(str) == "2025")]
+            val_diag = "-"
+            if not dados_2025.empty:
+                val_diag = dados_2025.iloc[0].get("3 AVALIAÇÃO", "-")
+            
+            cor = CORES_EXCLUSIVAS.get(val_diag, "#eee")
+            html_tab += f'<td style="background:{cor}; color:{get_text_color(val_diag)}; text-align:center; font-weight:bold; font-size:10px; border:1px solid #eee;">{val_diag}</td>'
 
-        # Colunas das Avaliações do Ano
-        for etapa in ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"]:
-            r = dados_ano[dados_ano[col_etapa] == etapa]
-            if not r.empty:
-                nv = r["NIVEL"].iloc[0]
-                txt_nv = nv.split(". ")[1] if ". " in nv else nv
-                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv, "#eee")}; color:{get_text_color(nv)}; text-align:center; font-weight:bold; border:1px solid #eee; font-size:11px; padding:8px;">{txt_nv}</td>'
-            else: 
-                html_tab += '<td style="border:1px solid #eee; background: #fafafa;"></td>'
+        # --- COLUNAS DE AVALIAÇÃO (1, 2 e 3) ---
+        colunas_planilha = ["1 AVALIAÇÃO", "2 AVALIAÇÃO", "3 AVALIAÇÃO"]
+        historico_niveis = []
 
-        # Coluna Status Maré
-        status_td = '<td style="border:1px solid #eee; text-align:center;">-</td>'
-        if not dados_ano.empty:
-            nv_fim = dados_ano["NIVEL"].iloc[-1]
-            status_td = f'<td style="border:1px solid #eee; background:#FDFDFD;">{get_status_mare_html(nv_fim, dados_ano["NIVEL"].tolist())}</td>'
+        for col in colunas_planilha:
+            nivel = str(linha.get(col, "")).strip()
+            if nivel and nivel != "nan" and nivel != "":
+                historico_niveis.append(nivel)
+                cor = CORES_EXCLUSIVAS.get(nivel, "#eee")
+                txt_c = get_text_color(nivel)
+                # Exibe apenas o texto após o número (ex: "Pré-Silábico")
+                label = nivel.split(". ")[1] if ". " in nivel else nivel
+                html_tab += f'<td style="background:{cor}; color:{txt_c}; text-align:center; font-weight:bold; border:1px solid #eee; font-size:10px; padding:8px;">{label}</td>'
+            else:
+                html_tab += '<td style="border:1px solid #eee; background:#fafafa;"></td>'
+
+        # --- COLUNA STATUS MARÉ ---
+        status_html = '<td style="border:1px solid #eee; text-align:center;">-</td>'
+        if historico_niveis:
+            status_html = f'<td style="border:1px solid #eee;">{get_status_mare_html(historico_niveis[-1], historico_niveis)}</td>'
         
-        html_tab += status_td + '</tr>'
+        html_tab += status_html + '</tr>'
     
     st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)
     

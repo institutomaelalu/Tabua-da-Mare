@@ -781,18 +781,25 @@ elif menu == "📖 Turno Estendido":
     if lista_filtrada:
         aluno_sel = st.selectbox(f"Selecione o Aluno:", lista_filtrada)
         
-        # IDENTIFICAÇÃO DA SALA COM COR DINÂMICA
+        # IDENTIFICAÇÃO DA SALA COM COR DINÂMICA (CORREÇÃO DE CORES)
         sala_raw = dict_alunos_geral.get(aluno_sel, "NÃO DEFINIDA")
         
-        # Lógica de Cor: Se for Ciranda do Mundo ou não encontrada, usa o Roxo (C_ROXO)
-        if "CIRAND" in sala_raw or "MUNDO" in sala_raw:
-            cor_pilula = C_ROXO
-        else:
-            # Busca no TURMAS_CONFIG (ex: SALA AZUL, SALA VERDE)
-            cor_pilula = TURMAS_CONFIG.get(sala_raw, {"cor": C_ROXO})["cor"]
+        # 1. Tenta encontrar a cor exata ou aproximada
+        cor_pilula = C_ROXO # Padrão
+        
+        if "AZUL" in sala_raw:
+            cor_pilula = C_AZUL
+        elif "VERDE" in sala_raw:
+            cor_pilula = C_VERDE
+        elif "ROSA" in sala_raw:
+            cor_pilula = C_ROSA
+        elif "AMARELA" in sala_raw or "AMARELO" in sala_raw:
+            cor_pilula = C_AMARELO
+        elif "CIRAND" in sala_raw or "MUNDO" in sala_raw:
+            cor_pilula = C_ROXO # Identidade do App
         
         st.markdown(f"""
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 25px; background: #f8f9fa; padding: 10px; border-radius: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 25px; background: #f8f9fa; padding: 10px; border-radius: 12px; border-left: 5px solid {cor_pilula};">
                 <span style="font-weight: bold; font-size: 15px; color: #444;">Sala de Origem:</span>
                 <span style="background-color: {cor_pilula}; color: white; padding: 6px 18px; 
                 border-radius: 50px; font-weight: 800; font-size: 13px; letter-spacing: 0.5px;
@@ -820,7 +827,7 @@ elif menu == "📖 Turno Estendido":
             
         novo_nv = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_ini)
 
-        with st.form("form_te_estendido_v2"):
+        with st.form("form_te_unificado_v3"):
             # Ano e Etapa conforme solicitado
             ano_form = st.selectbox("Ano Letivo da Avaliação:", [2026, 2025])
             etapa_av = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
@@ -830,7 +837,7 @@ elif menu == "📖 Turno Estendido":
             evs = EVIDENCIAS_POR_NIVEL.get(novo_nv, [])
             st.write(f"**Evidências observadas para {novo_nv}:**")
             cols_ev = st.columns(3)
-            selecionadas = [ev for i, ev in enumerate(evs) if cols_ev[i%3].checkbox(ev, key=f"ev_te_final_{i}")]
+            selecionadas = [ev for i, ev in enumerate(evs) if cols_ev[i%3].checkbox(ev, key=f"ev_final_te_{i}")]
             
             obs_txt = st.text_area("Observações Adicionais:")
             
@@ -850,7 +857,7 @@ elif menu == "📖 Turno Estendido":
                     st.cache_data.clear()
                     st.rerun()
     else:
-        st.warning("Nenhum aluno encontrado com este nome.")
+        st.warning("Nenhum aluno encontrado.")
 # --- ABA: DADOS - TURNO ESTENDIDO (ATUALIZADO COM CORES E LEGENDA) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("""

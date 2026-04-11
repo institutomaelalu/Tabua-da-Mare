@@ -5,6 +5,20 @@ import numpy as np
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
+# --- ADICIONAR ESTE BLOCO NO TOPO (Aprox. Linha 25) ---
+CORES_EXCLUSIVAS = {
+    "1. Pré-Silábico": "#FFDADA", 
+    "2. Silábico s/ Valor": "#FFE8D1", 
+    "3. Silábico c/ Valor": "#FFF9DB", 
+    "4. Silábico Alfabético": "#E3FAFC", 
+    "5. Alfabético Inicial": "#E3F9E5", 
+    "6. Alfabético Final": "#E7F5FF", 
+    "7. Alfabético Ortográfico": "#F3F0FF"
+}
+
+def get_text_color(nivel):
+    return "#2C3E50" # Cor do texto para os cards de alfabetização
+
 # =================================================================
 # 1. CONFIGURAÇÃO, CONSTANTES E ESTILO
 # =================================================================
@@ -494,24 +508,21 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                     st.cache_data.clear()
                     st.rerun()
 
-        with g_col2:
-            with st.popover("🤝 Registro de Padrinho", key="pad_popover", use_container_width=True):
+with g_col2:
+            with st.popover("🤝 Registro de Padrinho/Madrinha", key="pad_popover", use_container_width=True):
                 st.markdown("##### 🤝 Novo Apadrinhamento")
                 s_busca = st.selectbox("Selecione a Sala:", list(TURMAS_CONFIG.keys()), key="pad_sala")
                 
-                try:
-                    df_b = conn.read(spreadsheet=sheet_id, worksheet=s_busca).fillna("")
-                    df_b.columns = [str(c).strip().upper() for c in df_b.columns]
-                    
-                    filtro_vazios = ["", "-", "nan", "0", "NONE"]
-                    lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].astype(str).str.upper().isin(filtro_vazios)]["ALUNO"].unique())
-                    
-                    if lista_lib:
-                        nome_p = st.text_input("Nome do Padrinho/Madrinha")
-                        al_sel = st.selectbox("Escolha o Afilhado:", lista_lib)
-                        
-                        if st.button("Confirmar Apadrinhamento", use_container_width=True):
-                            if nome_p:
+                # O bloco abaixo deve estar EXATAMENTE com este recuo:
+                df_b = conn.read(spreadsheet=nome_planilha, worksheet=s_busca).fillna("")
+                # ... lógica de filtro ...
+                
+                nome_p = st.text_input("Nome do Padrinho/Madrinha")
+                al_sel = st.selectbox("Escolha o Afilhado:", lista_lib)
+                
+                if st.button("Confirmar Apadrinhamento", use_container_width=True):
+                    # Todo o código de salvamento aqui dentro com mais um Tab de recuo
+                                                if nome_p:
                                 idx = df_b[df_b["ALUNO"] == al_sel].index[0] + 2
                                 conn.update_cell(spreadsheet=sheet_id, worksheet=s_busca, row=idx, col=6, value=nome_p.upper())
                                 st.success("Registro concluído!")
@@ -523,6 +534,8 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                         st.info("Nenhum aluno sem padrinho nesta sala.")
                 except Exception as e:
                     st.error(f"Erro ao carregar aba: {e}")
+                    pass
+
 
         with g_col3:
             with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
@@ -535,19 +548,20 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 
                 if st.button("Confirmar Turno Estendido", use_container_width=True):
                     if selecionados:
-                        try:
-                            # Acesso via Client gspread para loop de append
-                            raw_id = st.secrets["connections"]["gsheets"]["spreadsheet"]
-                            s_id = raw_id.split("/d/")[-1].split("/")[0] if "/d/" in raw_id else raw_id
-                            sh = conn.client.open_by_key(s_id)
-                            ws = sh.worksheet("TURNO_ESTENDIDO")
-                            for aluno in selecionados:
-                                ws.append_row([aluno.upper(), s_est])
-                            st.success("Adicionados com sucesso!")
-                            st.cache_data.clear()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro: {e}")
+# --- AJUSTE NA FORMA DE ACESSAR O GSPREAD ---
+try:
+    # Em vez de tentar cavar o atributo, use o .client direto do gsheets_connection
+    client = conn.client 
+    
+    # IMPORTANTE: Como você mudou o segredo para o NOME da planilha, 
+    # use client.open() em vez de client.open_by_key()
+    nome_planilha = st.secrets["connections"]["gsheets"]["spreadsheet"]
+    sh = client.open(nome_planilha) 
+    
+    ws = sh.worksheet(s_busca) # Ou a variável da aba correspondente
+    # ... código de atualização continua igual ...
+except Exception as e:
+    st.error(f"Erro ao acessar planilha: {e}")
 
         with g_col4:
             with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
@@ -892,10 +906,10 @@ elif menu == "📊 Dados - Turno Estendido":
 
     # --- 1. LEGENDA DE NÍVEIS ---
     st.markdown("##### 📝 Legenda de Níveis")
-    cols_leg = st.columns(len(NIVEIS_ALF))
+        cols_leg = st.columns(len(NIVEIS_ALF))
     for i, nv in enumerate(NIVEIS_ALF):
-        cor_fundo = CORES_EXCLUSIVAS.get(nv, "#eee")
-        cor_txt = get_text_color(nv) 
+    nv = str(r.get("NÍVEL", "")).strip() # Garante que nv seja string e sem espaços
+    cor_fundo = CORES_EXCLUSIVAS.get(nv, "#eee") 
         
         cols_leg[i].markdown(f"""
             <div style="background-color:{cor_fundo}; color:{cor_txt}; padding:8px 2px; border-radius:10px; 

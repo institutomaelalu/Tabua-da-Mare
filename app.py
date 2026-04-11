@@ -447,7 +447,29 @@ elif menu == "📝 Alunos matriculados":
     sala_atual = st.session_state.sel_mat
     cor_h = TURMAS_CONFIG[sala_atual]["cor"]
     
-    # --- 1. CARREGAMENTO E FILTRAGEM (Mantido) ---
+    # 1. CSS PARA CORRIGIR O CHECKBOX E A FONTE (O segredo está aqui)
+    st.markdown(f"""
+        <style>
+            /* 1. Força a fonte Source Sans Pro 14px igual à imagem de referência */
+            [data-testid="stMarkdownContainer"] p {{
+                font-family: 'Source Sans Pro', sans-serif !important;
+                font-size: 14px !important;
+                color: #31333F !important;
+                margin: 0px !important;
+            }}
+            /* 2. Mata o espaço vazio do checkbox que causa o erro visual */
+            div[data-testid="stCheckbox"] label span {{
+                display: none !important;
+            }}
+            div[data-testid="stCheckbox"] {{
+                margin-top: -5px !important;
+                display: flex;
+                justify-content: center;
+            }}
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- CARREGAMENTO E FILTRAGEM ---
     df_g = conn.read(worksheet="GERAL").fillna("")
     df_g.columns = [str(c).strip().upper() for c in df_g.columns]
     df_s = conn.read(worksheet=sala_atual).fillna("")
@@ -455,24 +477,12 @@ elif menu == "📝 Alunos matriculados":
     tn, cm = render_filtros(df_g, "mat")
     
     df_f = df_s.copy()
-    if tn != "Todos":
-        df_f = df_f[df_f["TURMA"] == tn]
-    if cm != "Todas":
-        df_f = df_f[df_f["COMUNIDADE"] == cm]
+    if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
+    if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-    # --- 2. ESTATÍSTICAS (Estilo Suave) ---
+    # --- CABEÇALHO PADRONIZADO ---
     st.markdown(f"""
-        <div style="background-color: #f8f9fa; padding: 12px; border-radius: 10px; border-left: 5px solid {cor_h}; margin-bottom: 20px; font-family: 'Source Sans Pro', sans-serif;">
-            <span style="font-size: 14px; color: #666;">📊 <b>Estatísticas da Sala:</b></span><br>
-            <span style="font-size: 15px; color: #31333F;">
-                👥 Total na <b>{sala_atual}</b>: {len(df_s)} alunos | 🔍 Filtro: <b>{len(df_f)}</b>
-            </span>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # --- 3. CABEÇALHO (Igual à Gestão) ---
-    st.markdown(f"""
-        <div style="background-color:{cor_h}; color: white; padding: 12px; border-radius: 5px 5px 0 0; display: flex; font-family: 'Source Sans Pro', sans-serif; font-weight: bold; font-size: 14px; text-transform: uppercase;">
+        <div style="background-color:{cor_h}; color: white; padding: 12px; border-radius: 5px 5px 0 0; display: flex; font-weight: bold; font-size: 14px; text-transform: uppercase; font-family: 'Source Sans Pro', sans-serif;">
             <div style="flex: 0.8; text-align: center;">SEL.</div>
             <div style="flex: 3;">ALUNO</div>
             <div style="flex: 1;">IDADE</div>
@@ -482,47 +492,32 @@ elif menu == "📝 Alunos matriculados":
     
     selecionados = []
 
-    # --- 4. LISTAGEM PADRONIZADA (Fonte 14px Source Sans Pro) ---
+    # --- LISTAGEM COM ALINHAMENTO CORRIGIDO ---
     for i, r in df_f.iterrows():
         c0, c1, c2, c3 = st.columns([0.8, 3, 1, 2])
         
         n_l = str(r.get("ALUNO", "")).replace("**", "").strip()
-        idade = str(r.get("IDADE", ""))
-        comunidade = str(r.get("COMUNIDADE", ""))
-        
-        # Estilo idêntico ao da imagem analisada
-        estilo_celula = "font-family: 'Source Sans Pro', sans-serif; font-size: 14px; color: #31333F; margin-top: 8px; margin-bottom: 8px;"
         
         with c0:
             if n_l in st.session_state.get("alunos_te_dict", {}): 
-                st.markdown(f'<p style="text-align:center; {estilo_celula}">✍️📖</p>', unsafe_allow_html=True)
+                st.markdown('<p style="text-align:center;">✍️📖</p>', unsafe_allow_html=True)
             else:
-                # Alinhamento do checkbox para não empurrar a linha
-                st.markdown('<div style="margin-top: -3px; text-align: center;">', unsafe_allow_html=True)
-                if st.checkbox("", key=f"chk_mat_{sala_atual}_{i}"): 
+                # Checkbox agora limpo pelo CSS lá de cima
+                if st.checkbox("", key=f"m_{sala_atual}_{i}"): 
                     selecionados.append(n_l)
-                st.markdown('</div>', unsafe_allow_html=True)
         
-        with c1:
-            st.markdown(f'<p style="{estilo_celula}">{n_l}</p>', unsafe_allow_html=True)
-        with c2:
-            st.markdown(f'<p style="{estilo_celula}">{idade}</p>', unsafe_allow_html=True)
-        with c3:
-            st.markdown(f'<p style="{estilo_celula}">{comunidade}</p>', unsafe_allow_html=True)
+        with c1: st.markdown(f'<p>{n_l}</p>', unsafe_allow_html=True)
+        with c2: st.markdown(f'<p>{r.get("IDADE", "")}</p>', unsafe_allow_html=True)
+        with c3: st.markdown(f'<p>{r.get("COMUNIDADE", "")}</p>', unsafe_allow_html=True)
         
-        # Linha separadora discreta
-        st.markdown('<hr style="margin:0; border:0; border-bottom: 1px solid #eee;">', unsafe_allow_html=True)
+        st.markdown('<hr style="margin:8px 0; border:0; border-bottom: 1px solid #f0f0f0;">', unsafe_allow_html=True)
 
-    # --- 5. AÇÃO EM MASSA ---
+    # --- BOTÃO DE MATRÍCULA ---
     if selecionados:
-        st.write("")
-        st.markdown(f"""<style> div.stButton > button {{ background-color: {cor_h} !important; color: white !important; font-weight: bold; width: 100%; border-radius: 8px; }} </style>""", unsafe_allow_html=True)
-        if st.button(f"🚀 Matricular {len(selecionados)} aluno(s)"):
-            if "alunos_te_dict" not in st.session_state:
-                st.session_state["alunos_te_dict"] = {}
-            for al in selecionados:
-                st.session_state["alunos_te_dict"][al] = sala_atual
-            st.success(f"✅ Sucesso!")
+        st.markdown(f"""<style> div.stButton > button {{ background-color: {cor_h} !important; color: white !important; width: 100%; font-weight: bold; }} </style>""", unsafe_allow_html=True)
+        if st.button(f"🚀 Confirmar Matrícula de {len(selecionados)} aluno(s)"):
+            if "alunos_te_dict" not in st.session_state: st.session_state["alunos_te_dict"] = {}
+            for al in selecionados: st.session_state["alunos_te_dict"][al] = sala_atual
             st.rerun()
 elif menu == "🤝 Gestão de apadrinhamento":
     st.markdown(f"### 🤝 Gestão de Apadrinhamento")

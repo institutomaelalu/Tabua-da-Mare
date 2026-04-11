@@ -532,26 +532,36 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 
                 if st.button("Confirmar Turno Estendido", use_container_width=True):
                     try:
-                        # Lógica Robusta para acessar o Cliente de Escrita
+                        # 1. Localiza o cliente gspread de forma ultra-segura
                         client = None
-                        if hasattr(conn, "_instance") and hasattr(conn._instance, "client"):
-                            client = conn._instance.client
-                        elif hasattr(conn, "client"):
+                        
+                        # Tentativa A: Atributo client direto (comum em versões recentes)
+                        if hasattr(conn, "client"):
                             client = conn.client
+                        # Tentativa B: Através do _instance (comum em versões estáveis)
+                        elif hasattr(conn, "_instance") and hasattr(conn._instance, "client"):
+                            client = conn._instance.client
+                        # Tentativa C: Através da session
                         elif hasattr(conn, "session") and hasattr(conn.session, "client"):
                             client = conn.session.client
                         
-                        if client:
-                            sh = client.open_by_key(st.secrets["connections"]["gsheets"]["spreadsheet"])
+                        if client is None:
+                            st.error("Não foi possível acessar o driver de escrita. Verifique as configurações.")
+                        else:
+                            # 2. Acesso à planilha - O segredo está em usar o client correto
+                            spreadsheet_id = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                            sh = client.open_by_key(spreadsheet_id)
                             ws = sh.worksheet("TURNO_ESTENDIDO")
+                            
                             for aluno in selecionados:
                                 ws.append_row([aluno.upper(), s_est])
+                            
                             st.success(f"{len(selecionados)} alunos adicionados!")
                             st.cache_data.clear()
                             st.rerun()
-                        else:
-                            st.error("Erro interno: Cliente de escrita não encontrado.")
+                            
                     except Exception as e:
+                        # Se falhar o open_by_key, tentamos por título como último recurso
                         st.error(f"Erro ao salvar: {e}")
 
         with g_col4:
@@ -574,9 +584,6 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                     st.rerun()
 
     st.divider()
-
-    # --- BOTÕES DAS SALAS ---
-    render_botoes_salas("btn_pad", "sel_pad")
     
     # Restante da lógica da tabela (FILTROS E VISUALIZAÇÃO) permanece igual...
 

@@ -257,11 +257,11 @@ st.markdown(f"""
 
 # 2. Funções de Dados
 TURMAS_CONFIG = {
-    "SALA ROSA": {"cor": C_ROSA, "key": "sala_rosa"},
-    "SALA AMARELA": {"cor": C_AMARELO, "key": "sala_amarela"},
-    "SALA VERDE": {"cor": C_VERDE, "key": "sala_verde"},
-    "SALA AZUL": {"cor": C_AZUL, "key": "sala_azul"},
-    "CIRAND. MUNDO": {"cor": C_ROXO, "key": "cirand_mundo"},
+    "ROSA": {"cor": C_ROSA, "icon": "🌸"},
+    "AMARELA": {"cor": C_AMARELO, "icon": "⭐"},
+    "VERDE": {"cor": C_VERDE, "icon": "🌿"},
+    "AZUL": {"cor": C_AZUL, "icon": "💧"},
+    "CIRAND. MUNDO": {"cor": C_ROXO, "icon": "🌍"}
 }
 
 def get_gspread_client():
@@ -319,14 +319,41 @@ def aplicar_filtros(df_alvo, df_geral, tn, cm):
     return df_f
 
 def render_botoes_salas(key_prefix, session_key, salas_permitidas=None):
+    # 1. Filtra as salas e garante que não haja erros de nomes inexistentes
     salas = salas_permitidas if salas_permitidas else list(TURMAS_CONFIG.keys())
+    
+    # Criamos as colunas
     cols = st.columns(len(salas))
+    
     for i, sala in enumerate(salas):
-        cfg = TURMAS_CONFIG[sala]
-        op = "1.0" if st.session_state[session_key] == sala else "0.3"
-        st.markdown(f'<style>div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button {{ background-color: {cfg["cor"]} !important; color: white !important; opacity: {op}; }}</style>', unsafe_allow_html=True)
-        if cols[i].button(sala, key=f"{key_prefix}_{sala}"):
-            st.session_state[session_key] = sala; st.rerun()
+        # 2. Busca configuração com fallback (seguro contra KeyError)
+        # Se a sala não existir no dicionário, usa cinza (#566573)
+        cfg = TURMAS_CONFIG.get(sala.strip(), {"cor": "#566573", "icon": "🏫"})
+        
+        # 3. Lógica de Estilo (Opacidade e Borda para o selecionado)
+        is_active = st.session_state.get(session_key) == sala
+        op = "1.0" if is_active else "0.4"
+        borda = "2px solid black" if is_active else "1px solid #ccc"
+        
+        # Aplicando o CSS dinâmico
+        st.markdown(f'''
+            <style>
+                div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button {{
+                    background-color: {cfg["cor"]} !important;
+                    color: white !important;
+                    opacity: {op};
+                    border: {borda} !important;
+                    font-weight: bold !important;
+                    height: 45px;
+                }}
+            </style>
+        ''', unsafe_allow_html=True)
+        
+        # 4. Renderização do Botão
+        label = f"{cfg.get('icon', '')} {sala}"
+        if cols[i].button(label, key=f"{key_prefix}_{sala}", use_container_width=True):
+            st.session_state[session_key] = sala
+            st.rerun()
 
 def criar_grafico_mare(categorias, valores):
     fig = go.Figure(go.Scatter(
@@ -781,11 +808,19 @@ elif menu == "📖 Turno Estendido":
     st.markdown("---")
 
 # --- SELEÇÃO DE ALUNO ---
-    # Forçamos as salas para garantir que os botões coloridos apareçam sempre
+# Em vez de pegar direto da planilha, filtramos apenas as salas que existem no seu APP
+salas_na_planilha = df_alf["SALA"].unique().tolist()
+salas_te = [s for s in salas_na_planilha if s in TURMAS_CONFIG.keys()]
+
+if not salas_te:
+    # Se a planilha estiver vazia, mostra as salas padrão para você poder matricular
     salas_te = ["ROSA", "AMARELA", "VERDE", "AZUL", "CIRAND. MUNDO"]
-    
-    # Chamamos a renderização dos botões (Certifique-se que essa função usa salas_te)
-    render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_te)
+
+# Garante que a seleção atual seja válida para não dar erro no próximo clique
+if st.session_state.get("sel_te") not in salas_te:
+    st.session_state.sel_te = salas_te[0]
+
+render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_te)
     
     # Filtra alunos da sala selecionada que já existem na planilha
     al_te = df_alf[df_alf["SALA"] == st.session_state.sel_te]["ALUNO"].unique().tolist()

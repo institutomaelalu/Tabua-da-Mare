@@ -525,27 +525,28 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                     st.success("Registro concluído!"); st.cache_data.clear()
 
         with g_col3:
-            with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
+with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
                 st.markdown("##### ⏳ Matrícula Estendida")
                 s_est = st.selectbox("Origem dos Alunos:", list(TURMAS_CONFIG.keys()), key="sel_est_sala")
                 df_est = conn.read(worksheet=s_est).fillna("")
                 lista_est = sorted(df_est["ALUNO"].unique())
                 selecionados = st.multiselect("Selecione os alunos:", lista_est)
+                
                 if st.button("Confirmar Turno Estendido", use_container_width=True):
                     try:
-                    # Acessa a planilha específica através do cliente gspread
-                    sh = conn._instance.client.open_by_key(st.secrets["connections"]["gsheets"]["spreadsheet"])
-                    ws = sh.worksheet("TURNO_ESTENDIDO")
-                    
-                    for aluno in selecionados:
-                        # Adiciona a linha diretamente via gspread
-                        ws.append_row([aluno.upper(), s_est])
-                    
-                    st.success(f"{len(selecionados)} alunos adicionados ao Turno Estendido!")
-                    st.cache_data.clear()
-                    st.rerun() # Atualiza a tela para mostrar os novos dados
-                except Exception as e:
-                    st.error(f"Erro ao salvar: {e}")
+                        # AGORA IDENTADO: Tudo dentro do try precisa de 4 espaços a mais
+                        sh = conn._instance.client.open_by_key(st.secrets["connections"]["gsheets"]["spreadsheet"])
+                        ws = sh.worksheet("TURNO_ESTENDIDO")
+                        
+                        for aluno in selecionados:
+                            # Tudo dentro do for precisa de mais 4 espaços
+                            ws.append_row([aluno.upper(), s_est])
+                        
+                        st.success(f"{len(selecionados)} alunos adicionados ao Turno Estendido!")
+                        st.cache_data.clear()
+                        st.rerun() 
+                    except Exception as e:
+                        st.error(f"Erro ao salvar: {e}")
         with g_col4:
             with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
                 st.markdown("##### ⚠️ Zona de Exclusão")

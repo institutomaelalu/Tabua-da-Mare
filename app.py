@@ -523,15 +523,27 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 st.markdown("##### 🤝 Novo Apadrinhamento")
                 s_busca = st.selectbox("Selecione a Sala:", list(TURMAS_CONFIG.keys()), key="pad_sala")
 try:
+    # 1. Tenta ler a aba selecionada
     df_b = conn.read(spreadsheet=sheet_id, worksheet=s_busca).fillna("")
     df_b.columns = [str(c).strip().upper() for c in df_b.columns]
 except Exception as e:
+    # 2. Se falhar (aba não existe), cria um DataFrame vazio com as colunas necessárias
     st.error(f"A aba '{s_busca}' não foi encontrada na planilha.")
-    df_b = pd.DataFrame()
-                df_b.columns = [str(c).strip().upper() for c in df_b.columns]
-                lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].isin(["", "-", "nan", "0"])]["ALUNO"].unique())
-                nome_p = st.text_input("Nome do Padrinho/Madrinha")
-                al_sel = st.selectbox("Escolha o Afilhado:", lista_lib)
+    df_b = pd.DataFrame(columns=["ALUNO", "PADRINHO/MADRINHA"])
+
+# 3. Agora o código segue NORMALMENTE (alinhado fora do try/except)
+# Verificamos se o DataFrame não está vazio para processar a lista
+if not df_b.empty:
+    # Filtra alunos sem padrinho (valores vazios, traço ou zero)
+    col_pad = "PADRINHO/MADRINHA" 
+    filtro_vazios = ["", "-", "nan", "0", "None"]
+    
+    lista_lib = sorted(df_b[df_b[col_pad].astype(str).isin(filtro_vazios)]["ALUNO"].unique())
+    
+    nome_p = st.text_input("Nome do Padrinho/Madrinha")
+    al_sel = st.selectbox("Escolha o Afilhado:", lista_lib)
+else:
+    st.warning("Não há dados disponíveis para esta sala.")
                 
                 if st.button("Confirmar Apadrinhamento", use_container_width=True):
                     idx = df_b[df_b["ALUNO"] == al_sel].index[0] + 2

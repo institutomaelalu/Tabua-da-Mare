@@ -428,55 +428,57 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
     # Configuração de Cores (Identidade Visual)
     cor_rosa, cor_amarela, cor_verde, cor_azul, cor_lavanda = "#F783AC", "#FFE066", "#A9E34B", "#99E9F2", "#D0BFFF"
 
-   # --- CSS PARA INVERSÃO DE CORES (ULTRA-ESPECÍFICO) ---
+   # --- CSS PARA INVERSÃO DE CORES (ULTRA-ESPECÍFICO E CORRIGIDO) ---
     st.markdown(f"""
         <style>
-        /* 1. BOTÕES DE GESTÃO (Popovers Superiores) - FORÇAR BRANCO TOTAL */
+        /* 1. BOTÕES DE GESTÃO (Popovers Superiores) - FUNDO BRANCO E TEXTO COLORIDO */
         div[data-testid="stPopover"] > button {{
             background-color: white !important;
-            background-image: none !important; /* Remove gradientes do tema */
+            background-image: none !important; /* Remove o gradiente colorido original */
             border-radius: 8px;
             transition: 0.3s;
             height: 3.2rem;
             box-shadow: none !important;
         }}
         
-        /* Cores específicas para texto e bordas dos botões brancos */
+        /* Aplica bordas e cores de texto específicas para cada botão */
         div[key="mat_popover"] > button {{ color: {cor_rosa} !important; border: 2px solid {cor_rosa} !important; }}
         div[key="pad_popover"] > button {{ color: {cor_amarela} !important; border: 2px solid {cor_amarela} !important; }}
         div[key="est_popover"] > button {{ color: {cor_verde} !important; border: 2px solid {cor_verde} !important; }}
         div[key="del_popover"] > button {{ color: {cor_azul} !important; border: 2px solid {cor_azul} !important; }}
 
-        /* Texto em Negrito para os Popovers */
+        /* Garante que o texto dentro dos popovers (botão branco) seja Negrito e colorido */
         div[data-testid="stPopover"] button p {{
             font-weight: 800 !important;
-            color: inherit !important;
+            color: inherit !important; /* Herda a cor definida acima */
         }}
 
-        /* 2. BOTÕES DE SELEÇÃO DE SALA (Inferiores) - COLORIDOS COM TEXTO BRANCO E NEGRITO */
+        /* 2. BOTÕES DE SELEÇÃO DE SALA (Inferiores) - COLORIDOS COM TEXTO BRANCO EM NEGRITO */
+        /* O prefixo 'btn_pad' deve bater com o que você usa na função render_botoes_salas */
         div[key^="btn_pad"] > button {{
             color: white !important;
             border: none !important;
             box-shadow: 2px 2px 5px rgba(0,0,0,0.1) !important;
         }}
         
-        /* O SEGREDO DO NEGRITO: Mirar no parágrafo dentro do botão de sala */
+        /* FORÇANDO NEGRITO NOS BOTÕES DE SALA (Caminho completo do elemento) */
         div[key^="btn_pad"] button div[data-testid="stMarkdownContainer"] p {{
-            font-weight: 800 !important;
+            font-weight: 900 !important;
             color: white !important;
+            -webkit-text-stroke: 0.5px white; /* Reforço visual do negrito */
         }}
 
-        /* Cores de fundo dos botões de sala */
+        /* Cores de fundo específicas para as salas */
         div[key$="SALA ROSA"] > button {{ background-color: {cor_rosa} !important; }}
         div[key$="SALA AMARELA"] > button {{ background-color: {cor_amarela} !important; }}
         div[key$="SALA VERDE"] > button {{ background-color: {cor_verde} !important; }}
         div[key$="SALA AZUL"] > button {{ background-color: {cor_azul} !important; }}
         div[key$="CIRAND. MUNDO"] > button {{ background-color: {cor_lavanda} !important; }}
 
-        /* Hover para os botões brancos (Gestão) */
-        div[data-testid="stPopover"] > button:hover {{
-            filter: brightness(0.95);
-            background-color: #fdfdfd !important;
+        /* Efeito de hover para manter o padrão visual */
+        div[key^="btn_pad"] > button:hover {{
+            filter: brightness(0.9);
+            color: white !important;
         }}
         </style>
     """, unsafe_allow_html=True)

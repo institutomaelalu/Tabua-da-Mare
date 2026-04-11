@@ -257,11 +257,11 @@ st.markdown(f"""
 
 # 2. Funções de Dados
 TURMAS_CONFIG = {
-    "ROSA": {"cor": C_ROSA, "icon": "🌸"},
-    "AMARELA": {"cor": C_AMARELO, "icon": "⭐"},
-    "VERDE": {"cor": C_VERDE, "icon": "🌿"},
-    "AZUL": {"cor": C_AZUL, "icon": "💧"},
-    "CIRAND. MUNDO": {"cor": C_ROXO, "icon": "🌍"}
+    "SALA ROSA": {"cor": C_ROSA, "key": "sala_rosa"},
+    "SALA AMARELA": {"cor": C_AMARELO, "key": "sala_amarela"},
+    "SALA VERDE": {"cor": C_VERDE, "key": "sala_verde"},
+    "SALA AZUL": {"cor": C_AZUL, "key": "sala_azul"},
+    "CIRAND. MUNDO": {"cor": C_ROXO, "key": "cirand_mundo"},
 }
 
 def get_gspread_client():
@@ -319,41 +319,14 @@ def aplicar_filtros(df_alvo, df_geral, tn, cm):
     return df_f
 
 def render_botoes_salas(key_prefix, session_key, salas_permitidas=None):
-    # 1. Filtra as salas e garante que não haja erros de nomes inexistentes
     salas = salas_permitidas if salas_permitidas else list(TURMAS_CONFIG.keys())
-    
-    # Criamos as colunas
     cols = st.columns(len(salas))
-    
     for i, sala in enumerate(salas):
-        # 2. Busca configuração com fallback (seguro contra KeyError)
-        # Se a sala não existir no dicionário, usa cinza (#566573)
-        cfg = TURMAS_CONFIG.get(sala.strip(), {"cor": "#566573", "icon": "🏫"})
-        
-        # 3. Lógica de Estilo (Opacidade e Borda para o selecionado)
-        is_active = st.session_state.get(session_key) == sala
-        op = "1.0" if is_active else "0.4"
-        borda = "2px solid black" if is_active else "1px solid #ccc"
-        
-        # Aplicando o CSS dinâmico
-        st.markdown(f'''
-            <style>
-                div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button {{
-                    background-color: {cfg["cor"]} !important;
-                    color: white !important;
-                    opacity: {op};
-                    border: {borda} !important;
-                    font-weight: bold !important;
-                    height: 45px;
-                }}
-            </style>
-        ''', unsafe_allow_html=True)
-        
-        # 4. Renderização do Botão
-        label = f"{cfg.get('icon', '')} {sala}"
-        if cols[i].button(label, key=f"{key_prefix}_{sala}", use_container_width=True):
-            st.session_state[session_key] = sala
-            st.rerun()
+        cfg = TURMAS_CONFIG[sala]
+        op = "1.0" if st.session_state[session_key] == sala else "0.3"
+        st.markdown(f'<style>div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button {{ background-color: {cfg["cor"]} !important; color: white !important; opacity: {op}; }}</style>', unsafe_allow_html=True)
+        if cols[i].button(sala, key=f"{key_prefix}_{sala}"):
+            st.session_state[session_key] = sala; st.rerun()
 
 def criar_grafico_mare(categorias, valores):
     fig = go.Figure(go.Scatter(
@@ -753,6 +726,162 @@ elif menu == "📊 Avaliação da Tábua da Maré":
                     st.error("Por favor, selecione um aluno.")
     else:
         st.warning(f"Nenhum aluno encontrado na {sala_atual}. Verifique se a aba da sala na planilha tem a coluna 'ALUNO'.")
+# --- ABA: TURNO ESTENDIDO ---
+elif menu == "📖 Turno Estendido":
+    st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
+
+    try:
+        # Chamada simplificada usando a chave do secrets
+        df_h = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
+    except Exception as e:
+        st.error(f"Erro ao conectar com a planilha: {e}")
+        st.stop()
+
+    # --- LÓGICA DE ANOS DINÂMICOS ---
+    if "Ano" not in df_h.columns:
+        df_h["Ano"] = 2026
+
+    # Converte para numérico para evitar erros de comparação
+    df_h["Ano"] = pd.to_numeric(df_h["Ano"], errors='coerce').fillna(2026).astype(int)
+    anos_na_planilha = sorted(df_h["Ano"].unique().tolist())
+    
+    if "lista_anos_te" not in st.session_state:
+        st.session_state.lista_anos_te = anos_na_planilha if anos_na_planilha else [2025, 2026]
+    
+    if "ano_registro_te" not in st.session_state: 
+        st.session_state.ano_registro_te = st.session_state.lista_anos_te[-1]
+
+    st.write("**Ano da Avaliação:**")
+    cols_anos_all = st.columns([0.15] * len(st.session_state.lista_anos_te) + [0.1, 0.6])
+    
+    cores_interface_anos = {2025: "#2E86C1", 2026: "#28B463", 2027: "#E67E22", 2028: "#8E44AD"}
+
+    for i, ano in enumerate(st.session_state.lista_anos_te):
+        is_active = st.session_state.ano_registro_te == ano
+        cor_base = cores_interface_anos.get(ano, "#34495E")
+        cor_btn = cor_base if is_active else "#D5DBDB"
+        txt_cor = "white" if is_active else "#566573"
+        
+        if cols_anos_all[i].button(f"📅 {ano}", key=f"btn_reg_ano_{ano}", use_container_width=True):
+            st.session_state.ano_registro_te = ano
+            st.rerun()
+        
+        st.markdown(f"<style>div[data-testid='stHorizontalBlock'] div:nth-child({i+1}) button {{ background-color: {cor_btn} !important; color: {txt_cor} !important; border: {'2px solid black' if is_active else '1px solid #ccc'} !important; }}</style>", unsafe_allow_html=True)
+
+    with cols_anos_all[len(st.session_state.lista_anos_te)].popover("➕"):
+        novo_ano_input = st.number_input("Digite o novo ano:", min_value=2024, max_value=2100, value=st.session_state.lista_anos_te[-1] + 1)
+        if st.button("Confirmar Novo Ano"):
+            if novo_ano_input not in st.session_state.lista_anos_te:
+                st.session_state.lista_anos_te.append(novo_ano_input)
+                st.session_state.lista_anos_te.sort()
+                st.session_state.ano_registro_te = novo_ano_input
+                st.rerun()
+
+    st.write(f"Registrando para o ano letivo: **{st.session_state.ano_registro_te}**")
+    st.markdown("---")
+
+# --- SELEÇÃO DE ALUNO ---
+    # Forçamos as salas para garantir que os botões coloridos apareçam sempre
+    salas_te = ["ROSA", "AMARELA", "VERDE", "AZUL", "CIRAND. MUNDO"]
+    
+    # Chamamos a renderização dos botões (Certifique-se que essa função usa salas_te)
+    render_botoes_salas("btn_te", "sel_te", salas_permitidas=salas_te)
+    
+    # Filtra alunos da sala selecionada que já existem na planilha
+    al_te = df_alf[df_alf["SALA"] == st.session_state.sel_te]["ALUNO"].unique().tolist()
+    
+    if not al_te:
+        st.warning("Selecione a sala ou matricule alunos nesta turma.")
+        al = None
+    else:
+        al = st.selectbox("Aluno:", sorted(al_te))
+        
+        # --- O SEGREDO DO HISTÓRICO POR ANO ---
+        ano_ativo = int(st.session_state.ano_registro_te)
+        # Busca histórico filtrando por NOME e por ANO selecionado no botão
+        dados_aluno = df_alf[(df_alf["ALUNO"] == al) & (df_alf["ANO"] == ano_ativo)]
+        
+        # diag agora contém apenas os dados do ano que está no topo
+        diag = dados_aluno.iloc[-1] if not dados_aluno.empty else None
+        
+        # --- TRILHA VISUAL ---
+        st.markdown("""<style>
+            .trilha-container { display: flex; align-items: center; justify-content: center; gap: 0px; margin: 10px 0; padding: 5px 0; overflow-x: auto; }
+            .caixa-trilha-ajustada { padding: 6px 4px; border-radius: 10px; text-align: center; font-size: 11px; font-weight: bold; min-width: 110px; height: 55px; display: flex; align-items: center; justify-content: center; line-height: 1.1; box-shadow: 1px 1px 3px rgba(0,0,0,0.05); flex-shrink: 0; }
+            .seta-trilha { font-weight: bold; color: #D5DBDB; font-size: 16px; margin: 0 -5px; z-index: 1; }
+        </style>""", unsafe_allow_html=True)
+
+        ht = '<div class="trilha-container">'
+        for i, n_t in enumerate(NIVEIS_ALF):
+            nivel_atual_planilha = diag["Diagnóstico"] if diag is not None else ""
+            is_current = (nivel_atual_planilha == n_t)
+            
+            cor_bg = CORES_EXCLUSIVAS.get(n_t, "#eee")
+            cor_txt = get_text_color(n_t)
+            borda = "3px solid #2C3E50" if is_current else "1px solid rgba(0,0,0,0.1)"
+            opacidade = "1.0" if is_current else "0.65"
+            
+            ht += f'<div class="caixa-trilha-ajustada" style="background-color:{cor_bg}; color:{cor_txt}; border:{borda}; opacity:{opacidade};">{n_t.split(". ")[1]}</div>'
+            if i < len(NIVEIS_ALF)-1: ht += '<div class="seta-trilha">→</div>'
+        st.markdown(ht + '</div>', unsafe_allow_html=True)
+
+        # --- FORMULÁRIO DE SALVAMENTO ---
+        try:
+            idx_inicial = NIVEIS_ALF.index(diag["Diagnóstico"]) if (diag is not None and diag["Diagnóstico"] in NIVEIS_ALF) else 0
+        except:
+            idx_inicial = 0
+            
+        nV = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_inicial)
+
+        with st.form("f_alf_nuvem"):
+            tipo = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
+            evidencias_atuais = EVIDENCIAS_POR_NIVEL.get(nV, [])
+            
+            st.write(f"**Evidências observadas para {nV}:**")
+            e_cols = st.columns(3)
+            s_ev = []
+            for i, ev in enumerate(evidencias_atuais):
+                if e_cols[i % 3].checkbox(ev, key=f"chk_{nV}_{i}"):
+                    s_ev.append(ev)
+            
+            obs = st.text_area("Observações Adicionais:")
+            
+if st.form_submit_button("🚀 Salvar na Planilha Google"):
+                try:
+                    client = get_gspread_client_seguro()
+                    if client:
+                        sh = client.open_by_key(ID_PLANILHA)
+                        ws = sh.worksheet("TURNO_ESTENDIDO")
+                        
+                        # Monta a linha para o Sheets
+                        # ALUNO, SALA, 1 AVAL, 2 AVAL, 3 AVAL, ANO, DIAGNÓSTICO, EVIDÊNCIAS, OBS
+                        tipo_map = {"1ª Avaliação": 2, "2ª Avaliação": 3, "Avaliação Final": 4}
+                        col_index = tipo_map.get(tipo, 2)
+                        
+                        nova_linha = [al, st.session_state.sel_te, "", "", "", ano_ativo, nV, ", ".join(s_ev), obs]
+                        nova_linha[col_index] = "OK" # Marca o período avaliado
+                        
+                        ws.append_row(nova_linha)
+                        st.success(f"Avaliação de {ano_ativo} salva com sucesso!")
+                        st.cache_data.clear()
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Erro técnico ao salvar: {e}")
+                
+                sucesso = registrar_turno_estendido(
+                    aluno=al,
+                    sala=st.session_state.sel_te,
+                    avaliacao_tipo=tipo_map.get(tipo),
+                    nivel=nV,
+                    evidencias_list=s_ev,
+                    obs=obs,
+                    ano=int(st.session_state.ano_registro_te)
+                )
+                
+                if sucesso:
+                    st.success("Dados sincronizados com sucesso!")
+                    st.cache_data.clear() 
+                    st.rerun()
 # --- ABA: DADOS - TURNO ESTENDIDO (ATUALIZADO COM CORES E LEGENDA) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("""
@@ -878,6 +1007,7 @@ elif menu == "📊 Dados - Turno Estendido":
     
     st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)
     st.markdown("---")
+    
 elif menu == "📈 Indicadores pedagógicos":
 
     st.markdown(f"### 📈 Indicadores")

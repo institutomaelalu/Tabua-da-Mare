@@ -444,114 +444,96 @@ elif menu == "📝 Alunos matriculados":
     st.markdown(f"### 📋 Quadro de Alunos Matriculados")
     render_botoes_salas("btn_mat", "sel_mat")
     
-    # --- 1. CONTADORES (Logo abaixo dos botões) ---
     sala_atual = st.session_state.sel_mat
     cor_h = TURMAS_CONFIG[sala_atual]["cor"]
     
-    # Lemos a aba GERAL e a aba da SALA selecionada
+    # --- 1. CARREGAMENTO E FILTRAGEM ---
     df_g = conn.read(worksheet="GERAL").fillna("")
     df_g.columns = [str(c).strip().upper() for c in df_g.columns]
     
     df_s = conn.read(worksheet=sala_atual).fillna("")
     df_s.columns = [str(c).strip().upper() for c in df_s.columns]
 
-    # Renderiza filtros baseados na aba GERAL
     tn, cm = render_filtros(df_g, "mat")
     
-    # Filtragem dos dados da sala para o cálculo
     df_f = df_s.copy()
     if tn != "Todos":
         df_f = df_f[df_f["TURMA"] == tn]
     if cm != "Todas":
         df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-    # Exibição das métricas estilizadas
+    # --- 2. CONTADORES (Estilo Clean) ---
     st.markdown(f"""
-        <div style="background-color: #f8f9fa; padding: 12px; border-radius: 10px; border-left: 5px solid {cor_h}; margin-bottom: 20px; font-family: 'Source Sans Pro', sans-serif;">
-            <span style="font-size: 14px; color: #666;">📊 <b>Estatísticas da Sala:</b></span><br>
-            <span style="font-size: 16px; color: #333;">👥 Total na <b>{sala_atual}</b>: {len(df_s)} alunos</span> | 
-            <span style="font-size: 16px; color: #333;">🔍 No filtro atual (<b>{tn}</b>): <b>{len(df_f)}</b> alunos</span>
+        <div style="background-color: #f8f9fa; padding: 12px; border-radius: 10px; border-left: 5px solid {cor_h}; margin-bottom: 20px;">
+            <span style="font-size: 14px; color: #666; font-family: 'Source Sans Pro', sans-serif;">📊 <b>Estatísticas da Sala:</b></span><br>
+            <span style="font-size: 16px; color: #333; font-family: 'Source Sans Pro', sans-serif;">
+                👥 Total na <b>{sala_atual}</b>: {len(df_s)} alunos | 🔍 No filtro atual (<b>{tn}</b>): <b>{len(df_f)}</b> alunos
+            </span>
         </div>
     """, unsafe_allow_html=True)
 
     st.info("✍️📖 = Aluno já matriculado no Turno Estendido")
 
-    # --- 2. CABEÇALHO DA TABELA (Estilo Imagem 1) ---
-    # Usando a mesma fonte e padding para alinhar com a Gestão de Apadrinhamento
-    st.markdown(f"""
-        <style>
-            .header-tabela {{
-                background-color: {cor_h};
-                color: white;
-                font-family: 'Source Sans Pro', sans-serif;
-                padding: 10px;
-                border-radius: 5px 5px 0 0;
-                display: flex;
-                font-weight: bold;
-                font-size: 14px;
-            }}
-            .linha-aluno {{
-                font-family: 'Source Sans Pro', sans-serif;
-                border-bottom: 1px solid #eee;
-                padding: 5px 0;
-                color: #333;
-                align-items: center;
-            }}
-        </style>
-        <div class="header-tabela">
-            <div style="flex: 0.5;">Sel.</div>
-            <div style="flex: 3;">ALUNO</div>
-            <div style="flex: 1;">IDADE</div>
-            <div style="flex: 2;">COMUNIDADE</div>
-        </div>
-    """, unsafe_allow_html=True)
+    # --- 3. TABELA COM ESTILO IDENTICO À GESTÃO ---
+    # Colunas da tabela
+    v_cols = ["SEL.", "ALUNO", "IDADE", "COMUNIDADE"]
+    
+    # Início da Tabela com a classe custom-table
+    html_header = f'<table class="custom-table"><thead style="background-color:{cor_h}"><tr>'
+    html_header += "".join([f'<th>{c}</th>' for c in v_cols]) + '</tr></thead><tbody>'
+    st.markdown(html_header, unsafe_allow_html=True)
     
     selecionados = []
-    
-    # --- 3. ITERAÇÃO SOBRE OS DADOS FILTRADOS ---
+
+    # Iteração para renderizar as linhas
     for i, r in df_f.iterrows():
-        # Criamos as colunas com a mesma proporção do cabeçalho
-        c0, c1, c2, c3 = st.columns([0.5, 3, 1, 2])
+        # Usamos colunas para alinhar o Checkbox com a Tabela HTML
+        c0, c1, c2, c3 = st.columns([0.8, 3, 1, 2])
         
-        n_l = str(r['ALUNO']).replace("**", "").strip()
+        n_l = str(r.get("ALUNO", "")).replace("**", "").strip()
+        idade = str(r.get("IDADE", ""))
+        comunidade = str(r.get("COMUNIDADE", ""))
         
         with c0:
             if n_l in st.session_state.get("alunos_te_dict", {}): 
-                st.markdown('<p style="margin-top:10px;">✍️📖</p>', unsafe_allow_html=True)
+                st.markdown('<p style="text-align:center; margin-top:10px;">✍️📖</p>', unsafe_allow_html=True)
             else:
-                if st.checkbox("", key=f"chk_{sala_atual}_{i}"): 
+                # Checkbox invisível visualmente mas funcional
+                if st.checkbox("", key=f"chk_mat_{sala_atual}_{i}"): 
                     selecionados.append(n_l)
         
-        # Estilizando o texto das colunas para combinar com a Imagem 1
         with c1:
-            st.markdown(f'<p style="font-family:Source Sans Pro; margin-top:10px;"><b>{n_l}</b></p>', unsafe_allow_html=True)
+            st.markdown(f'<p style="margin-top:12px; font-family:Source Sans Pro;">{n_l}</p>', unsafe_allow_html=True)
         with c2:
-            st.markdown(f'<p style="font-family:Source Sans Pro; margin-top:10px;">{r["IDADE"]}</p>', unsafe_allow_html=True)
+            st.markdown(f'<p style="margin-top:12px; font-family:Source Sans Pro;">{idade}</p>', unsafe_allow_html=True)
         with c3:
-            st.markdown(f'<p style="font-family:Source Sans Pro; margin-top:10px;">{r["COMUNIDADE"]}</p>', unsafe_allow_html=True)
+            st.markdown(f'<p style="margin-top:12px; font-family:Source Sans Pro;">{comunidade}</p>', unsafe_allow_html=True)
+        
+        # Linha divisória para manter o aspecto de tabela
+        st.markdown('<hr style="margin:0; border:0; border-bottom:1px solid #eee;">', unsafe_allow_html=True)
 
-    # --- 4. AÇÃO EM MASSA ---
+    # --- 4. AÇÃO EM MASSA (Botão Largo) ---
     if selecionados:
+        st.write("---")
         st.markdown(f"""
             <style>
                 div.stButton > button {{
                     background-color: {cor_h} !important;
                     color: white !important;
-                    border-radius: 8px !important;
+                    font-weight: bold !important;
                     width: 100%;
+                    border-radius: 10px;
                 }}
             </style>
         """, unsafe_allow_html=True)
         
-        if st.button(f"🚀 Matricular {len(selecionados)} aluno(s) no Turno Estendido", key="btn_bulk_te"):
-            # Aqui você deve chamar sua função de gravação na planilha real se necessário
-            # Por enquanto, mantemos a lógica de session_state que você usava
-            for al in selecionados: 
+        if st.button(f"🚀 Matricular {len(selecionados)} aluno(s) no Turno Estendido"):
+            for al in selecionados:
                 if "alunos_te_dict" not in st.session_state:
                     st.session_state["alunos_te_dict"] = {}
                 st.session_state["alunos_te_dict"][al] = sala_atual
             
-            st.success(f"✅ {len(selecionados)} alunos adicionados com sucesso!")
+            st.success(f"✅ {len(selecionados)} alunos matriculados com sucesso!")
             st.cache_data.clear()
             st.rerun()
 

@@ -548,19 +548,23 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 
                 selecionados = st.multiselect("Selecione os alunos:", sorted(df_est["ALUNO"].unique()))
                 
-                if st.button("Confirmar Turno Estendido", use_container_width=True):
-                    if selecionados:
-                        try:
-                            client = conn.client 
-                            sh = client.open(nome_planilha) 
-                            ws = sh.worksheet("TURNO_ESTENDIDO")
-                            for aluno in selecionados:
-                                ws.append_row([aluno.upper(), s_est, datetime.now().strftime("%Y")])
-                            st.success(f"{len(selecionados)} alunos adicionados!")
-                            st.cache_data.clear()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro ao salvar: {e}")
+if st.button("Confirmar Turno Estendido", use_container_width=True):
+    if selecionados:
+        try:
+            # Acesse o cliente gspread real
+            client = conn.client 
+            sh = client.open(nome_planilha) 
+            ws = sh.worksheet("TURNO_ESTENDIDO")
+            
+            for aluno in selecionados:
+                # Garanta que os dados batam com as colunas da sua aba
+                ws.append_row([aluno.upper(), s_est, datetime.now().strftime("%Y")])
+                
+            st.success(f"{len(selecionados)} alunos adicionados!")
+            st.cache_data.clear()
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro ao salvar: {e}")
 
         with g_col4:
             with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):

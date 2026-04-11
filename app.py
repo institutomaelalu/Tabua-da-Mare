@@ -587,42 +587,36 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 </div>
             """, unsafe_allow_html=True)
 
-            # --- CONSTRUÇÃO DA TABELA HTML (SEM RECUO PARA EVITAR CODE BLOCK) ---
-            v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
-            
-            # Cabeçalho
-            # DICA: Removi espaços extras antes das tags <table> e <thead>
-            table_html = f'<table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 14px; border: 1px solid #ddd;">'
-            table_html += f'<thead style="background-color: {cor_h}; color: white; text-align: left;"><tr>'
-            for col in v_cols:
-                table_html += f'<th style="padding: 12px; border: 1px solid #ddd;">{col}</th>'
-            table_html += '</tr></thead><tbody>'
-            
-            # Linhas (Loop iterando pelo DataFrame filtrado)
-            for i, (_, r) in enumerate(df_f.iterrows()):
-                bg = "#ffffff" if i % 2 == 0 else "#f9f9f9"
-                p_nome = str(r.get("PADRINHO/MADRINHA", "-")).strip()
-                if p_nome in ["", "0", "nan", "None", "-"]: p_nome = "-"
-                
-                table_html += f'<tr style="background-color: {bg};">'
-                table_html += f'<td style="padding: 10px; border: 1px solid #eee; font-weight: bold;">{r.get("ALUNO", "-")}</td>'
-                table_html += f'<td style="padding: 10px; border: 1px solid #eee; text-align: center;">{r.get("TURMA", "-")}</td>'
-                table_html += f'<td style="padding: 10px; border: 1px solid #eee; text-align: center;">{r.get("IDADE", "-")}</td>'
-                table_html += f'<td style="padding: 10px; border: 1px solid #eee;">{r.get("COMUNIDADE", "-")}</td>'
-                table_html += f'<td style="padding: 10px; border: 1px solid #eee; color: {cor_h if p_nome != "-" else "#999"}; font-weight: 600;">{p_nome}</td>'
-                table_html += '</tr>'
-            
-            table_html += "</tbody></table>"
-            
-            # EXIBIÇÃO FINAL
-            # Usar apenas markdown com unsafe_allow_html
-            st.markdown(table_html, unsafe_allow_html=True)
-            
-        else:
-            st.info(f"A {sala_v} ainda não possui alunos matriculados.")
-            
-    except Exception as e:
-        st.error(f"Erro ao carregar a tabela: {e}")
+            # --- CONSTRUÇÃO DA TABELA HTML REVISADA ---
+v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
+
+# Diminuímos o font-size para 12px ou 13px para reduzir a fonte geral
+table_html = f'<table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px; border: 1px solid #ddd;">'
+table_html += f'<thead style="background-color: {cor_h}; color: white; text-align: left;"><tr>'
+
+for col in v_cols:
+    table_html += f'<th style="padding: 8px; border: 1px solid #ddd;">{col}</th>'
+table_html += '</tr></thead><tbody>'
+
+for i, (_, r) in enumerate(df_f.iterrows()):
+    bg = "#ffffff" if i % 2 == 0 else "#f9f9f9"
+    p_nome = str(r.get("PADRINHO/MADRINHA", "-")).strip()
+    if p_nome in ["", "0", "nan", "None", "-"]: p_nome = "-"
+    
+    table_html += f'<tr style="background-color: {bg};">'
+    table_html += f'<td style="padding: 8px; border: 1px solid #eee; font-weight: bold;">{r.get("ALUNO", "-")}</td>'
+    table_html += f'<td style="padding: 8px; border: 1px solid #eee; text-align: center;">{r.get("TURMA", "-")}</td>'
+    table_html += f'<td style="padding: 8px; border: 1px solid #eee; text-align: center;">{r.get("IDADE", "-")}</td>'
+    table_html += f'<td style="padding: 8px; border: 1px solid #eee;">{r.get("COMUNIDADE", "-")}</td>'
+    
+    # AJUSTE AQUI: Removida a cor dinâmica (cor_h). Agora usa a cor padrão da linha.
+    table_html += f'<td style="padding: 8px; border: 1px solid #eee; font-weight: 600;">{p_nome}</td>'
+    table_html += '</tr>'
+
+table_html += "</tbody></table>"
+
+# Renderização
+st.markdown(table_html, unsafe_allow_html=True)
 
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")

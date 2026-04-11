@@ -750,26 +750,25 @@ elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
 
     try:
-        # Leitura e padronização rigorosa
+        # Leitura padronizada para evitar KeyError
         df_h = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
         df_logica = df_h.copy()
         df_logica.columns = [str(c).strip().upper() for c in df_logica.columns]
         
-        # Identifica a coluna de diagnóstico (NIVEL ou DIAGNÓSTICO)
+        # Identifica a coluna de diagnóstico
         col_diag = next((c for c in ["NIVEL", "DIAGNÓSTICO"] if c in df_logica.columns), None)
 
-        # Atualiza dicionário de alunos em tempo real
+        # Mapeamento de alunos baseado no que existe na planilha
         if not df_logica.empty and "ALUNO" in df_logica.columns and "SALA" in df_logica.columns:
             dict_alunos_te = pd.Series(df_logica.SALA.values, index=df_logica.ALUNO.values).to_dict()
-            st.session_state["alunos_te_dict"] = dict_alunos_te
         else:
-            dict_alunos_te = st.session_state.get("alunos_te_dict", {})
+            dict_alunos_te = {}
 
     except Exception as e:
         st.error(f"Erro ao conectar com a planilha: {e}")
         st.stop()
 
-    # --- 1. BOTÕES DE ANO (PADRÃO DADOS) ---
+    # --- 1. BOTÕES DE ANO ---
     if "ano_registro_te" not in st.session_state: 
         st.session_state.ano_registro_te = 2026
 
@@ -794,71 +793,65 @@ elif menu == "📖 Turno Estendido":
 
     st.divider()
 
-    # --- 2. BOTÕES DAS SALAS (USANDO SUA FUNÇÃO DO TOPO) ---
-    salas_te = sorted(list(set(dict_alunos_te.values())))
+    # --- 2. BOTÕES DAS SALAS (RESTAURADOS: TODAS AS SALAS) ---
+    if "sel_te_aba" not in st.session_state:
+        st.session_state.sel_te_aba = "SALA ROSA"
     
-    if salas_te:
-        if "sel_te_aba" not in st.session_state or st.session_state.sel_te_aba not in salas_te:
-            st.session_state.sel_te_aba = salas_te[0]
+    # Chamada da função oficial sem restrição de 'salas_permitidas' para mostrar todas
+    render_botoes_salas("btn_te_visual", "sel_te_aba")
+    
+    sala_atual = st.session_state.sel_te_aba
+    
+    # Filtra alunos que pertencem à sala selecionada (conforme a planilha)
+    alunos_sala = [nome for nome, sala in dict_alunos_te.items() if str(sala).strip().upper() == sala_atual.upper()]
+    
+    if alunos_sala:
+        aluno_sel = st.selectbox("Selecione o Aluno:", sorted(alunos_sala))
         
-        # Chama sua função oficial de componentes
-        render_botoes_salas("btn_te_comp", "sel_te_aba", salas_permitidas=salas_te)
+        # --- 3. LEGENDA DE NÍVEIS (USANDO SUA FUNÇÃO) ---
+        df_al = df_logica[(df_logica["ALUNO"] == aluno_sel) & (df_logica["ANO"].astype(str).str.contains(str(st.session_state.ano_registro_te)))]
+        ultimo_nv = df_al[col_diag].iloc[-1] if not df_al.empty and col_diag else "Sem registro"
         
-        sala_atual = st.session_state.sel_te_aba
-        alunos_sala = [n for n, s in dict_alunos_te.items() if s == sala_atual]
-        
-        if alunos_sala:
-            aluno_sel = st.selectbox("Selecione o Aluno:", sorted(alunos_sala))
-            
-            # --- 3. LEGENDA DE NÍVEIS (USANDO SUA FUNÇÃO DO TOPO) ---
-            # Para destacar o nível atual sem mudar sua função global, 
-            # mostramos o nível atual em um badge antes da legenda
-            df_al = df_logica[(df_logica["ALUNO"] == aluno_sel) & (df_logica["ANO"].astype(str).str.contains(str(st.session_state.ano_registro_te)))]
-            ultimo_nv = df_al[col_diag].iloc[-1] if not df_al.empty and col_diag else "Nenhum"
-            
-            st.markdown(f"Diagnóstico atual: <span class='sala-badge' style='background:{C_ROXO}'>{ultimo_nv}</span>", unsafe_allow_html=True)
-            
-            # Chama sua função oficial de legenda
-            render_legenda_niveis()
+        st.markdown(f"Diagnóstico atual: **{ultimo_nv}**")
+        render_legenda_niveis()
 
-            st.markdown("---")
+        st.markdown("---")
 
-            # --- 4. FORMULÁRIO DE REGISTRO ---
-            try:
-                idx_ini = NIVEIS_ALF.index(ultimo_nv) if ultimo_nv in NIVEIS_ALF else 0
-            except: idx_ini = 0
-                
-            novo_nv = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_ini)
+        # --- 4. FORMULÁRIO DE REGISTRO ---
+        try:
+            idx_ini = NIVEIS_ALF.index(ultimo_nv) if ultimo_nv in NIVEIS_ALF else 0
+        except: idx_ini = 0
+            
+        novo_nv = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_ini)
 
-            with st.form("f_te_final_comp"):
-                etapa_av = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
-                evs = EVIDENCIAS_POR_NIVEL.get(novo_nv, [])
+        with st.form("f_te_final_visual"):
+            etapa_av = st.selectbox("Etapa da Avaliação:", ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"])
+            evs = EVIDENCIAS_POR_NIVEL.get(novo_nv, [])
+            
+            st.write(f"**Evidências observadas para {novo_nv}:**")
+            c_ev = st.columns(3)
+            selecionadas = [ev for i, ev in enumerate(evs) if c_ev[i%3].checkbox(ev, key=f"chk_v_te_{i}")]
+            
+            obs_txt = st.text_area("Observações Adicionais:")
+            
+            if st.form_submit_button("🚀 Salvar Avaliação"):
+                sucesso = registrar_turno_estendido(
+                    aluno=aluno_sel,
+                    sala=sala_atual,
+                    avaliacao_tipo=etapa_av,
+                    nivel=novo_nv,
+                    evidencias_list=selecionadas,
+                    obs=obs_txt,
+                    ano=int(st.session_state.ano_registro_te)
+                )
                 
-                st.write(f"**Evidências observadas para {novo_nv}:**")
-                c_ev = st.columns(3)
-                selecionadas = [ev for i, ev in enumerate(evs) if c_ev[i%3].checkbox(ev, key=f"chk_te_f_{i}")]
-                
-                obs_txt = st.text_area("Observações Adicionais:")
-                
-                if st.form_submit_button("🚀 Salvar Avaliação"):
-                    sucesso = registrar_turno_estendido(
-                        aluno=aluno_sel,
-                        sala=sala_atual,
-                        avaliacao_tipo=etapa_av,
-                        nivel=novo_nv,
-                        evidencias_list=selecionadas,
-                        obs=obs_txt,
-                        ano=int(st.session_state.ano_registro_te)
-                    )
-                    
-                    if sucesso:
-                        st.success(f"Avaliação de {aluno_sel} registrada!")
-                        st.cache_data.clear()
-                        st.rerun()
-        else:
-            st.info(f"Nenhum aluno encontrado na {sala_atual}.")
+                if sucesso:
+                    st.success(f"Avaliação de {aluno_sel} registrada!")
+                    st.cache_data.clear()
+                    st.rerun()
     else:
-        st.warning("Verifique as colunas ALUNO e SALA na aba TURNO_ESTENDIDO.")
+        # MENSAGEM CASO A SALA ESTEJA VAZIA NO TURNO ESTENDIDO
+        st.info(f"Não há alunos da **{sala_atual}** matriculados no Turno Estendido.")
 # --- ABA: DADOS - TURNO ESTENDIDO (ATUALIZADO COM CORES E LEGENDA) ---
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("""

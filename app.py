@@ -462,7 +462,7 @@ elif menu == "📝 Alunos matriculados":
     # 2. CABEÇALHO COM DIVISORES (Fonte 14)
     st.markdown(f"""
         <div style="background-color:{cor_h}; color: white; padding: 10px; border-radius: 5px 5px 0 0; 
-                    display: flex; font-weight: bold; font-size: 14px; text-transform: uppercase; align-items: center;">
+                    display: flex; font-weight: bold; font-size: 12px; text-transform: uppercase; align-items: center;">
             <div style="flex: 0.5; text-align: center; border-right: 1px solid rgba(255,255,255,0.3);">ST</div>
             <div style="flex: 3; padding-left: 10px; border-right: 1px solid rgba(255,255,255,0.3);">ALUNO</div>
             <div style="flex: 1; text-align: center; border-right: 1px solid rgba(255,255,255,0.3);">IDADE</div>

@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 import os
+import gspread
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
@@ -247,14 +248,12 @@ def get_gspread_client():
 
 def safe_read(worksheet_name):
     try:
-        if worksheet_name == "GERAL": url = st.secrets["connections"]["gsheets"]["geral"]
-        else: url = st.secrets["connections"]["gsheets"][TURMAS_CONFIG[worksheet_name]['key']]
-        url_csv = url.split("/edit")[0] + "/export?format=csv"
-        df = conn.read(worksheet=nome_da_aba_selecionada).fillna("")
+        # Simplificando a leitura
+        df = conn.read(worksheet=worksheet_name).fillna("")
         df.columns = [str(c).strip().upper() for c in df.columns]
-        if "PADRINHO" in df.columns: df = df.rename(columns={"PADRINHO": "PADRINHO/MADRINHA"})
-        return df.fillna("")
-    except: return pd.DataFrame()
+        return df
+    except: 
+        return pd.DataFrame()
 
 def render_filtros(df_geral, key_suffix):
     f1, f2 = st.columns(2)
@@ -532,9 +531,23 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             selecionados = st.multiselect("Selecione 1 ou mais alunos:", lista_est)
             
             if st.button("Confirmar Turno Estendido", use_container_width=True):
-                for aluno in selecionados:
-                    conn.append_row(worksheet="TURNO_ESTENDIDO", data=[aluno.upper(), s_est])
-                st.success("Alunos atualizados!"); st.cache_data.clear()
+                if selecionados:
+                    try:
+                        # O segredo é usar o .client para acessar os comandos do gspread
+                        sh = conn.client.open(nome_planilha)
+                        ws = sh.worksheet("TURNO_ESTENDIDO")
+                        
+                        for aluno in selecionados:
+                            # Agora o append_row vai funcionar através do cliente real
+                            ws.append_row([aluno.upper(), s_est, datetime.now().strftime("%Y")])
+                        
+                        st.success(f"{len(selecionados)} aluno(s) adicionado(s)!")
+                        st.cache_data.clear() # Limpa o cache para a tabela atualizar
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao salvar: {e}")
+                else:
+                    st.warning("Selecione pelo menos um aluno.")
 
     with gestao_col4:
         with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):

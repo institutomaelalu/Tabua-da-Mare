@@ -440,11 +440,12 @@ if menu == "👤 Matrícula":
                 sh.worksheet("GERAL").append_row([nome, sala, turno, idade, comu, ""])
                 st.success("Cadastrado com sucesso!"); st.rerun()
 
+# Certifique-se de que na sua sidebar o texto seja EXATAMENTE: 📝 Controle de Matrícula e Apadrinhamento
 elif menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
     st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     
-    # 1. BOTÕES DE SELEÇÃO E CONTADOR
+    # 1. BOTÕES DE SELEÇÃO
     render_botoes_salas("btn_pad", "sel_pad")
     sala_atual = st.session_state.sel_pad
     cor_h = TURMAS_CONFIG[sala_atual]["cor"]
@@ -456,15 +457,15 @@ elif menu == "📝 Controle de Matrícula e Apadrinhamento":
     df_s = conn.read(worksheet=sala_atual).fillna("")
     df_s.columns = [str(c).strip().upper() for c in df_s.columns]
 
-    # Exibição da quantidade de alunos logo abaixo dos botões
+    # 2. CONTADOR DE ALUNOS (Logo abaixo dos botões)
     st.markdown(f"""
-        <div style="background-color: #f8f9fa; padding: 5px 15px; border-radius: 5px; border-left: 4px solid {cor_h}; margin: 10px 0 20px 0;">
+        <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; border-left: 4px solid {cor_h}; margin: 10px 0 20px 0;">
             <span style="font-size: 14px; color: #555;">📍 Atualmente existem <b>{len(df_s)}</b> alunos matriculados na <b>{sala_atual}</b></span>
         </div>
     """, unsafe_allow_html=True)
 
     if not df_s.empty:
-        # 2. RENDERIZAÇÃO DOS FILTROS
+        # 3. RENDERIZAÇÃO DOS FILTROS
         tn, cm = render_filtros(df_g, "pad")
         
         df_f = df_s.copy()
@@ -473,66 +474,35 @@ elif menu == "📝 Controle de Matrícula e Apadrinhamento":
         if cm != "Todas":
             df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-        # 3. MONTAGEM DA TABELA ESTILIZADA (Fonte 13px e Divisórias Suaves)
-        # Aplicando o ID exclusivo para garantir que o estilo não vaze para o resto do app
-        html = f"""
-        <style>
-            .tabela-mestra {{
-                width: 100%;
-                border-collapse: collapse;
-                font-family: 'Source Sans Pro', sans-serif;
-                color: #31333F;
-                margin-top: 15px;
-            }}
-            .tabela-mestra thead th {{
-                background-color: {cor_h};
-                color: white !important;
-                padding: 10px;
-                text-align: left;
-                font-size: 13px;
-                text-transform: uppercase;
-                border-right: 1px solid rgba(255,255,255,0.2);
-            }}
-            .tabela-mestra td {{
-                padding: 8px 10px;
-                border-bottom: 1px solid #f0f0f0;
-                border-right: 1px solid #f0f0f0;
-                font-size: 13px;
-            }}
-            .tabela-mestra tr:hover {{
-                background-color: #fcfcfc;
-            }}
-        </style>
-        <table class="tabela-mestra">
-            <thead>
-                <tr>
-                    <th style="width: 45%;">ALUNO</th>
-                    <th style="width: 10%; text-align: center;">IDADE</th>
-                    <th style="width: 20%;">COMUNIDADE</th>
-                    <th style="width: 25%;">PADRINHO/MADRINHA</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
+        # 4. MONTAGEM DA TABELA (Mantendo o formato original custom-table)
+        v_cols = ["ALUNO", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
+        
+        # Estilo para forçar fonte 13px e separadores suaves
+        st.markdown(f"""
+            <style>
+                .custom-table {{ font-size: 13px !important; width: 100%; border-collapse: collapse; }}
+                .custom-table thead th {{ background-color: {cor_h} !important; color: white !important; padding: 10px; text-align: left; }}
+                .custom-table td {{ padding: 8px 10px; border-bottom: 1px solid #f0f0f0; border-right: 1px solid #f0f0f0; }}
+                .custom-table tr:last-child td {{ border-bottom: none; }}
+            </style>
+        """, unsafe_allow_html=True)
+
+        html = f'<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in v_cols]) + '</tr></thead><tbody>'
         
         for _, r in df_f.iterrows():
-            nome = str(r.get("ALUNO", "")).replace("**", "").strip()
+            n_l = str(r.get("ALUNO", "")).replace("**", "").strip()
             idade = str(r.get("IDADE", ""))
             comunidade = str(r.get("COMUNIDADE", ""))
             padrinho = str(r.get("PADRINHO/MADRINHA", ""))
+            
             padrinho_texto = padrinho if padrinho.lower() not in ["nan", "", "none", "0"] else "-"
             
-            html += f"""
-                <tr>
-                    <td>{nome}</td>
-                    <td style="text-align: center;">{idade}</td>
-                    <td>{comunidade}</td>
-                    <td>{padrinho_texto}</td>
-                </tr>
-            """
+            html += f'<tr><td>{n_l}</td><td>{idade}</td><td>{comunidade}</td><td>{padrinho_texto}</td></tr>'
         
         st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
-        st.caption(f"Exibindo {len(df_f)} alunos conforme filtros aplicados.")
+        
+        # Rodapé com contagem
+        st.caption(f"Total exibido: {len(df_f)} alunos na {sala_atual}")
         
     else: 
         st.warning(f"A aba '{sala_atual}' parece estar vazia na Google Sheet.")

@@ -532,10 +532,20 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 lista_est = sorted(df_est["ALUNO"].unique())
                 selecionados = st.multiselect("Selecione os alunos:", lista_est)
                 if st.button("Confirmar Turno Estendido", use_container_width=True):
+                try:
+                    # Acessa a planilha específica através do cliente gspread
+                    sh = conn._instance.client.open_by_key(st.secrets["connections"]["gsheets"]["spreadsheet"])
+                    ws = sh.worksheet("TURNO_ESTENDIDO")
+                    
                     for aluno in selecionados:
-                        conn.append_row(worksheet="TURNO_ESTENDIDO", data=[aluno.upper(), s_est])
-                    st.success("Alunos atualizados!"); st.cache_data.clear()
-
+                        # Adiciona a linha diretamente via gspread
+                        ws.append_row([aluno.upper(), s_est])
+                    
+                    st.success(f"{len(selecionados)} alunos adicionados ao Turno Estendido!")
+                    st.cache_data.clear()
+                    st.rerun() # Atualiza a tela para mostrar os novos dados
+                except Exception as e:
+                    st.error(f"Erro ao salvar: {e}")
         with g_col4:
             with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
                 st.markdown("##### ⚠️ Zona de Exclusão")

@@ -4,21 +4,6 @@ import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
-nome_planilha = "APP_IMLA"
-
-# --- ADICIONAR ESTE BLOCO NO TOPO (Aprox. Linha 25) ---
-CORES_EXCLUSIVAS = {
-    "1. Pré-Silábico": "#FFDADA", 
-    "2. Silábico s/ Valor": "#FFE8D1", 
-    "3. Silábico c/ Valor": "#FFF9DB", 
-    "4. Silábico Alfabético": "#E3FAFC", 
-    "5. Alfabético Inicial": "#E3F9E5", 
-    "6. Alfabético Final": "#E7F5FF", 
-    "7. Alfabético Ortográfico": "#F3F0FF"
-}
-
-def get_text_color(nivel):
-    return "#2C3E50" # Cor do texto para os cards de alfabetização
 
 # =================================================================
 # 1. CONFIGURAÇÃO, CONSTANTES E ESTILO
@@ -70,20 +55,20 @@ st.markdown(f"""
 # 2. CONEXÃO E CARREGAMENTO DE DADOS
 # =================================================================
 conn = st.connection("gsheets", type=GSheetsConnection)
-nome_planilha = st.secrets["connections"]["gsheets"]["spreadsheet"]
+
 try:
     # Extração segura do ID da Planilha
     raw_url = st.secrets["connections"]["gsheets"]["spreadsheet"]
-    nome_planilha = raw_url.split("/d/")[-1].split("/")[0] if "/d/" in raw_url else raw_url
+    sheet_id = raw_url.split("/d/")[-1].split("/")[0] if "/d/" in raw_url else raw_url
 
     # Carregamento Principal
-    df_g = conn.read(spreadsheet=nome_planilha, worksheet="GERAL").fillna("")
+    df_g = conn.read(spreadsheet=sheet_id, worksheet="GERAL").fillna("")
     df_g.columns = [str(c).strip().upper() for c in df_g.columns]
     
-    df_alf = conn.read(spreadsheet=nome_planilha, worksheet="TURNO_ESTENDIDO").fillna("")
+    df_alf = conn.read(spreadsheet=sheet_id, worksheet="TURNO_ESTENDIDO").fillna("")
     df_alf.columns = [str(c).strip().upper() for c in df_alf.columns]
 
-    df_aval = conn.read(spreadsheet=nome_planilha, worksheet="TABUA_MARE").fillna("")
+    df_aval = conn.read(spreadsheet=sheet_id, worksheet="TABUA_MARE").fillna("")
     df_aval.columns = [str(c).strip().upper() for c in df_aval.columns]
     
 except Exception as e:
@@ -451,109 +436,142 @@ st.markdown(f"<div class='main-header'><h1><span style='color:{C_VERDE}'>Institu
 # --- ABAS ---
 if menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
-    st.markdown("*Gerencie aqui as matrículas, apadrinhamentos e o turno estendido.*")
+    st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     
-    # 1. Definição das variáveis de apoio (Certifique-se que estão no topo do app também)
-    nome_planilha = "APP_IMLA"
+    # 1. Definição Única das Cores
+    c_rosa, c_amarela, c_verde, c_azul, c_lavanda = "#F783AC", "#FFE066", "#A9E34B", "#99E9F2", "#D0BFFF"
 
-    # --- PAINEL DE GESTÃO (Visual Padrão) ---
-    st.write("---")
-    g_col1, g_col2, g_col3, g_col4 = st.columns([1, 1, 1, 1])
+    # --- CSS PARA A "TABELA BRANCA" E ESTILIZAÇÃO DOS BOTÕES ---
+    st.markdown(f"""
+        <style>
+        div[key="painel_branco"] {{
+            background-color: white !important;
+            padding: 20px !important;
+            border-radius: 15px !important;
+            border: 1px solid #E0E0E0 !important;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05) !important;
+            margin-bottom: 25px !important;
+        }}
+        div[data-testid="stPopover"] > button {{
+            background-color: white !important;
+            background-image: none !important;
+            border-radius: 10px !important;
+            height: 3.5rem !important;
+            transition: 0.3s !important;
+        }}
+        div[key="mat_popover"] > button {{ color: {c_rosa} !important; border: 2px solid {c_rosa} !important; }}
+        div[key="pad_popover"] > button {{ color: {c_amarela} !important; border: 2px solid {c_amarela} !important; }}
+        div[key="est_popover"] > button {{ color: {c_verde} !important; border: 2px solid {c_verde} !important; }}
+        div[key="del_popover"] > button {{ color: {c_azul} !important; border: 2px solid {c_azul} !important; }}
+        
+        div[key^="btn_pad"] button div[data-testid="stMarkdownContainer"] p {{
+            font-weight: 900 !important;
+            color: white !important;
+            font-size: 15px !important;
+        }}
+        </style>
+    """, unsafe_allow_html=True)
 
-    with g_col1:
-        with st.popover("➕ Matrícula", use_container_width=True):
-            st.markdown("##### 📝 Nova Matrícula")
-            n_nome = st.text_input("Nome do Aluno")
-            n_nasc = st.date_input("Nascimento", format="DD/MM/YYYY")
-            n_sala = st.selectbox("Sala Destino", list(TURMAS_CONFIG.keys()), key="reg_sala")
-            n_turno = st.selectbox("Turno", ["A", "B"], key="reg_turno")
-            n_comu = st.text_input("Comunidade")
-            
-            if st.button("Confirmar Matrícula", use_container_width=True):
-                if n_nome:
+    # --- PAINEL DE GESTÃO ---
+    with st.container(key="painel_branco"):
+        st.markdown("<p style='text-align:center; color:gray; font-weight:bold; margin-bottom:15px;'>PAINEL DE GESTÃO</p>", unsafe_allow_html=True)
+        g_col1, g_col2, g_col3, g_col4 = st.columns([1, 2.2, 1.3, 0.9])
+
+        with g_col1:
+            with st.popover("➕ Matrícula", key="mat_popover", use_container_width=True):
+                st.markdown("##### 📝 Nova Matrícula")
+                n_nome = st.text_input("Nome do Aluno")
+                n_nasc = st.date_input("Nascimento", format="DD/MM/YYYY")
+                n_sala = st.selectbox("Sala Destino", list(TURMAS_CONFIG.keys()), key="reg_sala")
+                n_turno = st.selectbox("Turno", ["A", "B"], key="reg_turno")
+                n_comu = st.text_input("Comunidade")
+                
+                if st.button("Confirmar Matrícula", use_container_width=True):
                     idade_calc = datetime.now().year - n_nasc.year
                     nova_linha = [n_nome.upper(), n_turno, f"{idade_calc} ANOS", n_nasc.strftime("%d/%m/%Y"), n_comu.upper(), ""]
-                    # Salvamento direto via conn
-                    conn.append_row(spreadsheet=nome_planilha, worksheet=n_sala, data=nova_linha)
+                    conn.append_row(spreadsheet=sheet_id, worksheet=n_sala, data=nova_linha)
                     st.success(f"{n_nome.upper()} matriculado!")
                     st.cache_data.clear()
                     st.rerun()
 
-    with g_col2:
-        with st.popover("🤝 Apadrinhamento", use_container_width=True):
-            st.markdown("##### 🤝 Novo Apadrinhamento")
-            s_busca = st.selectbox("Selecione a Sala:", list(TURMAS_CONFIG.keys()), key="pad_sala")
-            try:
-                df_b = conn.read(spreadsheet=nome_planilha, worksheet=s_busca).fillna("")
-                df_b.columns = [str(c).strip().upper() for c in df_b.columns]
-                filtro_vazios = ["", "-", "nan", "0", "NONE", "None"]
-                lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].astype(str).str.upper().isin(filtro_vazios)]["ALUNO"].unique())
+        with g_col2:
+            with st.popover("🤝 Registro de Padrinho", key="pad_popover", use_container_width=True):
+                st.markdown("##### 🤝 Novo Apadrinhamento")
+                s_busca = st.selectbox("Selecione a Sala:", list(TURMAS_CONFIG.keys()), key="pad_sala")
                 
-                if lista_lib:
-                    nome_p = st.text_input("Nome do Padrinho/Madrinha")
-                    al_sel = st.selectbox("Escolha o Afilhado:", lista_lib)
-                    if st.button("Confirmar Apadrinhamento", use_container_width=True):
-                        if nome_p:
-                            idx = df_b[df_b["ALUNO"] == al_sel].index[0] + 2
-                            # CORREÇÃO CRÍTICA: Acesso ao cliente real
-                            sh = conn.client.open(nome_planilha)
-                            sh.worksheet(s_busca).update_cell(int(idx), 6, nome_p.upper())
-                            st.success("Apadrinhamento registrado!")
+                try:
+                    df_b = conn.read(spreadsheet=sheet_id, worksheet=s_busca).fillna("")
+                    df_b.columns = [str(c).strip().upper() for c in df_b.columns]
+                    
+                    filtro_vazios = ["", "-", "nan", "0", "NONE"]
+                    lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].astype(str).str.upper().isin(filtro_vazios)]["ALUNO"].unique())
+                    
+                    if lista_lib:
+                        nome_p = st.text_input("Nome do Padrinho/Madrinha")
+                        al_sel = st.selectbox("Escolha o Afilhado:", lista_lib)
+                        
+                        if st.button("Confirmar Apadrinhamento", use_container_width=True):
+                            if nome_p:
+                                idx = df_b[df_b["ALUNO"] == al_sel].index[0] + 2
+                                conn.update_cell(spreadsheet=sheet_id, worksheet=s_busca, row=idx, col=6, value=nome_p.upper())
+                                st.success("Registro concluído!")
+                                st.cache_data.clear()
+                                st.rerun()
+                            else:
+                                st.warning("Digite o nome do padrinho.")
+                    else:
+                        st.info("Nenhum aluno sem padrinho nesta sala.")
+                except Exception as e:
+                    st.error(f"Erro ao carregar aba: {e}")
+
+        with g_col3:
+            with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
+                st.markdown("##### ⏳ Matrícula Estendida")
+                s_est = st.selectbox("Origem dos Alunos:", list(TURMAS_CONFIG.keys()), key="sel_est_sala")
+                df_est = conn.read(spreadsheet=sheet_id, worksheet=s_est).fillna("")
+                df_est.columns = [str(c).strip().upper() for c in df_est.columns]
+                
+                selecionados = st.multiselect("Selecione os alunos:", sorted(df_est["ALUNO"].unique()))
+                
+                if st.button("Confirmar Turno Estendido", use_container_width=True):
+                    if selecionados:
+                        try:
+                            # Acesso via Client gspread para loop de append
+                            raw_id = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                            s_id = raw_id.split("/d/")[-1].split("/")[0] if "/d/" in raw_id else raw_id
+                            sh = conn.client.open_by_key(s_id)
+                            ws = sh.worksheet("TURNO_ESTENDIDO")
+                            for aluno in selecionados:
+                                ws.append_row([aluno.upper(), s_est])
+                            st.success("Adicionados com sucesso!")
                             st.cache_data.clear()
                             st.rerun()
-                else:
-                    st.info("Nenhum aluno sem padrinho nesta sala.")
-            except Exception as e:
-                st.error(f"Erro: {e}")
+                        except Exception as e:
+                            st.error(f"Erro: {e}")
 
-    with g_col3:
-        with st.popover("⏳ Turno Estendido", use_container_width=True):
-            st.markdown("##### ⏳ Matrícula Estendida")
-            s_est = st.selectbox("Origem dos Alunos:", list(TURMAS_CONFIG.keys()), key="sel_est_sala")
-            df_est = conn.read(spreadsheet=nome_planilha, worksheet=s_est).fillna("")
-            df_est.columns = [str(c).strip().upper() for c in df_est.columns]
-            selecionados = st.multiselect("Selecione os alunos:", sorted(df_est["ALUNO"].unique()))
-            
-            if st.button("Confirmar Estendido", use_container_width=True):
-                if selecionados:
-                    try:
-                        sh = conn.client.open(nome_planilha) 
-                        ws = sh.worksheet("TURNO_ESTENDIDO")
-                        for aluno in selecionados:
-                            ws.append_row([aluno.upper(), s_est, datetime.now().strftime("%Y")])
-                        st.success("Adicionados com sucesso!")
-                        st.cache_data.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao salvar: {e}")
-
-    with g_col4:
-        with st.popover("🗑️ Remover", use_container_width=True):
-            st.markdown("##### ⚠️ Exclusão")
-            tipo_del = st.radio("Remover:", ["Aluno", "Padrinho"])
-            s_del = st.selectbox("Aba:", list(TURMAS_CONFIG.keys()) + ["TURNO_ESTENDIDO"], key="aba_del")
-            df_del = conn.read(spreadsheet=nome_planilha, worksheet=s_del).fillna("")
-            df_del.columns = [str(c).strip().upper() for c in df_del.columns]
-            al_excluir = st.selectbox("Aluno:", sorted(df_del["ALUNO"].unique()) if not df_del.empty else [])
-            
-            if st.button("🚨 EXCLUIR", use_container_width=True):
-                try:
+        with g_col4:
+            with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
+                st.markdown("##### ⚠️ Zona de Exclusão")
+                tipo_del = st.radio("O que remover?", ["Aluno (Matrícula)", "Padrinho"])
+                s_del = st.selectbox("Aba:", list(TURMAS_CONFIG.keys()) + ["TURNO_ESTENDIDO"])
+                df_del = conn.read(spreadsheet=sheet_id, worksheet=s_del).fillna("")
+                df_del.columns = [str(c).strip().upper() for c in df_del.columns]
+                
+                al_excluir = st.selectbox("Selecionar Aluno:", sorted(df_del["ALUNO"].unique()) if not df_del.empty else [])
+                
+                if st.button("🚨 EXCLUIR", use_container_width=True):
                     idx_del = df_del[df_del["ALUNO"] == al_excluir].index[0] + 2
-                    sh = conn.client.open(nome_planilha)
                     if tipo_del == "Padrinho":
-                        sh.worksheet(s_del).update_cell(int(idx_del), 6, "")
+                        conn.update_cell(spreadsheet=sheet_id, worksheet=s_del, row=idx_del, col=6, value="")
                     else:
+                        # Para deletar linha, usamos o client gspread diretamente
+                        sh = conn.client.open_by_key(sheet_id)
                         sh.worksheet(s_del).delete_rows(int(idx_del))
                     st.success("Removido!")
                     st.cache_data.clear()
                     st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao excluir: {e}")
 
-    st.write("---")
-    
-    # --- RESTAURAÇÃO DA VISUALIZAÇÃO DAS TABELAS ---
-    # Renderiza os botões das salas (Rosa, Amarela, etc.)
+    st.divider()
     render_botoes_salas("btn_pad", "sel_pad")
     
     if "sel_pad" not in st.session_state:
@@ -562,36 +580,24 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
     sala_v = st.session_state.sel_pad
     cor_h = TURMAS_CONFIG[sala_v]["cor"]
 
-    # Carregamento e Filtros
-    df_s = conn.read(spreadsheet=nome_planilha, worksheet=sala_v).fillna("")
+    # --- VISUALIZAÇÃO DOS DADOS ---
+    df_s = conn.read(spreadsheet=sheet_id, worksheet=sala_v).fillna("")
     df_s.columns = [str(c).strip().upper() for c in df_s.columns]
 
     if not df_s.empty:
-        # Nota: Certifique-se que df_g (Geral) está carregado no início do seu app.py
-        try:
-            tn, cm = render_filtros(df_s, "pad") 
-            df_f = df_s.copy()
-            if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
-            if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
+        tn, cm = render_filtros(df_g, "pad") # df_g carregado no início do app
+        df_f = df_s.copy()
+        if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
+        if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-            st.markdown(f'<div style="border-left: 5px solid {cor_h}; padding-left:15px; margin-top:20px;"><h4>📍 {sala_v} ({len(df_f)} alunos)</h4></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="border-left: 5px solid {cor_h}; padding-left:15px;"><h4>📍 {sala_v} ({len(df_f)} alunos)</h4></div>', unsafe_allow_html=True)
 
-            v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
-            # Recriando a tabela HTML original
-            html = f'<table style="width:100%; border-collapse: collapse; margin-top:10px;">'
-            html += f'<thead style="background-color:#f1f1f1;"><tr>' + "".join([f'<th style="padding:10px; border:1px solid #ddd;">{c}</th>' for c in v_cols]) + '</tr></thead><tbody>'
-            
-            for _, r in df_f.iterrows():
-                p_txt = str(r.get('PADRINHO/MADRINHA','')) if str(r.get('PADRINHO/MADRINHA','')) not in ['nan','', '0', '-'] else '-'
-                html += f"<tr><td style='padding:8px; border:1px solid #ddd;'>{r['ALUNO']}</td>"
-                html += f"<td style='padding:8px; border:1px solid #ddd; text-align:center;'>{r['TURMA']}</td>"
-                html += f"<td style='padding:8px; border:1px solid #ddd; text-align:center;'>{r['IDADE']}</td>"
-                html += f"<td style='padding:8px; border:1px solid #ddd;'>{r['COMUNIDADE']}</td>"
-                html += f"<td style='padding:8px; border:1px solid #ddd;'>{p_txt}</td></tr>"
-            
-            st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
-        except Exception as e:
-            st.info("Selecione uma sala para visualizar os dados.")
+        v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
+        html = f'<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in v_cols]) + '</tr></thead><tbody>'
+        for _, r in df_f.iterrows():
+            p_txt = str(r.get('PADRINHO/MADRINHA','')) if str(r.get('PADRINHO/MADRINHA','')) not in ['nan','', '0', '-'] else '-'
+            html += f"<tr><td>{r['ALUNO']}</td><td style='text-align:center'>{r['TURMA']}</td><td>{r['IDADE']}</td><td>{r['COMUNIDADE']}</td><td>{p_txt}</td></tr>"
+        st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
 
@@ -884,42 +890,37 @@ elif menu == "📊 Dados - Turno Estendido":
     ano_sel = st.session_state.ano_ativo_te
     st.markdown(f"**Exibindo dados de: {ano_sel}**")
 
-   # --- 1. LEGENDA DE NÍVEIS ---
+    # --- 1. LEGENDA DE NÍVEIS ---
     st.markdown("##### 📝 Legenda de Níveis")
     cols_leg = st.columns(len(NIVEIS_ALF))
-    
-    for i, nv_label in enumerate(NIVEIS_ALF):
-        # Usamos nv_label para a legenda e CORES_EXCLUSIVAS que definimos no topo
-        cor_fundo = CORES_EXCLUSIVAS.get(nv_label, "#eee")
-        cor_txt = get_text_color(nv_label)
+    for i, nv in enumerate(NIVEIS_ALF):
+        cor_fundo = CORES_EXCLUSIVAS.get(nv, "#eee")
+        cor_txt = get_text_color(nv) 
         
         cols_leg[i].markdown(f"""
             <div style="background-color:{cor_fundo}; color:{cor_txt}; padding:8px 2px; border-radius:10px; 
             text-align:center; font-size:10px; font-weight:bold; min-height:50px; display:flex; align-items:center; justify-content:center; line-height:1.1; border: 1px solid rgba(0,0,0,0.05);">
-                {nv_label.split(". ")[1] if ". " in nv_label else nv_label}
+                {nv.split(". ")[1]}
             </div>
         """, unsafe_allow_html=True)
 
     # --- 2. FUNÇÃO AUXILIAR MARÉ ---
     def get_status_mare_html(nv_atual, hist):
         pct, txt = 85, "maré baixa"
-        if nv_atual == "7. Alfabético Ortográfico": 
-            pct, txt = 15, "maré cheia"
+        if nv_atual == "7. Alfabético Ortográfico": pct, txt = 15, "maré cheia"
         elif len(hist) >= 2:
-            n_at = MAPA_NIVEIS.get(nv_atual, 0)
-            n_ant = MAPA_NIVEIS.get(hist[-2], 0)
+            n_at, n_ant = MAPA_NIVEIS.get(nv_atual, 0), MAPA_NIVEIS.get(hist[-2], 0)
             if n_at > n_ant: pct, txt = 45, "maré enchente"
             elif n_at < n_ant: pct, txt = 70, "maré vazante"
         
         return f'''
-        <div style="text-align:center;">
-            <div style="width:40px; height:20px; margin:0 auto; background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%); clip-path: path('M 0 4 Q 10 0 20 4 T 40 4 L 40 20 L 0 20 Z');"></div>
-            <span style="font-size:9px; color:#5DADE2; font-weight:bold; text-transform:uppercase;">{txt}</span>
+        <div class="mare-box">
+            <div class="mare-mini-tabela" style="background: linear-gradient(to bottom, #f0f0f0 {pct}%, #5DADE2 {pct}%); clip-path: path('M 0 4 Q 10 0 20 4 T 40 4 L 40 20 L 0 20 Z');"></div>
+            <span class="mare-texto-tabela">{txt}</span>
         </div>'''
 
     cols_header = ["Nome do Aluno", "1ª Sondagem", "2ª Sondagem", "3ª Sondagem", "STATUS MARÉ"]
-    if ano_sel == 2026: 
-        cols_header.insert(1, "Diagnóstico Atual")
+    if ano_sel == 2026: cols_header.insert(1, "Diagnóstico Atual")
 
     html_tab = f"""<table style="width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border: 1px solid #eee; color: #2C3E50;">
         <thead><tr style="background-color: #F8F9FA;">{"".join([f'<th style="padding:12px; border:1px solid #eee; font-size:12px;">{c}</th>' for c in cols_header])}</tr></thead>
@@ -934,16 +935,16 @@ elif menu == "📊 Dados - Turno Estendido":
         if ano_sel == 2026:
             d_ant = df_h[(df_h["ALUNO"] == al) & (df_h["ANO"] == 2025) & (df_h["AVALIACAO"] == "Avaliação Final")]
             if not d_ant.empty:
-                nv = str(d_ant["NIVEL"].iloc[0])
-                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv, "#eee")}; color:{get_text_color(nv)}; text-align:center; font-weight:bold; font-size:10px; border:1px solid #eee; padding:8px;">{nv.split(". ")[1] if ". " in nv else nv}</td>'
+                nv = d_ant["NIVEL"].iloc[0]
+                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv)}; color:{get_text_color(nv)}; text-align:center; font-weight:bold; font-size:10px; border:1px solid #eee; padding:8px;">{nv.split(". ")[1]}</td>'
             else: 
                 html_tab += '<td style="text-align:center; border:1px solid #eee; color:#ccc;">-</td>'
 
         for etapa in ["1ª Avaliação", "2ª Avaliação", "Avaliação Final"]:
             r = dados_ano[dados_ano["AVALIACAO"] == etapa]
             if not r.empty:
-                nv = str(r["NIVEL"].iloc[0])
-                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv, "#eee")}; color:{get_text_color(nv)}; text-align:center; font-weight:bold; border:1px solid #eee; font-size:11px; padding:8px;">{nv.split(". ")[1] if ". " in nv else nv}</td>'
+                nv = r["NIVEL"].iloc[0]
+                html_tab += f'<td style="background:{CORES_EXCLUSIVAS.get(nv)}; color:{get_text_color(nv)}; text-align:center; font-weight:bold; border:1px solid #eee; font-size:11px; padding:8px;">{nv.split(". ")[1]}</td>'
             else: 
                 html_tab += '<td style="border:1px solid #eee;"></td>'
 

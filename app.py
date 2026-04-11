@@ -522,7 +522,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             with st.popover("🤝 Registro de Padrinho/Madrinha", key="pad_popover", use_container_width=True):
                 st.markdown("##### 🤝 Novo Apadrinhamento")
                 s_busca = st.selectbox("Selecione a Sala:", list(TURMAS_CONFIG.keys()), key="pad_sala")
-                try:
+try:
     df_b = conn.read(spreadsheet=sheet_id, worksheet=s_busca).fillna("")
     df_b.columns = [str(c).strip().upper() for c in df_b.columns]
 except Exception as e:

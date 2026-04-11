@@ -957,6 +957,15 @@ elif menu == "🌊 Canal do Apadrinhamento":
 
 # --- VISUALIZAÇÃO 1: GERAL (LIMPEZA TOTAL E GRÁFICO FULL WIDTH) ---
             if modo == "🌊 Tábua da Maré (Geral)":
+                # 0. DEFINIÇÃO DAS CATEGORIAS (Evita o NameError: CATEGORIAS is not defined)
+                CATEGORIAS = [
+                    "Atividades em grupo/proatividade", 
+                    "Interesse pelo novo", 
+                    "Compartilhamento de materiais", 
+                    "Clareza e Desenvoltura", 
+                    "Respeito às regras"
+                ]
+
                 # 1. Busca de dados e Cor da Sala
                 info_row = afils[afils["ALUNO"].astype(str).str.contains(al_af, na=False)].iloc[0]
                 nome_sala = "Não informada"
@@ -1007,6 +1016,7 @@ elif menu == "🌊 Canal do Apadrinhamento":
                 with col_vasilhas:
                     df_av = df_aval.copy()
                     df_av.columns = [str(c).strip().upper() for c in df_av.columns]
+                    # Busca pelo nome na coluna padronizada ALUNO
                     dados_mare = df_av[df_av["ALUNO"] == al_af]
                     
                     if not dados_mare.empty:
@@ -1015,6 +1025,7 @@ elif menu == "🌊 Canal do Apadrinhamento":
                         valores_grafico = []
                         
                         for i, cat in enumerate(CATEGORIAS):
+                            # Busca o valor da categoria usando maiúsculas
                             val = r_mare.get(cat.upper(), 0)
                             try: val = float(val)
                             except: val = 0.0
@@ -1023,6 +1034,7 @@ elif menu == "🌊 Canal do Apadrinhamento":
                             status_txt = "Maré Baixa" if val <= 1 else "Maré Cheia" if val >= 3 else "Maré Alta"
                             html_v = render_vasilha_mare(val, cat)
                             
+                            # Limpeza de HTML para evitar sobreposição de elementos
                             html_v_limpo = html_v.split('<span style="position: absolute;')[0]
                             if not html_v_limpo.endswith('</div></div>'):
                                 html_v_limpo += '</div></div>'
@@ -1034,12 +1046,20 @@ elif menu == "🌊 Canal do Apadrinhamento":
                                         <div class="status-mare-final">{status_txt}</div>
                                     </div>
                                 """, unsafe_allow_html=True)
+                    else:
+                        st.warning("Avaliação comportamental ainda não registrada para este aluno.")
 
-                # GRÁFICO LARGURA TOTAL
+                # GRÁFICO LARGURA TOTAL (Fora da coluna de vasilhas para ocupar todo o espaço)
                 if not dados_mare.empty:
                     st.markdown("<br>", unsafe_allow_html=True)
                     fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
-                    fig_espelho.update_layout(height=380, margin=dict(l=5, r=5, t=30, b=0), autosize=True)
+                    fig_espelho.update_layout(
+                        height=380, 
+                        margin=dict(l=5, r=5, t=30, b=0), 
+                        autosize=True,
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)'
+                    )
                     st.plotly_chart(fig_espelho, use_container_width=True, config={'displayModeBar': False})
 
             # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---

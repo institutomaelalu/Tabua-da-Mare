@@ -561,32 +561,43 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.divider()
 
 # --- VISUALIZAÇÃO DA TABELA ---
-    try: # Linha 590
+    # 1. Primeiro definimos a seleção da sala e as cores para evitar o erro 'not defined'
+    render_botoes_salas("btn_pad", "sel_pad")
+    
+    sala_v = st.session_state.get("sel_pad", "SALA ROSA")
+    cfg_sala = TURMAS_CONFIG.get(sala_v, {"cor": "#333", "icon": "🏫"})
+    cor_h = cfg_sala["cor"]
+
+    try:
+        # Carregamento e padronização das colunas
         df_s = conn.read(worksheet=sala_v).fillna("")
         df_s.columns = [str(c).strip().upper() for c in df_s.columns]
 
         if not df_s.empty:
-            # Filtros
+            # 2. Renderiza os filtros de Turno e Comunidade
             tn, cm = render_filtros(df_geral, "pad")
             df_f = df_s.copy()
-            if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
-            if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
+            
+            if tn != "Todos": 
+                df_f = df_f[df_f["TURMA"] == tn]
+            if cm != "Todas": 
+                df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-            # Banner informativo
+            # Banner de contagem
             st.markdown(f"""
                 <div style="background-color: {cor_h}22; padding: 10px; border-radius: 5px; border-left: 5px solid {cor_h}; margin: 20px 0;">
-                    <span style="font-size: 14px; color: #333;">{cfg_sala['icon']} Atualmente: <b>{len(df_f)}</b> alunos na <b>{sala_v}</b></span>
+                    <span style="font-size: 13px; color: #333;">{cfg_sala['icon']} Atualmente: <b>{len(df_f)}</b> alunos na <b>{sala_v}</b></span>
                 </div>
             """, unsafe_allow_html=True)
 
-            # --- CONSTRUÇÃO DA TABELA HTML ---
+            # 3. Construção da Tabela com Fonte Reduzida (11px/12px)
             v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
             
-            # Tabela com fonte 12px
-            table_html = f'<table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px; border: 1px solid #ddd;">'
+            # Iniciando o HTML com fonte compacta
+            table_html = f'<table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 11px; border: 1px solid #ddd;">'
             table_html += f'<thead style="background-color: {cor_h}; color: white; text-align: left;"><tr>'
             for col in v_cols:
-                table_html += f'<th style="padding: 8px; border: 1px solid #ddd;">{col}</th>'
+                table_html += f'<th style="padding: 6px; border: 1px solid #ddd;">{col}</th>'
             table_html += '</tr></thead><tbody>'
 
             for i, (_, r) in enumerate(df_f.iterrows()):
@@ -594,22 +605,27 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 p_nome = str(r.get("PADRINHO/MADRINHA", "-")).strip()
                 if p_nome in ["", "0", "nan", "None", "-"]: p_nome = "-"
                 
-                table_html += f'<tr style="background-color: {bg};">'
-                table_html += f'<td style="padding: 8px; border: 1px solid #eee; font-weight: bold;">{r.get("ALUNO", "-")}</td>'
-                table_html += f'<td style="padding: 8px; border: 1px solid #eee; text-align: center;">{r.get("TURMA", "-")}</td>'
-                table_html += f'<td style="padding: 8px; border: 1px solid #eee; text-align: center;">{r.get("IDADE", "-")}</td>'
-                table_html += f'<td style="padding: 8px; border: 1px solid #eee;">{r.get("COMUNIDADE", "-")}</td>'
-                table_html += f'<td style="padding: 8px; border: 1px solid #eee; font-weight: 600;">{p_nome}</td>'
+                table_html += f'<tr style="background-color: {bg}; color: #333;">' # Cor da fonte padrão para a linha
+                table_html += f'<td style="padding: 6px; border: 1px solid #eee; font-weight: bold;">{r.get("ALUNO", "-")}</td>'
+                table_html += f'<td style="padding: 6px; border: 1px solid #eee; text-align: center;">{r.get("TURMA", "-")}</td>'
+                table_html += f'<td style="padding: 6px; border: 1px solid #eee; text-align: center;">{r.get("IDADE", "-")}</td>'
+                table_html += f'<td style="padding: 6px; border: 1px solid #eee;">{r.get("COMUNIDADE", "-")}</td>'
+                
+                # Coluna Padrinho: Agora com a mesma cor das outras (color: #333) e fonte reduzida
+                table_html += f'<td style="padding: 6px; border: 1px solid #eee; font-weight: 600; color: #333;">{p_nome}</td>'
                 table_html += '</tr>'
 
             table_html += "</tbody></table>"
+            
+            # Renderização final
             st.markdown(table_html, unsafe_allow_html=True)
             
         else:
             st.info(f"A {sala_v} ainda não possui alunos matriculados.")
 
     except Exception as e:
-        st.error(f"Erro ao carregar tabela: {e}")
+        st.error(f"Erro ao carregar os dados da tabela: {e}")
+        
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
 

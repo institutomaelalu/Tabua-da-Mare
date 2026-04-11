@@ -756,54 +756,49 @@ elif menu == "📊 Avaliação da Tábua da Maré":
             st.error(f"Erro ao conectar com a planilha: {e}")
             st.stop()
 
-        # Condição: Só exibe os controles se houver alunos matriculados/registrados
-        if not df_h.empty and "ALUNO" in df_h.columns:
-            
-            # 1. BOTÕES DE SELEÇÃO DE SALAS (Igual às outras abas)
-            # Removemos o parâmetro 'salas_permitidas' para mostrar todas as salas (Rosa, Azul, Verde, etc)
-            render_botoes_salas("btn_te", "sel_te")
-            sala_v = st.session_state.get("sel_te", "SALA ROSA")
-            
-            # 2. SELEÇÃO DE ANO (Mantendo sua lógica de histórico)
-            if "lista_anos_te" not in st.session_state:
-                st.session_state.lista_anos_te = sorted(df_h["ANO"].unique().tolist()) if "ANO" in df_h.columns else [2026]
-            if "ano_registro_te" not in st.session_state:
-                st.session_state.ano_registro_te = 2026
-
-            cols_anos = st.columns(len(st.session_state.lista_anos_te) + 1)
-            for i, ano in enumerate(st.session_state.lista_anos_te):
-                is_active = st.session_state.ano_registro_te == ano
-                if cols_anos[i].button(f"📅 {ano}", key=f"year_te_{ano}", use_container_width=True):
-                    st.session_state.ano_registro_te = ano
-                    st.rerun()
-
-            st.markdown(f"Exibindo dados de: <b style='color:#6741d9'>{st.session_state.ano_registro_te}</b>", unsafe_allow_html=True)
-            st.divider()
-
-            # 3. FILTRAGEM DE ALUNOS DA SALA SELECIONADA
-            # Mapeia Aluno -> Sala conforme registrado na planilha do Turno Estendido
-            dict_alunos_te = pd.Series(df_h.SALA.values, index=df_h.ALUNO.values).to_dict()
-            alunos_na_sala = [n for n, s in dict_alunos_te.items() if str(s).strip().upper() == str(sala_v).strip().upper()]
-
-            if alunos_na_sala:
-                al_sel = st.selectbox("Selecione o Aluno para Avaliação:", sorted(alunos_na_sala))
-                
-                # --- O RESTANTE DO SEU CÓDIGO DE FORMULÁRIO/HISTÓRICO SEGUE AQUI ---
-                # (Trilha de diagnóstico, formulário de registro, etc)
-                
-            else:
-                st.info(f"Não há alunos do Turno Estendido registrados na **{sala_v}** para o ano selecionado.")
-        
-        else:
-            # Caso a planilha esteja vazia, os botões não aparecem e exibe o aviso
+        # Condição: Só prossegue se houver dados
+        if df_h.empty or "ALUNO" not in df_h.columns:
             st.warning("Nenhum aluno matriculado no Turno Estendido até o momento.")
-            st.info("Para matricular um aluno, vá na aba 'Controle de Matrícula e Apadrinhamento'.")        
+            st.info("Para matricular um aluno, vá na aba 'Controle de Matrícula e Apadrinhamento'.")
+            st.stop() # Interrompe a execução aqui para não dar erro no formulário abaixo
+
+        # 1. BOTÕES DE SELEÇÃO DE SALAS
+        render_botoes_salas("btn_te", "sel_te")
+        sala_v = st.session_state.get("sel_te", "SALA ROSA")
+        
+        # 2. SELEÇÃO DE ANO
+        if "lista_anos_te" not in st.session_state:
+            st.session_state.lista_anos_te = sorted(df_h["ANO"].unique().tolist()) if "ANO" in df_h.columns else [2026]
+        if "ano_registro_te" not in st.session_state:
+            st.session_state.ano_registro_te = 2026
+
+        cols_anos = st.columns(len(st.session_state.lista_anos_te) + 1)
+        for i, ano in enumerate(st.session_state.lista_anos_te):
+            if cols_anos[i].button(f"📅 {ano}", key=f"year_te_{ano}", use_container_width=True):
+                st.session_state.ano_registro_te = ano
+                st.rerun()
+
+        st.markdown(f"Exibindo dados de: <b style='color:#6741d9'>{st.session_state.ano_registro_te}</b>", unsafe_allow_html=True)
+        st.divider()
+
+        # 3. FILTRAGEM DE ALUNOS
+        dict_alunos_te = pd.Series(df_h.SALA.values, index=df_h.ALUNO.values).to_dict()
+        alunos_na_sala = [n for n, s in dict_alunos_te.items() if str(s).strip().upper() == str(sala_v).strip().upper()]
+
+        if not alunos_na_sala:
+            st.info(f"Não há alunos do Turno Estendido registrados na **{sala_v}** para o ano selecionado.")
+            st.stop() # Interrompe aqui se a sala escolhida não tiver ninguém
+
+        al_sel = st.selectbox("Selecione o Aluno para Avaliação:", sorted(alunos_na_sala))
+
+        # --- A PARTIR DAQUI O ALUNO JÁ ESTÁ SELECIONADO ---
+        
         # Histórico para a trilha
         dados_al = df_h[df_h["ALUNO"] == al_sel]
         diag_rec = dados_al.iloc[-1] if not dados_al.empty else None
         nivel_atual = diag_rec["DIAGNÓSTICO"] if diag_rec is not None else ""
 
-        # --- TRILHA DE DIAGNÓSTICO ---
+        # --- TRILHA DE DIAGNÓSTICO (Visual) ---
         st.markdown("""<style>
             .trilha-te { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 15px 0; overflow-x: auto; }
             .box-te { padding: 8px; border-radius: 12px; text-align: center; font-size: 10px; font-weight: bold; min-width: 95px; height: 42px; display: flex; align-items: center; justify-content: center; line-height: 1.1; }
@@ -831,7 +826,8 @@ elif menu == "📊 Avaliação da Tábua da Maré":
             st.write("**Evidências observadas:**")
             evidencias = EVIDENCIAS_POR_NIVEL.get(novo_nivel, [])
             e_cols = st.columns(3)
-            selecionados = [ev for i, ev in enumerate(evidencias) if e_cols[i%3].checkbox(ev, key=f"ev_te_{i}")]
+            # Nota: usei al_sel no key para evitar conflitos ao trocar de aluno
+            selecionados = [ev for i, ev in enumerate(evidencias) if e_cols[i%3].checkbox(ev, key=f"ev_te_{al_sel}_{i}")]
             
             obs = st.text_area("Observações Pedagógicas Adicionais:")
             
@@ -848,7 +844,7 @@ elif menu == "📊 Avaliação da Tábua da Maré":
                     ano=int(st.session_state.ano_registro_te)
                 )
                 if sucesso:
-                    st.success(f"Avaliação salva!")
+                    st.success(f"Avaliação de {al_sel} salva!")
                     st.cache_data.clear()
                     st.rerun()
 # --- ABA: DADOS - TURNO ESTENDIDO (ATUALIZADO COM CORES E LEGENDA) ---

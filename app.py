@@ -1065,8 +1065,8 @@ if modo == "🌊 Tábua da Maré (Geral)":
     else:
         st.info(f"💡 As competências de {al_af} ainda serão preenchidas pelos professores.")
 
-            # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---
-            elif modo == "📚 Turno Estendido":
+# --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---
+  elif modo == "📚 Turno Estendido":
                 df_h = (df_alf.copy()).fillna("")
                 dados_al = df_h[df_h["Aluno"] == al_af].sort_values(["Ano", "Avaliacao"])
                 dados_al = dados_al.drop_duplicates(subset=['Avaliacao', 'Ano'], keep='last')

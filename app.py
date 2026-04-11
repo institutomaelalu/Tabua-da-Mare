@@ -889,56 +889,46 @@ elif menu == "🌊 Canal do Apadrinhamento":
     
     # --- 1. UNIÃO DAS TURMAS (CONEXÃO GOOGLE SHEETS) ---
     lista_salas = []
-    # TURMAS_CONFIG.keys() deve conter: "SALA ROSA", "SALA AMARELA", etc.
+    # Usando TURMAS_CONFIG para mapear as abas
     for nome_aba in TURMAS_CONFIG.keys():
         try:
-            # Puxa cada aba individualmente do Google Sheets
-            df_temp = conn.read(worksheet=nome_aba).fillna("")
-            # Padroniza colunas para MAIÚSCULO (Segurança R&D)
-            df_temp.columns = [str(c).strip().upper() for c in df_temp.columns]
-            # Adiciona metadado da sala para filtros posteriores
-            df_temp["SALA_NOME"] = nome_aba
-            lista_salas.append(df_temp)
-        except Exception as e:
-            # Se uma aba falhar, o app continua tentando as outras
+            df_t = conn.read(worksheet=nome_aba).fillna("")
+            df_t.columns = [str(c).strip().upper() for c in df_t.columns]
+            df_t["SALA_NOME"] = nome_aba  # Metadado para saber de qual aba veio
+            lista_salas.append(df_t)
+        except:
             continue
     
     if not lista_salas:
-        st.error("⚠️ Não foi possível carregar os dados das salas do Google Sheets. Verifique a conexão.")
+        st.error("⚠️ Erro ao carregar salas. Verifique a conexão.")
         st.stop()
 
-    # Consolida todas as salas num único DataFrame
     df_total = pd.concat(lista_salas, ignore_index=True)
     
-    # --- 2. IDENTIFICAÇÃO DO PADRINHO ---
+    # --- 2. IDENTIFICAÇÃO E SELEÇÃO (ADMIN vs PADRINHO) ---
     col_padrinho = "PADRINHO/MADRINHA"
     
-    if col_padrinho in df_total.columns:
-        # Gera lista única de padrinhos removendo valores vazios ou nulos
-        padrinhos_lista = sorted([
-            str(p).strip() for p in df_total[col_padrinho].unique() 
-            if str(p).strip() not in ["", "0", "nan", "None", "NaN"]
-        ])
-    else:
-        padrinhos_lista = ["Nenhum Padrinho Encontrado"]
+    # Lista de padrinhos únicos para o Admin
+    padrinhos_lista = sorted([
+        str(p).strip() for p in df_total[col_padrinho].unique() 
+        if str(p).strip() not in ["", "0", "nan", "None", "NaN"]
+    ]) if col_padrinho in df_total.columns else []
 
-    # Lógica de Perfil (Padrinho Logado ou Simulação Admin)
+    # Lógica de Perfil
     if st.session_state.get("perfil") == "padrinho":
         p_sel = st.session_state.get("nome_usuario", "")
     else:
-        p_sel = st.selectbox("👤 Selecionar Padrinho (Visualização Admin):", padrinhos_lista)
+        p_sel = st.selectbox("👤 Selecionar Padrinho (Visualização Admin):", ["Selecione..."] + padrinhos_lista)
     
-    if p_sel and p_sel != "Nenhum Padrinho Encontrado":
-        # Filtra os afilhados vinculados ao padrinho selecionado
-        afils = df_total[df_total[col_padrinho].astype(str).str.upper() == p_sel.upper()]
+    if p_sel and p_sel not in ["Selecione...", "Nenhum Padrinho Encontrado"]:
+        # Filtra afilhados
+        afils_df = df_total[df_total[col_padrinho].astype(str).str.upper() == p_sel.upper()]
         
-        if not afils.empty:
-            # Seletor de Afilhado (Usa a coluna ALUNO em maiúsculo)
-            lista_nomes = sorted([str(n).replace("**", "").strip() for n in afils["ALUNO"].unique()])
-            al_af = st.selectbox("👶 Selecione seu afilhado:", lista_nomes)
+        if not afils_df.empty:
+            lista_nomes = sorted([str(n).strip() for n in afils_df["ALUNO"].unique()])
+            al_af = st.selectbox("👶 Selecione o afilhado:", lista_nomes)
             
-            # --- 3. VERIFICAÇÃO DE MATRÍCULA NO TURNO ESTENDIDO ---
-            # Verifica se o aluno está no dicionário de matrículas do session_state
+            # Verificação de Turno Estendido
             is_turno = al_af in st.session_state.get("alunos_te_dict", {})
             modo = "🌊 Tábua da Maré (Geral)"
 
@@ -947,126 +937,87 @@ elif menu == "🌊 Canal do Apadrinhamento":
                 <div style="background-color: #f3e5f5; padding: 20px; border-radius: 12px; border-left: 5px solid #6741d9; margin-bottom: 20px; color: black;">
                     <span style="font-size: 18px;">✨ <b>O seu afilhado, {al_af}, participa do nosso Turno Estendido!</b></span><br>
                     <p style="margin-top: 10px; line-height: 1.5; font-size: 14px;">
-                        Essa é uma ação do nosso Projeto <b>"Vamos Dar a Meia Volta e Alfabetizar"</b>, 
-                        voltado para a intensificação do desenvolvimento da leitura e escrita.
+                        Essa é uma ação do nosso Projeto <b>"Vamos Dar a Meia Volta e Alfabetizar"</b>.
                     </p>
                 </div>""", unsafe_allow_html=True)
                 modo = st.radio("O que deseja visualizar?", ["🌊 Tábua da Maré (Geral)", "📚 Turno Estendido"], horizontal=True)
 
             st.markdown("---")
 
-# --- VISUALIZAÇÃO 1: GERAL (TÁBUA DA MARÉ) ---
-if modo == "🌊 Tábua da Maré (Geral)":
-    # 0. DEFINIÇÕES GLOBAIS
-    CATEGORIAS = [
-        "Atividades em grupo/proatividade", 
-        "Interesse pelo novo", 
-        "Compartilhamento de materiais", 
-        "Clareza e Desenvoltura", 
-        "Respeito às regras"
-    ]
-    
-    # 1. BUSCA MULTI-ABA PARA A FICHA
-    nome_sala = "Não encontrada"
-    idade = "---"
-    comunidade = "Não informada"
-    padrinho = "Sem padrinho/madrinha"
-    
-    # Passo A: Buscar a Turma na aba GERAL
-    df_geral_busc = safe_read("GERAL")
-    if not df_geral_temp.empty:
-        df_geral_temp.columns = [str(c).strip().upper() for c in df_geral_temp.columns]
-        aluno_geral = df_geral_temp[df_geral_temp["ALUNO"] == al_af]
-        if not aluno_geral.empty:
-            info_g = aluno_geral.iloc[0]
-            nome_sala = info_g.get("TURMA", "Não informada")
-            idade = info_g.get("IDADE", "---")
-            comunidade = info_g.get("COMUNIDADE", "Não informada")
-
-    # Passo B: Buscar o Padrinho nas abas das Salas (Azul, Rosa, Verde, Amarela, Cirand. Mundo)
-    abas_salas = ["SALA AZUL", "SALA ROSA", "SALA VERDE", "SALA AMARELA", "CIRAND. MUNDO"]
-    for aba in abas_salas:
-        df_sala = safe_read(aba)
-        if not df_sala.empty:
-            df_sala.columns = [str(c).strip().upper() for c in df_sala.columns]
-            aluno_sala = df_sala[df_sala["ALUNO"] == al_af]
-            if not aluno_sala.empty:
-                # Se achou o aluno, pega o padrinho/madrinha
-                info_s = aluno_sala.iloc[0]
-                padrinho = info_s.get("PADRINHO/MADRINHA", "Sem padrinho/madrinha")
-                # Se por acaso idade ou comunidade estiverem vazios na GERAL, tenta pegar daqui
-                if idade == "---": idade = info_s.get("IDADE", "---")
-                if comunidade == "Não informada": comunidade = info_s.get("COMUNIDADE", "Não informada")
-                break
-
-    # Lógica de cor baseada na TURMA lida na GERAL
-    cor_sala_bg = "#ffffff"
-    sala_upper = str(nome_sala).upper()
-    if "AZUL" in sala_upper: cor_sala_bg = "#E3F2FD"
-    elif "ROSA" in sala_upper: cor_sala_bg = "#FCE4EC"
-    elif "VERDE" in sala_upper: cor_sala_bg = "#E8F5E9"
-    elif "AMARELA" in sala_upper: cor_sala_bg = "#FFFDE7"
-    elif "LARANJA" in sala_upper: cor_sala_bg = "#FFF3E0"
-
-    # 2. CSS PARA STATUS
-    st.markdown("""
-        <style>
-        .status-mare-final {
-            font-size: 11px !important; color: #2c3e50;
-            margin-top: -10px; font-weight: bold; text-align: center;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # 3. LAYOUT (Ficha + Conteúdo)
-    col_ficha, col_conteudo = st.columns([1, 2.3])
-    
-    with col_ficha:
-        st.markdown(f"""
-            <div style="background-color: {cor_sala_bg}; padding: 18px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); color: black;">
-                <h4 style="margin: 0 0 12px 0; color: #1A5276; border-bottom: 2px solid rgba(0,0,0,0.1);">📋 Ficha do Aluno</h4>
-                <p style="margin: 8px 0; font-size: 13px;"><b>👤 Nome:</b><br>{al_af}</p>
-                <p style="margin: 8px 0; font-size: 13px;"><b>🏫 Sala/Turma:</b><br>{nome_sala}</p>
-                <p style="margin: 8px 0; font-size: 13px;"><b>🎂 Idade:</b><br>{idade}</p>
-                <p style="margin: 8px 0; font-size: 13px;"><b>🏡 Comunidade:</b><br>{comunidade}</p>
-                <p style="margin: 8px 0; font-size: 13px;"><b>🤝 Padrinho/Madrinha:</b><br>{padrinho}</p>
-            </div>
-        """, unsafe_allow_html=True)
-
-    with col_conteudo:
-        # Busca avaliações na aba TABUA_MARE
-        df_av = df_aval.copy()
-        df_av.columns = [str(c).strip().upper() for c in df_av.columns]
-        dados_mare = df_av[df_av["ALUNO"] == al_af]
-        
-        valores_grafico = []
-        if not dados_mare.empty:
-            r_mare = dados_mare.iloc[-1]
-            for cat in CATEGORIAS:
-                try:
-                    v = r_mare.get(cat.upper(), 0)
-                    valores_grafico.append(float(v) if v not in ["", None] else 0.0)
-                except: valores_grafico.append(0.0)
-
-        # Só mostra se houver notas (Soma > 0)
-        if sum(valores_grafico) > 0:
-            v_cols = st.columns(5)
-            for i, cat in enumerate(CATEGORIAS):
-                val = valores_grafico[i]
-                status_txt = "Maré Baixa" if val <= 1 else "Maré Cheia" if val >= 3 else "Maré Alta"
-                html_v = render_vasilha_mare(val, cat)
-                html_v_limpo = html_v.split('<span style="position: absolute;')[0]
-                if not html_v_limpo.endswith('</div></div>'): html_v_limpo += '</div></div>'
+            # --- VISUALIZAÇÃO 1: GERAL (TÁBUA DA MARÉ) ---
+            if modo == "🌊 Tábua da Maré (Geral)":
+                CATEGORIAS = ["Atividades em grupo/proatividade", "Interesse pelo novo", "Compartilhamento de materiais", "Clareza e Desenvoltura", "Respeito às regras"]
                 
-                with v_cols[i % 5]:
-                    st.markdown(f'<div style="text-align: center;">{html_v_limpo}<div class="status-mare-final">{status_txt}</div></div>', unsafe_allow_html=True)
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            fig_espelho = criar_grafico_mare(CATEGORIAS, valores_grafico)
-            fig_espelho.update_layout(height=350, margin=dict(l=5, r=5, t=30, b=0))
-            st.plotly_chart(fig_espelho, use_container_width=True, config={'displayModeBar': False})
+                # 1. BUSCA DE DADOS PARA A FICHA
+                # Puxamos da aba GERAL para garantir a Turma oficial (Coluna B)
+                df_geral_temp = safe_read("GERAL")
+                nome_sala, idade, comunidade, padrinho_nome = "Não encontrada", "---", "Não informada", p_sel
+                
+                if not df_geral_temp.empty:
+                    df_geral_temp.columns = [str(c).strip().upper() for c in df_geral_temp.columns]
+                    al_g = df_geral_temp[df_geral_temp["ALUNO"] == al_af]
+                    if not al_g.empty:
+                        info_g = al_g.iloc[0]
+                        nome_sala = info_g.get("TURMA", "Não informada")
+                        idade = info_g.get("IDADE", "---")
+                        comunidade = info_g.get("COMUNIDADE", "Não informada")
+
+                # Lógica de cor baseada na TURMA
+                cor_sala_bg = "#ffffff"
+                sala_up = str(nome_sala).upper()
+                if "AZUL" in sala_up: cor_sala_bg = "#E3F2FD"
+                elif "ROSA" in sala_up: cor_sala_bg = "#FCE4EC"
+                elif "VERDE" in sala_up: cor_sala_bg = "#E8F5E9"
+                elif "AMARELA" in sala_up: cor_sala_bg = "#FFFDE7"
+                elif "LARANJA" in sala_up: cor_sala_bg = "#FFF3E0"
+
+                # 3. LAYOUT (Ficha + Conteúdo)
+                col_ficha, col_conteudo = st.columns([1, 2.3])
+                
+                with col_ficha:
+                    st.markdown(f"""
+                        <div style="background-color: {cor_sala_bg}; padding: 18px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); color: black;">
+                            <h4 style="margin: 0 0 12px 0; color: #1A5276; border-bottom: 2px solid rgba(0,0,0,0.1);">📋 Ficha do Aluno</h4>
+                            <p style="margin: 8px 0; font-size: 13px;"><b>👤 Nome:</b><br>{al_af}</p>
+                            <p style="margin: 8px 0; font-size: 13px;"><b>🏫 Sala/Turma:</b><br>{nome_sala}</p>
+                            <p style="margin: 8px 0; font-size: 13px;"><b>🎂 Idade:</b><br>{idade}</p>
+                            <p style="margin: 8px 0; font-size: 13px;"><b>🏡 Comunidade:</b><br>{comunidade}</p>
+                            <p style="margin: 8px 0; font-size: 13px;"><b>🤝 Padrinho/Madrinha:</b><br>{padrinho_nome}</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                with col_conteudo:
+                    df_av = df_aval.copy()
+                    df_av.columns = [str(c).strip().upper() for c in df_av.columns]
+                    dados_mare = df_av[df_av["ALUNO"] == al_af]
+                    
+                    valores_grafico = []
+                    if not dados_mare.empty:
+                        r_m = dados_mare.iloc[-1]
+                        for cat in CATEGORIAS:
+                            try:
+                                v = r_m.get(cat.upper(), 0)
+                                valores_grafico.append(float(v) if v not in ["", None] else 0.0)
+                            except: valores_grafico.append(0.0)
+
+                    if sum(valores_grafico) > 0:
+                        v_cols = st.columns(5)
+                        for i, cat in enumerate(CATEGORIAS):
+                            val = valores_grafico[i]
+                            status_txt = "Maré Baixa" if val <= 1 else "Maré Cheia" if val >= 3 else "Maré Alta"
+                            html_v = render_vasilha_mare(val, cat)
+                            html_v_limpo = html_v.split('<span style="position: absolute;')[0]
+                            if not html_v_limpo.endswith('</div></div>'): html_v_limpo += '</div></div>'
+                            with v_cols[i % 5]:
+                                st.markdown(f'<div style="text-align: center;">{html_v_limpo}<div style="font-size:11px; font-weight:bold;">{status_txt}</div></div>', unsafe_allow_html=True)
+                        
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        fig = criar_grafico_mare(CATEGORIAS, valores_grafico)
+                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                    else:
+                        st.info(f"Sem novas Avaliações da Tábua da Maré de **{al_af}**")
         else:
-            st.info(f"Sem novas Avaliações da Tábua da Maré de **{al_af}**")
+            st.warning("Nenhum afilhado encontrado para este padrinho.")
 # --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (ESTILO ATUALIZADO E ENQUADRADO) ---
 elif modo == "📚 Turno Estendido":
                 df_h = (df_alf.copy()).fillna("")

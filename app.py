@@ -425,17 +425,13 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
     st.markdown("*Esse é o nosso canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento!*")
     
-    # 1. Definição Única das Cores (Padronizadas para evitar NameError)
-    c_rosa = "#F783AC"
-    c_amarela = "#FFE066"
-    c_verde = "#A9E34B"
-    c_azul = "#99E9F2"
-    c_lavanda = "#D0BFFF"
+    # 1. Definição Única das Cores
+    c_rosa, c_amarela, c_verde, c_azul, c_lavanda = "#F783AC", "#FFE066", "#A9E34B", "#99E9F2", "#D0BFFF"
 
-    # --- CSS PARA A "TABELA BRANCA" E BOTÕES ---
+    # --- CSS PARA A "TABELA BRANCA" E ESTILIZAÇÃO DOS BOTÕES ---
     st.markdown(f"""
         <style>
-        /* CRIA O FUNDO BRANCO (TABELA) PARA OS BOTÕES DE GESTÃO */
+        /* CONTAINER DO PAINEL DE GESTÃO (TABELA BRANCA) */
         div[key="painel_branco"] {{
             background-color: white !important;
             padding: 20px !important;
@@ -445,23 +441,22 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             margin-bottom: 25px !important;
         }}
 
-        /* RESET DOS BOTÕES SUPERIORES (POPOVERS) - SEMPRE BRANCOS */
+        /* BOTÕES DE GESTÃO (POPOVERS) - FUNDO BRANCO E SEM NEGRITO */
         div[data-testid="stPopover"] > button {{
             background-color: white !important;
-            background-image: none !important;
+            background-image: none !important; /* Remove gradientes nativos */
             border-radius: 10px !important;
             height: 3.5rem !important;
             transition: 0.3s !important;
         }}
 
-        /* CORES DE TEXTO E BORDA DOS POPOVERS (SEM NEGRITO) */
         div[key="mat_popover"] > button {{ color: {c_rosa} !important; border: 2px solid {c_rosa} !important; }}
         div[key="pad_popover"] > button {{ color: {c_amarela} !important; border: 2px solid {c_amarela} !important; }}
         div[key="est_popover"] > button {{ color: {c_verde} !important; border: 2px solid {c_verde} !important; }}
         div[key="del_popover"] > button {{ color: {c_azul} !important; border: 2px solid {c_azul} !important; }}
 
         div[data-testid="stPopover"] button p {{
-            font-weight: 500 !important; /* Sem negrito conforme pedido */
+            font-weight: 500 !important;
             color: inherit !important;
         }}
 
@@ -472,14 +467,12 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             background-image: none !important;
         }}
 
-        /* NEGRITO ABSOLUTO NAS SALAS */
         div[key^="btn_pad"] button div[data-testid="stMarkdownContainer"] p {{
             font-weight: 900 !important;
             color: white !important;
             font-size: 15px !important;
         }}
 
-        /* CORES DE FUNDO DAS SALAS */
         div[key$="SALA ROSA"] > button {{ background-color: {c_rosa} !important; }}
         div[key$="SALA AMARELA"] > button {{ background-color: {c_amarela} !important; }}
         div[key$="SALA VERDE"] > button {{ background-color: {c_verde} !important; }}
@@ -488,7 +481,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
         </style>
     """, unsafe_allow_html=True)
 
-    # --- PAINEL DE GESTÃO (A TABELA BRANCA) ---
+    # --- PAINEL DE GESTÃO (DENTRO DO CONTAINER BRANCO) ---
     with st.container(key="painel_branco"):
         st.markdown("<p style='text-align:center; color:gray; font-weight:bold; margin-bottom:15px;'>PAINEL DE GESTÃO</p>", unsafe_allow_html=True)
         g_col1, g_col2, g_col3, g_col4 = st.columns([1, 2.2, 1.3, 0.9])
@@ -508,7 +501,9 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 if st.button("Confirmar Matrícula", use_container_width=True):
                     nova_linha = [n_nome.upper(), n_turno, txt_idade, n_nasc.strftime("%d/%m/%Y"), n_comu.upper(), ""]
                     conn.append_row(worksheet=n_sala, data=nova_linha)
-                    st.success(f"{n_nome.upper()} matriculado!"); st.cache_data.clear()
+                    st.success(f"{n_nome.upper()} matriculado!")
+                    st.cache_data.clear()
+                    st.rerun()
 
         with g_col2:
             with st.popover("🤝 Registro de Padrinho/Madrinha", key="pad_popover", use_container_width=True):
@@ -519,10 +514,13 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].isin(["", "-", "nan", "0"])]["ALUNO"].unique())
                 nome_p = st.text_input("Nome do Padrinho/Madrinha")
                 al_sel = st.selectbox("Escolha o Afilhado:", lista_lib)
+                
                 if st.button("Confirmar Apadrinhamento", use_container_width=True):
                     idx = df_b[df_b["ALUNO"] == al_sel].index[0] + 2
                     conn.update_cell(worksheet=s_busca, row=idx, col=6, value=nome_p.upper())
-                    st.success("Registro concluído!"); st.cache_data.clear()
+                    st.success("Registro concluído!")
+                    st.cache_data.clear()
+                    st.rerun()
 
         with g_col3:
             with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
@@ -534,24 +532,28 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 
                 if st.button("Confirmar Turno Estendido", use_container_width=True):
                     try:
-                        # Caminho compatível para acessar o gspread através da conexão
-                        if hasattr(conn, "_instance"):
+                        # Lógica Robusta para acessar o Cliente de Escrita
+                        client = None
+                        if hasattr(conn, "_instance") and hasattr(conn._instance, "client"):
                             client = conn._instance.client
-                        else:
+                        elif hasattr(conn, "client"):
+                            client = conn.client
+                        elif hasattr(conn, "session") and hasattr(conn.session, "client"):
                             client = conn.session.client
                         
-                        # Abre a planilha e a aba
-                        sh = client.open_by_key(st.secrets["connections"]["gsheets"]["spreadsheet"])
-                        ws = sh.worksheet("TURNO_ESTENDIDO")
-                        
-                        for aluno in selecionados:
-                            ws.append_row([aluno.upper(), s_est])
-                        
-                        st.success(f"{len(selecionados)} alunos adicionados!")
-                        st.cache_data.clear()
-                        st.rerun()
+                        if client:
+                            sh = client.open_by_key(st.secrets["connections"]["gsheets"]["spreadsheet"])
+                            ws = sh.worksheet("TURNO_ESTENDIDO")
+                            for aluno in selecionados:
+                                ws.append_row([aluno.upper(), s_est])
+                            st.success(f"{len(selecionados)} alunos adicionados!")
+                            st.cache_data.clear()
+                            st.rerun()
+                        else:
+                            st.error("Erro interno: Cliente de escrita não encontrado.")
                     except Exception as e:
                         st.error(f"Erro ao salvar: {e}")
+
         with g_col4:
             with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):
                 st.markdown("##### ⚠️ Zona de Exclusão")
@@ -560,15 +562,23 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 df_del = conn.read(worksheet=s_del).fillna("")
                 df_del.columns = [str(c).strip().upper() for c in df_del.columns]
                 al_del = st.selectbox("Selecionar Aluno:", sorted(df_del["ALUNO"].unique()) if not df_del.empty else [])
+                
                 if st.button("🚨 EXCLUIR", use_container_width=True):
                     idx_del = df_del[df_del["ALUNO"] == al_del].index[0] + 2
                     if tipo_del == "Padrinho":
                         conn.update_cell(worksheet=s_del, row=idx_del, col=6, value="")
                     else:
                         conn.delete_rows(worksheet=s_del, indices=[idx_del])
-                    st.error("Removido!"); st.cache_data.clear()
+                    st.error("Removido!")
+                    st.cache_data.clear()
+                    st.rerun()
 
     st.divider()
+
+    # --- BOTÕES DAS SALAS ---
+    render_botoes_salas("btn_pad", "sel_pad")
+    
+    # Restante da lógica da tabela (FILTROS E VISUALIZAÇÃO) permanece igual...
 
     # --- BOTÕES DAS SALAS (COLORIDOS) ---
     render_botoes_salas("btn_pad", "sel_pad")

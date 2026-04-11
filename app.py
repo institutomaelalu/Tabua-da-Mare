@@ -532,31 +532,33 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 
                 if st.button("Confirmar Turno Estendido", use_container_width=True):
                     try:
-                        # 1. Busca o cliente gspread de forma exaustiva
+                        # 1. Busca o cliente de escrita
                         client = None
-                        
-                        # Tenta encontrar o atributo que contém o 'open_by_key'
-                        if hasattr(conn, "client"):
-                            client = conn.client
-                        elif hasattr(conn, "_instance") and hasattr(conn._instance, "client"):
+                        if hasattr(conn, "_instance") and hasattr(conn._instance, "client"):
                             client = conn._instance.client
+                        elif hasattr(conn, "client"):
+                            client = conn.client
                         elif hasattr(conn, "session") and hasattr(conn.session, "client"):
                             client = conn.session.client
                         
-                        # Se o 'client' ainda for o wrapper, pegamos o atributo interno dele
+                        # Escavação profunda para o gspread
                         if client and not hasattr(client, "open_by_key"):
-                            if hasattr(client, "_client"):
-                                client = client._client
-                            elif hasattr(client, "service"):
-                                client = client.service
+                            client = getattr(client, "_client", getattr(client, "service", client))
 
-                        if client is None or not hasattr(client, "open_by_key"):
-                            st.error("Não foi possível acessar o driver de escrita gspread.")
+                        if client is None:
+                            st.error("Não foi possível acessar o driver de escrita.")
                         else:
-                            # 2. Execução da escrita
+                            # 2. Acesso aos dados nos Secrets
+                            # Certifique-se que em .streamlit/secrets.toml existe o campo [connections.gsheets]
                             spreadsheet_id = st.secrets["connections"]["gsheets"]["spreadsheet"]
                             sh = client.open_by_key(spreadsheet_id)
-                            ws = sh.worksheet("TURNO_ESTENDIDO")
+                            
+                            # 3. Verificação da Aba (Evita o 404)
+                            try:
+                                ws = sh.worksheet("TURNO_ESTENDIDO")
+                            except Exception:
+                                st.error("Erro 404: A aba 'TURNO_ESTENDIDO' não foi encontrada na sua planilha.")
+                                st.stop()
                             
                             for aluno in selecionados:
                                 ws.append_row([aluno.upper(), s_est])
@@ -566,7 +568,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                             st.rerun()
                             
                     except Exception as e:
-                        st.error(f"Erro técnico ao salvar: {e}")
+                        st.error(f"Erro ao salvar: {e}")
 
         with g_col4:
             with st.popover("🗑️ Remover", key="del_popover", use_container_width=True):

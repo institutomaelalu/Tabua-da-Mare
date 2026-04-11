@@ -443,16 +443,14 @@ if menu == "👤 Matrícula":
 elif menu == "📝 Alunos matriculados":
     st.markdown(f"### 📋 Quadro de Alunos Matriculados")
     
-    # 1. BOTÕES DE SALA (Idêntico ao original)
+    # 1. BOTÕES E FILTROS
     render_botoes_salas("btn_mat", "sel_mat")
     sala_atual = st.session_state.sel_mat
     cor_h = TURMAS_CONFIG[sala_atual]["cor"]
     
-    # 2. CARREGAMENTO E FILTRAGEM (Lógica de Sheets)
     df_s = conn.read(worksheet=sala_atual).fillna("")
     df_s.columns = [str(c).strip().upper() for c in df_s.columns]
     
-    # Filtros de Turma e Comunidade
     df_g_aux = conn.read(worksheet="GERAL").fillna("")
     df_g_aux.columns = [str(c).strip().upper() for c in df_g_aux.columns]
     tn, cm = render_filtros(df_g_aux, "mat")
@@ -461,36 +459,36 @@ elif menu == "📝 Alunos matriculados":
     if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
     if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-    # 3. CABEÇALHO DA TABELA (Estilo app (2).py)
+    # 2. CABEÇALHO COM DIVISORES (Fonte 14)
     st.markdown(f"""
         <div style="background-color:{cor_h}; color: white; padding: 10px; border-radius: 5px 5px 0 0; 
-                    display: flex; font-weight: bold; font-size: 14px; text-transform: uppercase;">
-            <div style="flex: 0.5; text-align: center;">ST</div>
-            <div style="flex: 3;">ALUNO</div>
-            <div style="flex: 1;">IDADE</div>
-            <div style="flex: 2;">COMUNIDADE</div>
+                    display: flex; font-weight: bold; font-size: 14px; text-transform: uppercase; align-items: center;">
+            <div style="flex: 0.5; text-align: center; border-right: 1px solid rgba(255,255,255,0.3);">ST</div>
+            <div style="flex: 3; padding-left: 10px; border-right: 1px solid rgba(255,255,255,0.3);">ALUNO</div>
+            <div style="flex: 1; text-align: center; border-right: 1px solid rgba(255,255,255,0.3);">IDADE</div>
+            <div style="flex: 2; padding-left: 10px;">COMUNIDADE</div>
         </div>
     """, unsafe_allow_html=True)
     
-    # 4. LISTAGEM (Usando st.columns para manter a fonte nativa e bonita)
+    # 3. LISTAGEM COM LINHAS VERTICAIS E HORIZONTAIS SUAVES
     matriculados_te = st.session_state.get("alunos_te_dict", {}).keys()
 
     if not df_f.empty:
         for i, r in df_f.iterrows():
-            # Criamos as colunas com as mesmas proporções do cabeçalho HTML
-            c_st, c_al, c_id, c_co = st.columns([0.5, 3, 1, 2])
-            
             nome_aluno = str(r.get("ALUNO", "")).replace("**", "").strip()
             idade = str(r.get("IDADE", ""))
             comunidade = str(r.get("COMUNIDADE", ""))
             status = "✍️📖" if nome_aluno in matriculados_te else ""
             
-            with c_st: st.markdown(f"<p style='text-align:center; margin:0;'>{status}</p>", unsafe_allow_html=True)
-            with c_al: st.markdown(f"<p style='margin:0;'>{nome_aluno}</p>", unsafe_allow_html=True)
-            with c_id: st.markdown(f"<p style='margin:0;'>{idade}</p>", unsafe_allow_html=True)
-            with c_co: st.markdown(f"<p style='margin:0;'>{comunidade}</p>", unsafe_allow_html=True)
-            
-            st.markdown("<hr style='margin: 0px 0px 5px 0px; opacity: 0.2;'>", unsafe_allow_html=True)
+            # HTML para garantir as linhas verticais entre as colunas
+            st.markdown(f"""
+                <div style="display: flex; font-size: 14px; color: #31333F; padding: 8px 0; align-items: center; border-bottom: 1px solid #eeeeee;">
+                    <div style="flex: 0.5; text-align: center; border-right: 1px solid #eeeeee;">{status}</div>
+                    <div style="flex: 3; padding-left: 10px; border-right: 1px solid #eeeeee;">{nome_aluno}</div>
+                    <div style="flex: 1; text-align: center; border-right: 1px solid #eeeeee;">{idade}</div>
+                    <div style="flex: 2; padding-left: 10px;">{comunidade}</div>
+                </div>
+            """, unsafe_allow_html=True)
     else:
         st.info("Nenhum aluno encontrado.")
 elif menu == "🤝 Gestão de apadrinhamento":

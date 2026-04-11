@@ -748,8 +748,7 @@ elif menu == "📊 Avaliação da Tábua da Maré":
 # --- ABA: TURNO ESTENDIDO ---
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
-    render_botoes_salas("btn_aval", "sel_aval")
-    sala_atual = st.session_state.sel_aval
+
     try:
         df_h = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
         df_h.columns = [str(c).strip().upper() for c in df_h.columns]

@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
+nome_planilha = "APP_IMLA"
 
 # --- ADICIONAR ESTE BLOCO NO TOPO (Aprox. Linha 25) ---
 CORES_EXCLUSIVAS = {
@@ -69,20 +70,20 @@ st.markdown(f"""
 # 2. CONEXÃO E CARREGAMENTO DE DADOS
 # =================================================================
 conn = st.connection("gsheets", type=GSheetsConnection)
-
+nome_planilha = st.secrets["connections"]["gsheets"]["spreadsheet"]
 try:
     # Extração segura do ID da Planilha
     raw_url = st.secrets["connections"]["gsheets"]["spreadsheet"]
-    sheet_id = raw_url.split("/d/")[-1].split("/")[0] if "/d/" in raw_url else raw_url
+    nome_planilha = raw_url.split("/d/")[-1].split("/")[0] if "/d/" in raw_url else raw_url
 
     # Carregamento Principal
-    df_g = conn.read(spreadsheet=sheet_id, worksheet="GERAL").fillna("")
+    df_g = conn.read(spreadsheet=nome_planilha, worksheet="GERAL").fillna("")
     df_g.columns = [str(c).strip().upper() for c in df_g.columns]
     
-    df_alf = conn.read(spreadsheet=sheet_id, worksheet="TURNO_ESTENDIDO").fillna("")
+    df_alf = conn.read(spreadsheet=nome_planilha, worksheet="TURNO_ESTENDIDO").fillna("")
     df_alf.columns = [str(c).strip().upper() for c in df_alf.columns]
 
-    df_aval = conn.read(spreadsheet=sheet_id, worksheet="TABUA_MARE").fillna("")
+    df_aval = conn.read(spreadsheet=nome_planilha, worksheet="TABUA_MARE").fillna("")
     df_aval.columns = [str(c).strip().upper() for c in df_aval.columns]
     
 except Exception as e:
@@ -540,7 +541,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
 
         with g_col3:
             with st.popover("⏳ Turno Estendido", key="est_popover", use_container_width=True):
-                st.markdown("##### ⏳ Matrícula Estendida")
+                st.markdown("##### ⏳ Matrícula no Turno Estendido")
                 s_est = st.selectbox("Origem dos Alunos:", list(TURMAS_CONFIG.keys()), key="sel_est_sala")
                 df_est = conn.read(spreadsheet=nome_planilha, worksheet=s_est).fillna("")
                 df_est.columns = [str(c).strip().upper() for c in df_est.columns]
@@ -566,7 +567,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 st.markdown("##### ⚠️ Zona de Exclusão")
                 tipo_del = st.radio("O que remover?", ["Aluno (Matrícula)", "Padrinho"])
                 s_del = st.selectbox("Aba:", list(TURMAS_CONFIG.keys()) + ["TURNO_ESTENDIDO"])
-                df_del = conn.read(spreadsheet=sheet_id, worksheet=s_del).fillna("")
+                df_del = conn.read(spreadsheet=nome_planilha, worksheet=s_del).fillna("")
                 df_del.columns = [str(c).strip().upper() for c in df_del.columns]
                 
                 al_excluir = st.selectbox("Selecionar Aluno:", sorted(df_del["ALUNO"].unique()) if not df_del.empty else [])
@@ -574,10 +575,10 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
                 if st.button("🚨 EXCLUIR", use_container_width=True):
                     idx_del = df_del[df_del["ALUNO"] == al_excluir].index[0] + 2
                     if tipo_del == "Padrinho":
-                        conn.update_cell(spreadsheet=sheet_id, worksheet=s_del, row=idx_del, col=6, value="")
+                        conn.update_cell(spreadsheet=nome_planilha, worksheet=s_del, row=idx_del, col=6, value="")
                     else:
                         # Para deletar linha, usamos o client gspread diretamente
-                        sh = conn.client.open_by_key(sheet_id)
+                        sh = conn.client.open_by_key(nome_planilha)
                         sh.worksheet(s_del).delete_rows(int(idx_del))
                     st.success("Removido!")
                     st.cache_data.clear()
@@ -593,7 +594,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
     cor_h = TURMAS_CONFIG[sala_v]["cor"]
 
     # --- VISUALIZAÇÃO DOS DADOS ---
-    df_s = conn.read(spreadsheet=sheet_id, worksheet=sala_v).fillna("")
+    df_s = conn.read(spreadsheet=nome_planilha, worksheet=sala_v).fillna("")
     df_s.columns = [str(c).strip().upper() for c in df_s.columns]
 
     if not df_s.empty:

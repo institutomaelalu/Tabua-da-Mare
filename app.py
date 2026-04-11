@@ -451,86 +451,88 @@ elif menu == "📝 Controle de Matrícula e Apadrinhamento":
     with col_mat:
         with st.popover("➕ Matricular Aluno"):
             st.markdown("##### 📝 Nova Matrícula")
-            novo_nome = st.text_input("Nome Completo do Aluno")
-            nova_turma = st.selectbox("Turno:", ["A", "B"])
-            nova_idade = st.text_input("Idade (ex: 10 ANOS)")
-            nova_nasc = st.date_input("Data de Nascimento", format="DD/MM/YYYY")
+            novo_nome = st.text_input("Nome do Aluno")
+            nova_nasc = st.date_input("Data de Nascimento", format="DD/MM/YYYY", min_value=datetime(2000, 1, 1))
+            
+            # Cálculo automático da idade
+            hoje = datetime.now()
+            idade_calculada = hoje.year - nova_nasc.year - ((hoje.month, hoje.day) < (nova_nasc.month, nova_nasc.day))
+            texto_idade = f"{idade_calculada} ANOS"
+            st.info(f"Idade identificada: **{texto_idade}**")
+            
+            nova_sala = st.selectbox("Sala", list(TURMAS_CONFIG.keys()), key="mat_sala")
+            nova_turma = st.selectbox("Turno", ["A", "B"], key="mat_turno")
             nova_comu = st.text_input("Comunidade")
-            nova_sala = st.selectbox("Destinar à Sala (Aba):", list(TURMAS_CONFIG.keys()))
             
             if st.button("Confirmar Matrícula"):
                 if novo_nome:
-                    # Ordem exata da planilha: ALUNO - TURMA - IDADE - NASC. - COMUNIDADE - PADRINHO/MADRINHA
-                    nasc_formatada = nova_nasc.strftime("%d/%m/%Y")
-                    nova_linha = [novo_nome.upper(), nova_turma, nova_idade.upper(), nasc_formatada, nova_comu.upper(), ""]
-                    
+                    nasc_str = nova_nasc.strftime("%d/%m/%Y")
+                    # Ordem: ALUNO - TURMA - IDADE - NASC. - COMUNIDADE - PADRINHO
+                    nova_linha = [novo_nome.upper(), nova_turma, texto_idade, nasc_str, nova_comu.upper(), ""]
                     try:
                         conn.append_row(worksheet=nova_sala, data=nova_linha)
-                        st.success(f"Matrícula de {novo_nome} realizada com sucesso!")
-                        st.cache_data.clear() 
+                        st.success(f"Matrícula de {novo_nome} realizada!")
+                        st.cache_data.clear()
                     except Exception as e:
-                        st.error(f"Erro ao salvar na Google Sheet: {e}")
-                else:
-                    st.warning("O nome do aluno é obrigatório.")
+                        st.error(f"Erro ao salvar: {e}")
 
     with col_pad:
         with st.popover("➕ Registrar Padrinho"):
             st.markdown("##### 🤝 Novo Apadrinhamento")
-            df_atual = conn.read(worksheet=st.session_state.sel_pad).fillna("")
-            lista_alunos = sorted(df_atual["ALUNO"].unique()) if not df_atual.empty else []
+            sala_busca = st.selectbox("Filtrar por Sala:", list(TURMAS_CONFIG.keys()), key="busca_pad_sala")
+            
+            # Busca dados da sala para filtrar apenas quem não tem padrinho
+            df_busca = conn.read(worksheet=sala_busca).fillna("")
+            df_busca.columns = [str(c).strip().upper() for c in df_busca.columns]
+            
+            # Filtro: Alunos onde a coluna PADRINHO/MADRINHA está vazia ou é "-"
+            sem_padrinho = df_busca[df_busca["PADRINHO/MADRINHA"].isin(["", "-", "nan", "0"])]
+            lista_disponivel = sorted(sem_padrinho["ALUNO"].unique()) if not sem_padrinho.empty else []
             
             padrinho_nome = st.text_input("Nome do Padrinho/Madrinha")
-            afilhado_sel = st.selectbox("Selecionar Afilhado(a):", lista_alunos)
+            afilhado_sel = st.selectbox("Selecionar Afilhado(a) (Apenas sem padrinho):", lista_disponivel)
             
             if st.button("Confirmar Apadrinhamento"):
                 if padrinho_nome and afilhado_sel:
                     try:
-                        df_update = conn.read(worksheet=st.session_state.sel_pad)
-                        # Localiza a linha do aluno (+2 por causa do cabeçalho e index 0)
+                        # Re-lê para garantir o índice correto
+                        df_update = conn.read(worksheet=sala_busca)
                         idx = df_update[df_update["ALUNO"] == afilhado_sel].index[0] + 2
-                        # PADRINHO/MADRINHA é a 6ª coluna (Coluna F) na sua nova descrição
-                        conn.update_cell(worksheet=st.session_state.sel_pad, row=idx, col=6, value=padrinho_nome.upper())
-                        
-                        st.success(f"Apadrinhamento de {afilhado_sel} registrado!")
+                        conn.update_cell(worksheet=sala_busca, row=idx, col=6, value=padrinho_nome.upper())
+                        st.success("Apadrinhamento registrado!")
                         st.cache_data.clear()
                     except Exception as e:
-                        st.error(f"Erro ao atualizar coluna de padrinhos: {e}")
+                        st.error(f"Erro: {e}")
 
     st.divider()
 
-    # 1. BOTÕES DE SELEÇÃO DE SALA
+    # 1. SELEÇÃO DE SALA PARA VISUALIZAÇÃO
     render_botoes_salas("btn_pad", "sel_pad")
-    sala_atual = st.session_state.sel_pad
-    cor_h = TURMAS_CONFIG[sala_atual]["cor"]
+    sala_visual = st.session_state.sel_pad
+    cor_h = TURMAS_CONFIG[sala_visual]["cor"]
 
-    # --- CARREGAMENTO DOS DADOS PARA EXIBIÇÃO ---
+    # --- CARREGAMENTO PARA A TABELA ---
     df_g = conn.read(worksheet="GERAL").fillna("")
     df_g.columns = [str(c).strip().upper() for c in df_g.columns]
-
-    df_s = conn.read(worksheet=sala_atual).fillna("")
+    df_s = conn.read(worksheet=sala_visual).fillna("")
     df_s.columns = [str(c).strip().upper() for c in df_s.columns]
 
     if not df_s.empty:
-        # 2. RENDERIZAÇÃO DOS FILTROS
         tn, cm = render_filtros(df_g, "pad")
-        
-        # 3. LÓGICA DE FILTRAGEM
         df_f = df_s.copy()
-        if tn != "Todos":
-            df_f = df_f[df_f["TURMA"] == tn]
-        if cm != "Todas":
-            df_f = df_f[df_f["COMUNIDADE"] == cm]
+        if tn != "Todos": df_f = df_f[df_f["TURMA"] == tn]
+        if cm != "Todas": df_f = df_f[df_f["COMUNIDADE"] == cm]
 
-        # 4. CONTADOR DINÂMICO
-        texto_turno = f" - {tn}" if tn != "Todos" else ""
+        # Contador Dinâmico
+        t_turno = f" - {tn}" if tn != "Todos" else ""
         st.markdown(f"""
             <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; border-left: 4px solid {cor_h}; margin: 10px 0 20px 0;">
-                <span style="font-size: 14px; color: #555;">📍 Atualmente temos <b>{len(df_f)}</b> alunos matriculados na <b>{sala_atual}{texto_turno}</b></span>
+                <span style="font-size: 14px; color: #555;">📍 Atualmente temos <b>{len(df_f)}</b> alunos matriculados na <b>{sala_visual}{t_turno}</b></span>
             </div>
         """, unsafe_allow_html=True)
 
-        # 5. TABELA VISUAL (Não exibe NASC para manter o layout limpo)
-        v_cols_visual = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
+        # Tabela Visual (Fonte 13px)
+        v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
         st.markdown(f"""
             <style>
                 .custom-table {{ font-size: 13px !important; width: 100%; border-collapse: collapse; }}
@@ -539,18 +541,11 @@ elif menu == "📝 Controle de Matrícula e Apadrinhamento":
             </style>
         """, unsafe_allow_html=True)
 
-        html = f'<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in v_cols_visual]) + '</tr></thead><tbody>'
+        html = f'<table class="custom-table"><thead><tr>' + "".join([f'<th>{c}</th>' for c in v_cols]) + '</tr></thead><tbody>'
         for _, r in df_f.iterrows():
-            padrinho = str(r.get('PADRINHO/MADRINHA',''))
-            padrinho_texto = padrinho if padrinho.lower() not in ['nan','', '0'] else '-'
-            
-            html += f"""<tr>
-                <td>{str(r.get('ALUNO',''))}</td>
-                <td style="text-align: center;">{str(r.get('TURMA',''))}</td>
-                <td>{str(r.get('IDADE',''))}</td>
-                <td>{str(r.get('COMUNIDADE',''))}</td>
-                <td>{padrinho_texto}</td>
-            </tr>"""
+            pad = str(r.get('PADRINHO/MADRINHA',''))
+            pad_txt = pad if pad.lower() not in ['nan','', '0'] else '-'
+            html += f"<tr><td>{r['ALUNO']}</td><td style='text-align:center'>{r['TURMA']}</td><td>{r['IDADE']}</td><td>{r['COMUNIDADE']}</td><td>{pad_txt}</td></tr>"
         
         st.markdown(html + '</tbody></table>', unsafe_allow_html=True)
         st.caption(f"Total exibido: {len(df_f)} alunos")

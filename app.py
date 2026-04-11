@@ -39,14 +39,24 @@ st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- 2. CARREGAMENTO INICIAL ---
-@st.cache_data(ttl=600)
-def engine_leitura_dados(nome_aba): # Mudei o nome da função aqui
-    try:
-        df = conn.read(worksheet=nome_aba, ttl=None).fillna("")
-        df.columns = [str(c).strip().upper() for c in df.columns]
-        return df
-    except Exception as e:
-        return pd.DataFrame()
+try:
+    # 1. Base Geral de Alunos
+    df_g = conn.read(worksheet="GERAL").fillna("")
+    df_g.columns = [str(c).strip().upper() for c in df_g.columns]
+    
+    # 2. Base do Turno Estendido (Substitui o ALF_FILE)
+    df_alf = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
+    df_alf.columns = [str(c).strip().upper() for c in df_alf.columns]
+
+    # 3. Base da Tábua da Maré (Substitui o AVAL_FILE)
+    df_aval = conn.read(worksheet="TABUA_MARE").fillna("")
+    df_aval.columns = [str(c).strip().upper() for c in df_aval.columns]
+    
+except Exception as e:
+    st.error(f"Erro ao carregar dados da nuvem: {e}")
+    df_g = pd.DataFrame(columns=["ALUNO", "TURNO", "COMUNIDADE", "SALA"])
+    df_alf = pd.DataFrame(columns=["ALUNO", "SALA", "ANO", "AVALIAÇÃO", "DIAGNÓSTICO"])
+    df_aval = pd.DataFrame(columns=["ALUNO", "SEMESTRE"] + CATEGORIAS)
 
 # --- 3. FUNÇÕES DE FILTRO (Ajustadas para os novos nomes) ---
 def render_filtros(df_geral, key_suffix):

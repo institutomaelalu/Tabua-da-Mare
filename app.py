@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 import os
+import unicodedata
 import gspread
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
@@ -12,6 +13,7 @@ st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 ID_PLANILHA = "1Zj8u67oAWKgYRd2uOkGssdaxXnwdsKsZBDxeLChnBr4"
 ARQUIVO_BUFFER   = "buffer_estendido.csv"
 ARQUIVO_DADOS_TE = "dados_turno_estendido.csv"
+ARQUIVO_TABUA_MARE_LOCAL = "tabua_mare_registros_locais.csv"
 
 C_ROSA, C_VERDE, C_AZUL, C_AMARELO, C_ROXO = "#ff81ba", "#a8cf45", "#5cc6d0", "#ffc713", "#6741d9"
 C_AZUL_MARE = "#8fd9fb"
@@ -48,6 +50,7 @@ CATEGORIAS = [
     "Clareza e desenvoltura", "Respeito às regras", "Vocabulário adequado",
     "Leitura e Escrita", "Compreensão de comandos", "Superação de desafios", "Assiduidade"
 ]
+OPCOES_MARE = ["Maré Baixa", "Maré Vazante", "Maré Enchente", "Maré Alta", "Maré Cheia"]
 EVIDENCIAS_POR_NIVEL = {
     "1. Pré-Silábico":          ["Diferencia letras de desenhos", "Escreve o nome sem apoio", "Acredita que nomes grandes têm muitas letras", "Sabe que se escreve da esquerda para a direita"],
     "2. Silábico s/ Valor":     ["Uma letra para cada sílaba (sem som)", "Segmenta a fala em partes", "Respeita quantidade de emissões sonoras", "Faz leitura global da palavra"],
@@ -251,26 +254,189 @@ def registrar_matricula_te(aluno, sala):
         return False
 
 
+def normalizar_texto(valor):
+    texto = "" if pd.isna(valor) else str(valor)
+    texto = unicodedata.normalize("NFKD", texto)
+    texto = "".join(ch for ch in texto if not unicodedata.combining(ch))
+    return " ".join(texto.strip().upper().split())
+
+
+def normalizar_sala_tabua(valor):
+    texto = normalizar_texto(valor)
+    if texto.startswith("SALA "):
+        texto = texto.replace("SALA ", "", 1)
+    return texto.split(" - ")[0].strip()
+
+
+def sala_para_tabua(valor):
+    texto = str(valor).replace("**", "").strip()
+    if texto.upper().startswith("SALA "):
+        texto = texto[5:].strip()
+    return texto
+
+
+def colunas_tabua_mare():
+    return ["ALUNO", "SALA/TURMA", "SEMESTRE"] + [c.upper() for c in CATEGORIAS] + [
+        "OBSERVAÇÕES PEDAGÓGICAS", "DATA_REGISTRO", "STATUS_ENVIO"
+    ]
+
+
+def carregar_tabua_mare_local():
+    if os.path.exists(ARQUIVO_TABUA_MARE_LOCAL):
+        df = pd.read_csv(ARQUIVO_TABUA_MARE_LOCAL).fillna("")
+    else:
+        df = pd.DataFrame(columns=colunas_tabua_mare())
+    df.columns = [str(c).strip().upper() for c in df.columns]
+    for col in colunas_tabua_mare():
+        if col not in df.columns:
+            df[col] = ""
+    return df
+
+
+def linha_tem_avaliacao_tabua(row):
+    for cat in CATEGORIAS:
+        valor = row.get(cat.upper(), row.get(cat, ""))
+        if str(valor).strip():
+            return True
+    for col in ["SEMESTRE", "OBSERVAÇÕES PEDAGÓGICAS", "OBSERVACOES"]:
+        if str(row.get(col, "")).strip():
+            return True
+    return False
+
+
+def obter_tabua_mare_para_visualizacao():
+    df_nuvem = df_aval.copy()
+    df_nuvem.columns = [str(c).strip().upper() for c in df_nuvem.columns]
+    df_local = carregar_tabua_mare_local()
+    frames = [df for df in [df_nuvem, df_local] if not df.empty]
+    if not frames:
+        return pd.DataFrame(columns=colunas_tabua_mare())
+    df = pd.concat(frames, ignore_index=True).fillna("")
+    for col in colunas_tabua_mare():
+        if col not in df.columns:
+            df[col] = ""
+    if "ALUNO" in df.columns and "SEMESTRE" in df.columns:
+        df["_CHAVE_ALUNO"] = df["ALUNO"].apply(normalizar_texto)
+        df["_CHAVE_SEMESTRE"] = df["SEMESTRE"].apply(normalizar_texto)
+        df = df.drop_duplicates(subset=["_CHAVE_ALUNO", "_CHAVE_SEMESTRE"], keep="last")
+        df = df.drop(columns=["_CHAVE_ALUNO", "_CHAVE_SEMESTRE"])
+    return df
+
+
 def registrar_tabua_mare(aluno, sala, semestre, notas_dict, obs):
     try:
-        df_atual = ler_planilha("TABUA_MARE").copy()
-        mask = (df_atual["ALUNO"] == aluno) & (df_atual["SEMESTRE"] == semestre)
+        df_atual = carregar_tabua_mare_local()
+        registro = {
+            "ALUNO": str(aluno).strip(),
+            "SALA/TURMA": sala_para_tabua(sala),
+            "SEMESTRE": semestre,
+            "OBSERVAÇÕES PEDAGÓGICAS": obs,
+            "DATA_REGISTRO": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "STATUS_ENVIO": "PENDENTE",
+        }
+        for cat in CATEGORIAS:
+            registro[cat.upper()] = notas_dict.get(cat, "")
+        for col in colunas_tabua_mare():
+            if col not in df_atual.columns:
+                df_atual[col] = ""
+        mask = (
+            (df_atual["ALUNO"].apply(normalizar_texto) == normalizar_texto(aluno)) &
+            (df_atual["SEMESTRE"].apply(normalizar_texto) == normalizar_texto(semestre))
+        )
         if mask.any():
             idx = df_atual.index[mask][0]
-            for col, valor in notas_dict.items():
+            for col, valor in registro.items():
                 df_atual.at[idx, col] = valor
-            df_atual.at[idx, "OBSERVAÇÕES PEDAGÓGICAS"] = obs
-            df_atual.at[idx, "SALA"] = sala
         else:
-            registro = {"ALUNO": aluno, "SALA": sala, "SEMESTRE": semestre, "OBSERVAÇÕES PEDAGÓGICAS": obs}
-            registro.update(notas_dict)
             df_atual = pd.concat([df_atual, pd.DataFrame([registro])], ignore_index=True)
-        conn.update(worksheet="TABUA_MARE", data=df_atual)
+        df_atual.to_csv(ARQUIVO_TABUA_MARE_LOCAL, index=False)
         st.cache_data.clear()
         return True
     except Exception as e:
-        st.error(f"Erro ao sincronizar Tábua da Maré: {e}")
+        st.error(f"Erro ao salvar na Tábua da Maré: {e}")
         return False
+
+
+def enviar_tabua_mare_local_para_sheets():
+    df_pendente = carregar_tabua_mare_local()
+    if df_pendente.empty:
+        st.info("Não há avaliações pendentes para enviar.")
+        return
+    client = get_gspread_client()
+    if client is None:
+        return
+    try:
+        from gspread.utils import rowcol_to_a1
+        sh = client.open_by_key(ID_PLANILHA)
+        wks = sh.worksheet("TABUA_MARE")
+        headers_originais = wks.row_values(1)
+        headers = [str(h).strip().upper() for h in headers_originais]
+        header_map = {normalizar_texto(h): i + 1 for i, h in enumerate(headers)}
+        df_sheet = pd.DataFrame(wks.get_all_records()).fillna("")
+        df_sheet.columns = [str(c).strip().upper() for c in df_sheet.columns]
+        if "ALUNO" not in df_sheet.columns:
+            st.error("A aba TABUA_MARE não possui a coluna ALUNO.")
+            return
+        col_sala = next((c for c in ["SALA/TURMA", "SALA", "TURMA"] if c in df_sheet.columns), "")
+        registros_restantes = []
+        sucessos = 0
+        for _, row in df_pendente.iterrows():
+            aluno = str(row.get("ALUNO", "")).strip()
+            semestre = str(row.get("SEMESTRE", "")).strip()
+            sala_local = str(row.get("SALA/TURMA", row.get("SALA", ""))).strip()
+            candidatos = df_sheet[df_sheet["ALUNO"].apply(normalizar_texto) == normalizar_texto(aluno)]
+            if candidatos.empty:
+                st.warning(f"Aluno não encontrado na TABUA_MARE: {aluno}")
+                registros_restantes.append(row.to_dict())
+                continue
+            if col_sala:
+                candidatos_sala = candidatos[candidatos[col_sala].apply(normalizar_sala_tabua) == normalizar_sala_tabua(sala_local)]
+                if candidatos_sala.empty:
+                    sala_planilha = str(candidatos.iloc[0].get(col_sala, "")).strip()
+                    st.warning(f"Sala divergente para {aluno}: app={sala_local}, planilha={sala_planilha}")
+                    registros_restantes.append(row.to_dict())
+                    continue
+                candidatos = candidatos_sala
+            if "SEMESTRE" in df_sheet.columns:
+                mesmo_semestre = candidatos[candidatos["SEMESTRE"].apply(normalizar_texto) == normalizar_texto(semestre)]
+                if not mesmo_semestre.empty:
+                    idx_planilha = mesmo_semestre.index[0]
+                else:
+                    semestre_vazio = candidatos[candidatos["SEMESTRE"].apply(normalizar_texto) == ""]
+                    idx_planilha = semestre_vazio.index[0] if not semestre_vazio.empty else candidatos.index[0]
+            else:
+                idx_planilha = candidatos.index[0]
+            linha_planilha = idx_planilha + 2
+            campos = {"SEMESTRE": semestre, "OBSERVAÇÕES PEDAGÓGICAS": str(row.get("OBSERVAÇÕES PEDAGÓGICAS", ""))}
+            for cat in CATEGORIAS:
+                campos[cat.upper()] = str(row.get(cat.upper(), "")).strip()
+            updates = []
+            for col, valor in campos.items():
+                col_num = header_map.get(normalizar_texto(col))
+                if col_num:
+                    celula = rowcol_to_a1(linha_planilha, col_num)
+                    updates.append({"range": celula, "values": [[valor]]})
+            try:
+                if updates:
+                    try:
+                        wks.batch_update(updates, value_input_option="USER_ENTERED")
+                    except TypeError:
+                        wks.batch_update(updates)
+                sucessos += 1
+            except Exception as e:
+                st.warning(f"Falha ao enviar {aluno}: {e}")
+                registros_restantes.append(row.to_dict())
+        if registros_restantes:
+            pd.DataFrame(registros_restantes).to_csv(ARQUIVO_TABUA_MARE_LOCAL, index=False)
+            st.warning(f"{sucessos}/{len(df_pendente)} avaliação(ões) enviada(s). Corrija os avisos e tente novamente.")
+        else:
+            if os.path.exists(ARQUIVO_TABUA_MARE_LOCAL):
+                os.remove(ARQUIVO_TABUA_MARE_LOCAL)
+            st.success(f"{sucessos} avaliação(ões) enviada(s) para a aba TABUA_MARE.")
+        st.cache_data.clear()
+        st.rerun()
+    except Exception as e:
+        st.error(f"Erro ao enviar avaliações para a TABUA_MARE: {e}")
 
 
 def atualizar_padrinho_sheets(sala, aluno, nome_padrinho):
@@ -794,10 +960,10 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
         st.info(f"A {sala_v} ainda não possui alunos matriculados.")
 
 elif menu == "📊 Avaliação da Tábua da Maré":
-    st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
+    st.markdown(f"### 📊 Lançar Avaliação")
+    st.info("As avaliações lançadas aqui ficam salvas na aba **Tábua da Maré**. O envio para a Google Sheet é confirmado depois, dentro da própria Tábua da Maré.")
 
-    df_av = df_aval.copy()
-    df_av.columns = [str(c).strip().title() for c in df_av.columns]
+    df_av = obter_tabua_mare_para_visualizacao()
 
     render_botoes_salas("btn_aval", "sel_aval")
     sala_atual = st.session_state.sel_aval
@@ -812,8 +978,8 @@ elif menu == "📊 Avaliação da Tábua da Maré":
 
     if alunos_na_sala:
         al = st.selectbox("Selecione o Aluno", sorted(alunos_na_sala))
-        col_busca_aluno = "Aluno" if "Aluno" in df_av.columns else df_av.columns[0]
-        historico_aluno = df_av[df_av[col_busca_aluno].astype(str).str.upper() == al.upper()]
+        col_busca_aluno = "ALUNO" if "ALUNO" in df_av.columns else df_av.columns[0]
+        historico_aluno = df_av[df_av[col_busca_aluno].apply(normalizar_texto) == normalizar_texto(al)]
         dados_anteriores = historico_aluno.iloc[-1] if not historico_aluno.empty else None
 
         st.markdown("#### ⭐ 10 motivos para avaliar!")
@@ -822,7 +988,6 @@ elif menu == "📊 Avaliação da Tábua da Maré":
             tr = st.selectbox("Período", ["1º Semestre", "2º Semestre"])
             cE, cD = st.columns(2)
             n_l = {}
-            opcoes = ["Maré Baixa", "Maré Vazante", "Maré Enchente", "Maré Alta", "Maré Cheia"]
 
             for i, cat in enumerate(CATEGORIAS):
                 val_anterior = "Maré Enchente"
@@ -832,10 +997,10 @@ elif menu == "📊 Avaliação da Tábua da Maré":
                             val_anterior = dados_anteriores[col_av]
                             break
                 try:
-                    idx_default = int(val_anterior) - 1 if str(val_anterior).isdigit() else opcoes.index(val_anterior)
+                    idx_default = int(val_anterior) - 1 if str(val_anterior).isdigit() else OPCOES_MARE.index(val_anterior)
                 except Exception:
                     idx_default = 2
-                n_l[cat] = (cE if i < 5 else cD).selectbox(cat, opcoes, index=idx_default, key=f"mare_s_{i}")
+                n_l[cat] = (cE if i < 5 else cD).selectbox(cat, OPCOES_MARE, index=idx_default, key=f"mare_s_{i}")
 
             obs_anterior = ""
             if dados_anteriores is not None:
@@ -845,12 +1010,12 @@ elif menu == "📊 Avaliação da Tábua da Maré":
                         break
             obs = st.text_area("Observações pedagógicas:", value=obs_anterior)
 
-            if st.form_submit_button("🚀 Enviar para Tábua da Maré"):
+            if st.form_submit_button("💾 Salvar na Tábua da Maré"):
                 if al:
                     sucesso = registrar_tabua_mare(aluno=al, sala=sala_atual, semestre=tr, notas_dict=n_l, obs=obs)
                     if sucesso:
                         st.balloons()
-                        st.success(f"Avaliação de {al} sincronizada!")
+                        st.success(f"Avaliação de {al} salva na Tábua da Maré.")
                         st.rerun()
                 else:
                     st.error("Por favor, selecione um aluno.")
@@ -1254,9 +1419,10 @@ elif menu == "🌊 Canal do Apadrinhamento":
             st.markdown("---")
 
             if modo == "🌊 Tábua da Maré (Geral)":
-                df_av_canal = df_aval.copy()
-                df_av_canal.columns = [str(c).strip().upper() for c in df_av_canal.columns]
+                df_av_canal = obter_tabua_mare_para_visualizacao()
                 dados_aluno_mare = df_av_canal[df_av_canal["ALUNO"].astype(str).str.strip() == al_af.strip()]
+                if not dados_aluno_mare.empty:
+                    dados_aluno_mare = dados_aluno_mare[dados_aluno_mare.apply(linha_tem_avaliacao_tabua, axis=1)]
 
                 if not dados_aluno_mare.empty:
                     for _, r in dados_aluno_mare.iterrows():
@@ -1339,14 +1505,21 @@ elif menu == "🌊 Canal do Apadrinhamento":
 elif menu == "🌊 Tábua da Maré":
     st.markdown(f"### 🌊 Tábua da Maré")
 
+    df_pendentes_mare = carregar_tabua_mare_local()
+    if not df_pendentes_mare.empty:
+        st.warning(f"Há {len(df_pendentes_mare)} avaliação(ões) aguardando confirmação de envio para a Google Sheet.")
+        if st.button("✅ Confirmar envio para TABUA_MARE"):
+            enviar_tabua_mare_local_para_sheets()
+    else:
+        st.success("Não há avaliações pendentes de envio para a Google Sheet.")
+
     render_botoes_salas("btn_int", "sel_int")
 
     if "sel_int" not in st.session_state:
         st.info("Selecione uma sala para visualizar os dados.")
         st.stop()
 
-    df_av = df_aval.copy()
-    df_av.columns = [str(c).strip().upper() for c in df_av.columns]
+    df_av = obter_tabua_mare_para_visualizacao()
 
     df_s = ler_planilha(st.session_state.sel_int)
 
@@ -1396,12 +1569,16 @@ elif menu == "🌊 Tábua da Maré":
                         </div>""", unsafe_allow_html=True)
 
                 dados_aluno = df_av[df_av["ALUNO"].str.strip() == al.strip()]
+                if not dados_aluno.empty:
+                    dados_aluno = dados_aluno[dados_aluno.apply(linha_tem_avaliacao_tabua, axis=1)]
 
                 if not dados_aluno.empty:
                     for _, r in dados_aluno.iterrows():
                         periodo = r.get("SEMESTRE", r.get("PERIODO", "Avaliação"))
                         st.write("---")
                         st.markdown(f"**🗓️ {periodo}**")
+                        if str(r.get("STATUS_ENVIO", "")).strip().upper() == "PENDENTE":
+                            st.caption("Pendente de envio para a Google Sheet")
                         valores = []
                         mapa_notas = {
                             "MARÉ BAIXA": 1, "MARÉ VAZANTE": 2,

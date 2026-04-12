@@ -1194,26 +1194,28 @@ elif menu == "🌊 Canal do Apadrinhamento":
                                 # MENSAGEM AMIGÁVEL QUANDO NÃO HÁ NADA LANÇADO
                                 st.info(f"ℹ️ **Nenhuma avaliação registrada.**\nAinda não foram realizados lançamentos para a Tábua da Maré deste aluno.")
 
-# --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (DENTRO DO CANAL DO APADRINHAMENTO) ---
+# --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (AJUSTADO PARA A SUA PLANILHA REAL) ---
 elif modo == "📚 Turno Estendido":
-    # 1. Padronização das Colunas
     df_h = (df_alf.copy()).fillna("")
     df_h.columns = [str(c).strip().upper() for c in df_h.columns]
     
-    # 2. Filtro do Aluno (Usando a coluna ALUNO em maiúsculo)
+    # Filtro pelo aluno selecionado
     dados_al = df_h[df_h["ALUNO"] == al_af]
     
     if not dados_al.empty:
-        # Pegamos a linha mais recente (normalmente o ano atual)
+        # Pegamos a linha mais recente
         info_al = dados_al.iloc[-1]
         
-        # Identificar o nível mais atual preenchido para a Maré
+        # MAPEAMENTO EXATO DAS SUAS COLUNAS (conforme imagem da planilha)
         niveis_seq = []
-        for c_av in ["1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL"]:
-            if info_al.get(c_av):
-                niveis_seq.append(info_al[c_av])
+        # Note que aqui removi o "ª" para bater com "1 AVALIAÇÃO" da imagem
+        for c_av in ["1 AVALIAÇÃO", "2 AVALIAÇÃO", "3 AVALIAÇÃO"]:
+            valor = info_al.get(c_av, "")
+            if valor and str(valor).strip() != "":
+                niveis_seq.append(str(valor))
         
-        u_nv = niveis_seq[-1] if niveis_seq else "1. Pré-Silábico"
+        # Nível atual é o último preenchido ou o Diagnóstico
+        u_nv = niveis_seq[-1] if niveis_seq else str(info_al.get("DIAGNÓSTICO", "1. Pré-Silábico"))
         
         c_inf, c_mare = st.columns([1.2, 1])
         with c_inf:
@@ -1222,15 +1224,15 @@ elif modo == "📚 Turno Estendido":
             <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black; height:220px; overflow-y: auto;">
                 <h4 style="margin:0;">{al_af}</h4>
                 <p style="margin: 10px 0;"><b>Nível Atual:</b> <span style="background:{cor_bg_nivel}; color:#2C3E50; padding:6px 12px; border-radius:20px; font-weight:bold; border: 1px solid rgba(0,0,0,0.1);">{u_nv}</span></p>
-                <p style="font-size: 13px;"><b>Últimas Evidências:</b><br>{info_al.get('EVIDÊNCIAS', 'Nenhuma evidência registrada.')}</p>
-                <p style="font-size: 13px;"><b>Obs. Pedagógicas:</b><br>{info_al.get('OBSERVAÇÕES PEDAGÓGICAS', 'Sem observações.')}</p>
+                <p style="font-size: 13px;"><b>Evidências:</b><br>{info_al.get('EVIDÊNCIAS', 'Sem registros.')}</p>
+                <p style="font-size: 13px;"><b>Ações Pedagógicas:</b><br>{info_al.get('AÇÕES PEDAGÓGICAS', 'Sem registros.')}</p>
             </div>""", unsafe_allow_html=True)
         
         with c_mare:
-            # Lógica do Gráfico da Maré baseada na evolução
+            # Lógica da Maré
             vols = [MAPA_NIVEIS.get(n, 0) for n in niveis_seq]
             pct_g, s_txt = 85, "Maré Baixa"
-            if u_nv == "7. Alfabético Ortográfico": pct_g, s_txt = 15, "Maré Cheia"
+            if "7." in u_nv: pct_g, s_txt = 15, "Maré Cheia"
             elif len(vols) >= 2:
                 if vols[-1] > vols[-2]: pct_g, s_txt = 45, "Maré Enchente"
                 elif vols[-1] < vols[-2]: pct_g, s_txt = 70, "Maré Vazante"
@@ -1242,32 +1244,23 @@ elif modo == "📚 Turno Estendido":
             with cl_leg:
                 st.markdown("""<div style="font-size: 11px; color: #555; padding-top: 15px; line-height: 1.4;">
                     <b>Legenda da Maré:</b><br>
-                    🔵 <b>Cheia:</b> Ortográfico<br>🟢 <b>Enchente:</b> Evoluiu<br>🟡 <b>Vazante:</b> Oscilação<br>⚪ <b>Baixa:</b> Inicial
+                    🔵 <b>Cheia:</b> Alfabetizado<br>🟢 <b>Enchente:</b> Evoluiu<br>🟡 <b>Vazante:</b> Oscilação<br>⚪ <b>Baixa:</b> Inicial
                 </div>""", unsafe_allow_html=True)
 
-        # --- TRILHA DE NÍVEIS ---
+        # Trilha de Jornada
         st.markdown("##### 🚀 Jornada de Alfabetização")
         html_t = '<div class="trilha-ap-container">'
         for i, nv_ref in enumerate(NIVEIS_ALF):
             is_current = (u_nv == nv_ref)
             cor_bg = CORES_EXCLUSIVAS.get(nv_ref, "#eee")
-            borda = "3px solid #2C3E50" if is_current else "1px solid rgba(0,0,0,0.15)"
+            borda = "3px solid #2C3E50" if is_current else "1px solid rgba(0,0,0,0.1)"
             opacidade = "1.0" if is_current else "0.4"
             html_t += f'<div class="caixa-trilha-ap" style="background-color:{cor_bg}; border:{borda}; opacity:{opacidade}; color:#2C3E50;">{nv_ref.split(". ")[1]}</div>'
             if i < len(NIVEIS_ALF)-1: html_t += '<div class="seta-ap">→</div>'
         st.markdown(html_t + '</div>', unsafe_allow_html=True)
 
-        # --- HISTÓRICO DE LANÇAMENTOS ---
-        st.markdown("##### 📂 Histórico do Ano")
-        for c_av in ["1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL"]:
-            nivel_f = info_al.get(c_av)
-            if nivel_f:
-                st.markdown(f"""<div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee; font-size:13px; color:black;">
-                    <span>📅 <b>{c_av.title()} / {info_al['ANO']}</b></span>
-                    <span style="background:{CORES_EXCLUSIVAS.get(nivel_f, '#ddd')}; padding:4px 10px; border-radius:12px; font-weight:bold; border:1px solid rgba(0,0,0,0.1);">{nivel_f}</span>
-                </div>""", unsafe_allow_html=True)
     else:
-        st.info("Ainda não há dados de alfabetização para este aluno no Turno Estendido.")
+        st.info(f"O aluno {al_af} ainda não possui registros na planilha de Turno Estendido.")
 elif menu == "🌊 Tábua da Maré":
     st.markdown(f"### 🌊 Tábua da Maré")
     

@@ -732,21 +732,32 @@ def extrair_resumo_te(df_al):
     return ultimo_nivel, evidencias, observacoes, niveis_seq, avaliacoes_por_ano
 
 
-def render_trilha_desenvolvimento_html(niveis_seq):
-    niveis_passados = set(niveis_seq)
-    atual = niveis_seq[-1] if niveis_seq else ""
-    html = '<div style="display:flex;gap:6px;overflow-x:auto;margin-top:8px;">'
-    for nv_ref in NIVEIS_ALF:
-        passou = nv_ref in niveis_passados
-        atual_css = "border:3px solid #2c3e50;transform:scale(1.03);" if nv_ref == atual else "border:1px solid #ffffff;"
-        opac = "1" if passou else "0.28"
-        cor = CORES_EXCLUSIVAS.get(nv_ref, "#eee")
-        txt = get_text_color(nv_ref)
+def render_trilha_desenvolvimento_html(avaliacoes_por_ano):
+    pontos = []
+    for ano, itens in sorted(avaliacoes_por_ano.items()):
+        for label, nivel in itens:
+            pontos.append({"ano": ano, "label": label, "nivel": nivel})
+    if not pontos:
+        return '<div style="color:#7f8c8d;font-size:13px;">Sem avaliações suficientes para formar a trilha.</div>'
+    html = '<div style="display:flex;align-items:center;gap:8px;overflow-x:auto;margin-top:10px;padding:8px 0;">'
+    total = len(pontos)
+    for i, ponto in enumerate(pontos):
+        nivel = ponto["nivel"]
+        cor = CORES_EXCLUSIVAS.get(nivel, "#eee")
+        txt = get_text_color(nivel)
+        destaque = "border:3px solid #2c3e50;" if i == total - 1 else "border:1px solid #ffffff;"
+        etapa = "Início" if i == 0 else ("Atual" if i == total - 1 else "Evolução")
         html += (
-            f'<div style="background:{cor};color:{txt};opacity:{opac};{atual_css}'
-            f'padding:8px;border-radius:8px;font-size:10px;font-weight:800;min-width:95px;'
-            f'text-align:center;line-height:1.15;">{nv_ref.split(". ")[1]}</div>'
+            f'<div style="background:{cor};color:{txt};{destaque}padding:10px;border-radius:12px;'
+            f'font-size:10px;font-weight:800;min-width:130px;text-align:center;line-height:1.2;'
+            f'box-shadow:0 2px 6px rgba(0,0,0,0.08);">'
+            f'<div style="font-size:9px;text-transform:uppercase;letter-spacing:.4px;opacity:.75;">{etapa} • {ponto["ano"]}</div>'
+            f'<div style="margin-top:4px;">{ponto["label"]}</div>'
+            f'<div style="margin-top:5px;font-size:11px;">{nivel.split(". ")[1] if ". " in nivel else nivel}</div>'
+            f'</div>'
         )
+        if i < total - 1:
+            html += '<div style="font-size:20px;color:#95a5a6;font-weight:900;">→</div>'
     return html + "</div>"
 
 
@@ -1654,7 +1665,6 @@ elif menu == "🌊 Canal do Apadrinhamento":
                             with c2[i - 5]:
                                 st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
 
-                        st.plotly_chart(criar_grafico_mare(CATEGORIAS, valores), use_container_width=True, key=f"canal_mare_{al_af}_{periodo}")
                         obs_pedag = r.get("OBSERVAÇÕES PEDAGÓGICAS", r.get("OBSERVACOES", "Sem registro."))
                         st.info(f"**Observação:** {obs_pedag}")
                         st.write("---")
@@ -1689,26 +1699,27 @@ elif menu == "🌊 Canal do Apadrinhamento":
 
                     with col_status:
                         st.markdown(render_status_mare_te_html(u_nv, hist_status), unsafe_allow_html=True)
-                        st.markdown("##### Últimas avaliações")
-                        if avaliacoes_por_ano:
-                            for ano, itens in sorted(avaliacoes_por_ano.items()):
-                                if not itens:
-                                    continue
-                                itens_html = "".join([
-                                    f'<li style="margin-bottom:4px;"><b>{label}:</b> {nivel}</li>'
-                                    for label, nivel in itens
-                                ])
-                                st.markdown(
-                                    f'<div style="background:#f8f9fa;border:1px solid #eee;border-radius:10px;'
-                                    f'padding:10px;margin-bottom:8px;color:#2c3e50;"><b>{ano}</b><ul style="margin:6px 0 0 16px;padding:0;">{itens_html}</ul></div>',
-                                    unsafe_allow_html=True,
-                                )
-                        else:
-                            st.info("Sem avaliações registradas.")
 
                     st.markdown("##### 🚀 Trilha de desenvolvimento")
                     render_legenda_niveis()
-                    st.markdown(render_trilha_desenvolvimento_html(niveis_seq), unsafe_allow_html=True)
+                    st.markdown(render_trilha_desenvolvimento_html(avaliacoes_por_ano), unsafe_allow_html=True)
+
+                    st.markdown("##### Últimas avaliações")
+                    if avaliacoes_por_ano:
+                        for ano, itens in sorted(avaliacoes_por_ano.items()):
+                            if not itens:
+                                continue
+                            itens_html = "".join([
+                                f'<li style="margin-bottom:4px;"><b>{label}:</b> {nivel}</li>'
+                                for label, nivel in itens
+                            ])
+                            st.markdown(
+                                f'<div style="background:#f8f9fa;border:1px solid #eee;border-radius:10px;'
+                                f'padding:10px;margin-bottom:8px;color:#2c3e50;"><b>{ano}</b><ul style="margin:6px 0 0 16px;padding:0;">{itens_html}</ul></div>',
+                                unsafe_allow_html=True,
+                            )
+                    else:
+                        st.info("Sem avaliações registradas.")
                 else:
                     st.warning("Dados não localizados para este aluno no Turno Estendido.")
 

@@ -7,11 +7,17 @@ import gspread
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
+# ─────────────────────────────────────────────
+# CONFIGURAÇÃO INICIAL (deve ser o primeiro comando Streamlit)
+# ─────────────────────────────────────────────
 st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 
+# ─────────────────────────────────────────────
+# CONSTANTES
+# ─────────────────────────────────────────────
 ID_PLANILHA = "1Zj8u67oAWKgYRd2uOkGssdaxXnwdsKsZBDxeLChnBr4"
-ARQUIVO_BUFFER   = "buffer_estendido.csv"
-ARQUIVO_DADOS_TE = "dados_turno_estendido.csv"
+ARQUIVO_BUFFER   = "buffer_estendido.csv"       # fila temporária para sync com Sheets
+ARQUIVO_DADOS_TE = "dados_turno_estendido.csv"  # banco de dados local permanente da aba
 
 C_ROSA, C_VERDE, C_AZUL, C_AMARELO, C_ROXO = "#ff81ba", "#a8cf45", "#5cc6d0", "#ffc713", "#6741d9"
 C_AZUL_MARE = "#8fd9fb"
@@ -33,15 +39,8 @@ TURMAS_CONFIG = {
     "SALA ROSA":     {"cor": C_ROSA,    "icon": "🌸"},
     "SALA AMARELA":  {"cor": C_AMARELO, "icon": "⭐"},
     "SALA VERDE":    {"cor": C_VERDE,   "icon": "🌿"},
-    "SALA AZUL":     {"cor": C_AZUL,    "icon": "💧"},
+    "SALA AZUL":     {"cor": C_AZUL,   "icon": "💧"},
     "CIRAND. MUNDO": {"cor": C_ROXO,    "icon": "🌍"},
-}
-BADGE_LABEL = {
-    "SALA ROSA":     "ROSA",
-    "SALA AMARELA":  "AMARELA",
-    "SALA VERDE":    "VERDE",
-    "SALA AZUL":     "AZUL",
-    "CIRAND. MUNDO": "MUNDO",
 }
 CATEGORIAS = [
     "Atividades em grupo/Proatividade", "Interesse pelo novo", "Compartilhamento de Materiais",
@@ -58,10 +57,19 @@ EVIDENCIAS_POR_NIVEL = {
     "7. Alfabético Ortográfico":["Escrita autônoma e correta", "Domina acentuação e regras complexas", "Lê com entonação e fluidez total", "Revisa o próprio texto"],
 }
 
+# ─────────────────────────────────────────────
+# CONEXÃO COM GOOGLE SHEETS
+# ─────────────────────────────────────────────
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+# ─────────────────────────────────────────────
+# FUNÇÕES DE LEITURA COM CACHE
+# Cada planilha é lida apenas UMA vez por sessão (ttl=600 = 10 min).
+# Use st.cache_data.clear() para forçar atualização após gravações.
+# ─────────────────────────────────────────────
 @st.cache_data(ttl=600, show_spinner=False)
 def ler_planilha(worksheet_name: str) -> pd.DataFrame:
+    """Lê uma aba do Google Sheets e retorna um DataFrame padronizado."""
     try:
         df = conn.read(worksheet=worksheet_name).fillna("")
         df.columns = [str(c).strip().upper() for c in df.columns]
@@ -70,10 +78,16 @@ def ler_planilha(worksheet_name: str) -> pd.DataFrame:
         st.warning(f"Não foi possível carregar a aba '{worksheet_name}': {e}")
         return pd.DataFrame()
 
+# ─────────────────────────────────────────────
+# CARREGAMENTO INICIAL (usando cache — só chama a API uma vez)
+# ─────────────────────────────────────────────
 df_g    = ler_planilha("GERAL")
 df_alf  = ler_planilha("TURNO_ESTENDIDO")
 df_aval = ler_planilha("TABUA_MARE")
 
+# ─────────────────────────────────────────────
+# CLIENTE GSPREAD (para gravações diretas)
+# ─────────────────────────────────────────────
 def get_gspread_client():
     from google.oauth2.service_account import Credentials
     scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -84,26 +98,44 @@ def get_gspread_client():
         st.error(f"Erro nas credenciais: {e}")
         return None
 
+# ─────────────────────────────────────────────
+# FUNÇÕES DE GRAVAÇÃO
+# ─────────────────────────────────────────────
+
 def _upsert_csv(caminho, chaves, novo_registro):
+    """
+    Atualiza ou insere um registro em um CSV local.
+    chaves: lista de colunas que identificam a linha (ex: ["ALUNO", "ANO", "ETAPA"])
+    """
     if os.path.exists(caminho):
         df = pd.read_csv(caminho).fillna("")
     else:
         df = pd.DataFrame(columns=list(novo_registro.keys()))
+
+    # garante que todas as colunas existam
     for col in novo_registro:
         if col not in df.columns:
             df[col] = ""
+
     mask = pd.Series([True] * len(df))
     for k in chaves:
         mask = mask & (df[k].astype(str) == str(novo_registro[k]))
+
     if mask.any():
         for k, v in novo_registro.items():
             df.loc[mask, k] = v
     else:
         df = pd.concat([df, pd.DataFrame([novo_registro])], ignore_index=True)
+
     df.to_csv(caminho, index=False)
 
 
 def salvar_dados_locais_te(aluno, sala, avaliacao_tipo, nivel, evidencias_str, obs, ano):
+    """
+    Atualiza o banco de dados local permanente de Turno Estendido.
+    Esse arquivo NUNCA é apagado — garante que os dados fiquem visíveis
+    na aba 'Dados - Turno Estendido' mesmo após a sincronização com o Sheets.
+    """
     MAP_ETAPA_COL = {
         "1ª Avaliação":    "1ª AVALIAÇÃO",
         "2ª Avaliação":    "2ª AVALIAÇÃO",
@@ -111,7 +143,7 @@ def salvar_dados_locais_te(aluno, sala, avaliacao_tipo, nivel, evidencias_str, o
     }
     col_destino = MAP_ETAPA_COL.get(avaliacao_tipo)
     if not col_destino:
-        return
+        return  # MATRÍCULA e outros tipos não geram linha na tabela de avaliação
 
     if os.path.exists(ARQUIVO_DADOS_TE):
         df = pd.read_csv(ARQUIVO_DADOS_TE).fillna("")
@@ -120,6 +152,7 @@ def salvar_dados_locais_te(aluno, sala, avaliacao_tipo, nivel, evidencias_str, o
                                     "1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL",
                                     "DIAGNÓSTICO", "EVIDÊNCIAS", "OBSERVAÇÕES"])
 
+    # Garante colunas
     for col in ["ALUNO", "SALA", "ANO", "1ª AVALIAÇÃO", "2ª AVALIAÇÃO",
                 "AVALIAÇÃO FINAL", "DIAGNÓSTICO", "EVIDÊNCIAS", "OBSERVAÇÕES"]:
         if col not in df.columns:
@@ -134,7 +167,8 @@ def salvar_dados_locais_te(aluno, sala, avaliacao_tipo, nivel, evidencias_str, o
         idx = df.index[mask][0]
         df.at[idx, col_destino] = nivel
         df.at[idx, "SALA"] = sala
-        df.at[idx, "DIAGNÓSTICO"] = nivel
+        if avaliacao_tipo == "Avaliação Final":
+            df.at[idx, "DIAGNÓSTICO"] = nivel
         if evidencias_str:
             df.at[idx, "EVIDÊNCIAS"] = evidencias_str
         if obs:
@@ -143,7 +177,7 @@ def salvar_dados_locais_te(aluno, sala, avaliacao_tipo, nivel, evidencias_str, o
         nova = {
             "ALUNO": aluno, "SALA": sala, "ANO": str(ano),
             "1ª AVALIAÇÃO": "", "2ª AVALIAÇÃO": "", "AVALIAÇÃO FINAL": "",
-            "DIAGNÓSTICO": nivel,
+            "DIAGNÓSTICO": nivel if avaliacao_tipo == "Avaliação Final" else "",
             "EVIDÊNCIAS": evidencias_str, "OBSERVAÇÕES": obs,
         }
         nova[col_destino] = nivel
@@ -153,38 +187,57 @@ def salvar_dados_locais_te(aluno, sala, avaliacao_tipo, nivel, evidencias_str, o
 
 
 def salvar_buffer_local(aluno, sala, avaliacao_tipo, nivel, evidencias_list, obs, ano):
+    """
+    Salva o registro de avaliação em:
+    1. buffer_estendido.csv  — fila para sync com Google Sheets (apagado após envio)
+    2. dados_turno_estendido.csv — banco local permanente (nunca apagado)
+    """
     hoje = datetime.now().strftime("%d/%m/%Y")
     evid_str = ", ".join(evidencias_list) if evidencias_list else ""
+
+    # ── 1. Buffer de sincronização ──
     novo_buf = {
         "ALUNO": aluno, "SALA": sala, "ETAPA": avaliacao_tipo,
         "NIVEL": nivel, "EVIDENCIAS": evid_str, "OBS": obs,
         "ANO": str(ano), "DATA": hoje,
     }
     _upsert_csv(ARQUIVO_BUFFER, ["ALUNO", "ANO", "ETAPA"], novo_buf)
+
+    # ── 2. Banco de dados local permanente ──
     salvar_dados_locais_te(aluno, sala, avaliacao_tipo, nivel, evid_str, obs, ano)
+
     return True
 
 
 def enviar_buffer_para_sheets():
+    """
+    Lê o buffer local e envia todos os registros pendentes para o Google Sheets.
+    Chamada apenas quando o usuário clicar no botão de sincronização.
+    """
     if not os.path.exists(ARQUIVO_BUFFER):
         st.info("Não há registros pendentes para sincronizar.")
         return
+
     df_pendente = pd.read_csv(ARQUIVO_BUFFER)
     if df_pendente.empty:
         st.info("Fila de registros está vazia.")
         return
+
     client = get_gspread_client()
     if client is None:
         return
+
     sh  = client.open_by_key(ID_PLANILHA)
     wks = sh.worksheet("TURNO_ESTENDIDO")
     col_map = {"1ª Avaliação": "C", "2ª Avaliação": "D", "Avaliação Final": "E"}
+
     sucessos = 0
     for _, row in df_pendente.iterrows():
         try:
             dados = wks.get_all_records()
             df_temp = pd.DataFrame(dados)
             linha_encontrada = -1
+
             if not df_temp.empty:
                 df_temp.columns = [str(c).strip().upper() for c in df_temp.columns]
                 filtro_vazio = (
@@ -202,16 +255,19 @@ def enviar_buffer_para_sheets():
                     indices_ano = df_temp.index[filtro_ano].tolist()
                     if indices_ano:
                         linha_encontrada = indices_ano[0] + 2
+
             etapa = str(row["ETAPA"])
             nivel = str(row["NIVEL"])
             evid  = str(row.get("EVIDENCIAS", ""))
             obs   = str(row.get("OBS", ""))
             ano   = str(row["ANO"])
+
             if linha_encontrada != -1:
                 letra_col = col_map.get(etapa, "C")
                 wks.update(range_name=f"F{linha_encontrada}", values=[[ano]])
                 wks.update(range_name=f"{letra_col}{linha_encontrada}", values=[[nivel]])
-                wks.update(range_name=f"G{linha_encontrada}", values=[[nivel]])
+                if etapa == "Avaliação Final":
+                    wks.update(range_name=f"G{linha_encontrada}", values=[[nivel]])
                 if obs:
                     wks.update(range_name=f"I{linha_encontrada}", values=[[obs]])
                 if evid:
@@ -220,11 +276,14 @@ def enviar_buffer_para_sheets():
                 nova_linha = [row["ALUNO"], row["SALA"], "", "", "", ano, "", evid, obs, str(row.get("DATA", ""))]
                 idx_etapa = {"1ª Avaliação": 2, "2ª Avaliação": 3, "Avaliação Final": 4}.get(etapa, 2)
                 nova_linha[idx_etapa] = nivel
-                nova_linha[6] = nivel
+                if etapa == "Avaliação Final":
+                    nova_linha[6] = nivel
                 wks.append_row(nova_linha)
+
             sucessos += 1
         except Exception as e:
             st.warning(f"Falha ao sincronizar {row['ALUNO']}: {e}")
+
     if sucessos == len(df_pendente):
         st.success(f"🎉 {sucessos} registro(s) enviado(s) com sucesso!")
         os.remove(ARQUIVO_BUFFER)
@@ -235,8 +294,10 @@ def enviar_buffer_para_sheets():
 
 
 def registrar_matricula_te(aluno, sala):
+    """Matricula aluno no Turno Estendido: salva localmente e também no Sheets."""
     salvar_buffer_local(aluno=aluno, sala=sala, avaliacao_tipo="MATRÍCULA",
                         nivel="", evidencias_list=[], obs="", ano="")
+    # Para matrícula, gravamos diretamente para que a lista de alunos seja atualizada imediatamente
     try:
         client = get_gspread_client()
         if client:
@@ -252,6 +313,7 @@ def registrar_matricula_te(aluno, sala):
 
 
 def registrar_tabua_mare(aluno, sala, semestre, notas_dict, obs):
+    """Salva ou atualiza dados na aba TABUA_MARE."""
     try:
         df_atual = ler_planilha("TABUA_MARE").copy()
         mask = (df_atual["ALUNO"] == aluno) & (df_atual["SEMESTRE"] == semestre)
@@ -274,6 +336,7 @@ def registrar_tabua_mare(aluno, sala, semestre, notas_dict, obs):
 
 
 def atualizar_padrinho_sheets(sala, aluno, nome_padrinho):
+    """Atualiza o campo Padrinho/Madrinha diretamente na aba da sala."""
     try:
         client = get_gspread_client()
         if client is None:
@@ -283,14 +346,17 @@ def atualizar_padrinho_sheets(sala, aluno, nome_padrinho):
         dados = wks.get_all_records()
         df_temp = pd.DataFrame(dados)
         df_temp.columns = [str(c).strip().upper() for c in df_temp.columns]
+
         if "PADRINHO/MADRINHA" not in df_temp.columns or "ALUNO" not in df_temp.columns:
             st.error("Colunas necessárias não encontradas.")
             return False
+
         indices = df_temp.index[df_temp["ALUNO"].astype(str).str.strip() == str(aluno).strip()].tolist()
         if not indices:
             st.error("Aluno não encontrado na aba.")
             return False
-        linha = indices[0] + 2
+
+        linha = indices[0] + 2  # +1 header, +1 base 1
         col_idx = list(df_temp.columns).index("PADRINHO/MADRINHA") + 1
         wks.update_cell(linha, col_idx, nome_padrinho)
         st.cache_data.clear()
@@ -300,87 +366,12 @@ def atualizar_padrinho_sheets(sala, aluno, nome_padrinho):
         return False
 
 
+# ─────────────────────────────────────────────
+# COMPONENTES VISUAIS
+# ─────────────────────────────────────────────
+
 def get_text_color(nivel=None):
     return "#2C3E50"
-
-
-def obter_ultimo_diagnostico(aluno_sel, df_logica, col_aluno, col_diag):
-    ultimo_nv = "Sem registro"
-    if col_aluno:
-        df_al = df_logica[df_logica[col_aluno].astype(str).str.strip() == aluno_sel]
-        if not df_al.empty:
-            for c_av in ["AVALIAÇÃO FINAL", "2ª AVALIAÇÃO", "1ª AVALIAÇÃO"]:
-                if c_av in df_al.columns:
-                    val = str(df_al[c_av].iloc[-1]).strip()
-                    if val and val not in ["nan", "None", ""]:
-                        ultimo_nv = val
-                        break
-            if ultimo_nv == "Sem registro" and col_diag and col_diag in df_al.columns:
-                val = str(df_al[col_diag].iloc[-1]).strip()
-                if val and val not in ["nan", "None", ""]:
-                    ultimo_nv = val
-
-    if os.path.exists(ARQUIVO_BUFFER):
-        df_buf_local = pd.read_csv(ARQUIVO_BUFFER)
-        buf_aluno = df_buf_local[df_buf_local["ALUNO"].astype(str).str.strip() == aluno_sel]
-        if not buf_aluno.empty and "NIVEL" in buf_aluno.columns:
-            ultimo_nv_buf = str(buf_aluno["NIVEL"].iloc[-1]).strip()
-            if ultimo_nv_buf and ultimo_nv_buf not in ["nan", "None", ""]:
-                ultimo_nv = ultimo_nv_buf
-
-    if os.path.exists(ARQUIVO_DADOS_TE):
-        df_dados = pd.read_csv(ARQUIVO_DADOS_TE).fillna("")
-        mask = df_dados["ALUNO"].astype(str).str.strip() == aluno_sel
-        if mask.any():
-            row = df_dados[mask].iloc[-1]
-            for c_av in ["AVALIAÇÃO FINAL", "2ª AVALIAÇÃO", "1ª AVALIAÇÃO", "DIAGNÓSTICO"]:
-                if c_av in df_dados.columns:
-                    val = str(row.get(c_av, "")).strip()
-                    if val and val not in ["nan", "None", ""]:
-                        ultimo_nv = val
-                        break
-
-    return ultimo_nv
-
-
-def render_legenda_niveis_botoes(aluno_sel, key_prefix="te"):
-    st.markdown("##### 📝 Selecione o Nível de Diagnóstico")
-
-    session_key = f"nivel_diag_{key_prefix}_{aluno_sel}"
-
-    css = "<style>"
-    for i, nv in enumerate(NIVEIS_ALF):
-        cor_fundo = CORES_EXCLUSIVAS.get(nv, "#eee")
-        is_selected = st.session_state.get(session_key) == nv
-        borda = "3px solid #000000" if is_selected else "2px solid transparent"
-        op = "1.0" if is_selected else "0.7"
-        css += (
-            f'div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child({i+1}) button {{'
-            f'background-color:{cor_fundo} !important;color:#2C3E50 !important;font-weight:800 !important;'
-            f'border:{borda} !important;border-radius:10px !important;opacity:{op} !important;'
-            f'min-height:50px !important;font-size:10px !important;white-space:normal !important;line-height:1.2 !important;}}'
-        )
-    css += "</style>"
-    st.markdown(css, unsafe_allow_html=True)
-
-    cols_leg = st.columns(len(NIVEIS_ALF))
-    for i, nv in enumerate(NIVEIS_ALF):
-        label_curto = nv.split(". ")[1] if ". " in nv else nv
-        if cols_leg[i].button(label_curto, key=f"btn_nivel_{key_prefix}_{i}", use_container_width=True):
-            st.session_state[session_key] = nv
-            st.rerun()
-
-    nivel_selecionado = st.session_state.get(session_key, None)
-    if nivel_selecionado:
-        cor_sel = CORES_EXCLUSIVAS.get(nivel_selecionado, "#eee")
-        st.markdown(
-            f'<div style="background:{cor_sel}; padding:10px 20px; border-radius:10px; margin:10px 0; '
-            f'font-weight:bold; font-size:14px; color:#2C3E50; border:2px solid #000;">'
-            f'Nível de Diagnóstico: {nivel_selecionado}</div>',
-            unsafe_allow_html=True
-        )
-
-    return nivel_selecionado
 
 
 def render_legenda_niveis():
@@ -485,28 +476,28 @@ def aplicar_filtros(df_alvo, df_geral, tn, cm):
 
 def render_botoes_salas(key_prefix, session_key, salas_permitidas=None):
     salas = salas_permitidas if salas_permitidas else list(TURMAS_CONFIG.keys())
-    css = "<style>"
-    for i, nome_aba in enumerate(salas):
-        cfg = TURMAS_CONFIG.get(nome_aba, {"cor": "#566573"})
-        cor = cfg["cor"]
-        is_active = st.session_state.get(session_key) == nome_aba
-        borda = "3px solid #000000" if is_active else "2px solid transparent"
-        op = "1.0" if is_active else "0.6"
-        css += (
-            f'div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child({i+1}) button {{'
-            f'background-color:{cor} !important;color:white !important;font-weight:800 !important;'
-            f'border:{borda} !important;border-radius:10px !important;opacity:{op} !important;}}'
-        )
-    css += "</style>"
-    st.markdown(css, unsafe_allow_html=True)
     cols = st.columns(len(salas))
     for i, nome_aba in enumerate(salas):
-        label_exibicao = BADGE_LABEL.get(nome_aba, nome_aba.replace("SALA ", ""))
-        if cols[i].button(label_exibicao, key=f"{key_prefix}_{i}", use_container_width=True):
+        cfg = TURMAS_CONFIG.get(nome_aba, {"cor": "#566573", "icon": "🏫"})
+        label_exibicao = nome_aba.replace("SALA ", "")
+        is_active = st.session_state.get(session_key) == nome_aba
+        op = "1.0" if is_active else "0.35"
+        st.markdown(f'''
+            <style>
+                div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button {{
+                    background-color: {cfg["cor"]} !important; color: white !important;
+                    opacity: {op}; border: {"2px solid black" if is_active else "1px solid #ccc"} !important;
+                    font-weight: bold !important;
+                }}
+            </style>''', unsafe_allow_html=True)
+        if cols[i].button(f'{cfg["icon"]} {label_exibicao}', key=f"{key_prefix}_{i}"):
             st.session_state[session_key] = nome_aba
             st.rerun()
 
 
+# ─────────────────────────────────────────────
+# ESTILO GLOBAL
+# ─────────────────────────────────────────────
 st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -534,6 +525,9 @@ thead tr th, th {{ color: #000000 !important; -webkit-text-fill-color: #000000 !
     font-weight: bold !important; background-color: #f8f9fa !important; text-align: center !important; }}
 </style>""", unsafe_allow_html=True)
 
+# ─────────────────────────────────────────────
+# INICIALIZAÇÃO DE SESSION STATE
+# ─────────────────────────────────────────────
 if "logado" not in st.session_state:
     st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
 if "alunos_te_dict" not in st.session_state:
@@ -543,6 +537,9 @@ for k in ["sel_mat", "sel_pad", "sel_aval", "sel_int", "sel_alf", "sel_ind", "se
     if k not in st.session_state:
         st.session_state[k] = "SALA ROSA"
 
+# ─────────────────────────────────────────────
+# LOGIN
+# ─────────────────────────────────────────────
 if not st.session_state.logado:
     st.markdown("<br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1.2, 1])
@@ -573,6 +570,9 @@ if st.sidebar.button("🚪 Sair"):
     st.session_state.update({"logado": False, "perfil": None, "nome_usuario": ""})
     st.rerun()
 
+# ─────────────────────────────────────────────
+# MENU
+# ─────────────────────────────────────────────
 menu_options = [
     "📝 Controle de Matrícula e Apadrinhamento",
     "📊 Dados - Turno Estendido",
@@ -595,18 +595,23 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ─────────────────────────────────────────────
+# ABA: CONTROLE DE MATRÍCULA E APADRINHAMENTO
+# ─────────────────────────────────────────────
 if menu == "📝 Controle de Matrícula e Apadrinhamento":
     st.markdown("### 📝 Controle de Matrícula e Apadrinhamento")
     st.markdown("*Canal de controle e registro dos alunos matriculados e do Programa de Apadrinhamento.*")
 
     cor_rosa, cor_amarela, cor_verde, cor_azul = "#F783AC", "#FFE066", "#A9E34B", "#99E9F2"
 
+    # ── Dados lidos do cache (zero chamadas extras à API) ──
     df_geral = df_g.copy()
     lista_alunos_geral = sorted(df_geral["ALUNO"].unique().tolist()) if not df_geral.empty else []
 
     df_te_check = df_alf.copy()
     set_matriculados_te = set(df_te_check["ALUNO"].unique().tolist()) if not df_te_check.empty else set()
 
+    # CSS dos popovers
     st.markdown(f"""
         <style>
         div[data-testid="stPopover"] > button {{
@@ -633,6 +638,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
         with st.popover("🤝 Padrinho/Madrinha", key="pad_popover", use_container_width=True):
             st.markdown("##### 🤝 Novo Apadrinhamento")
             s_busca_p = st.selectbox("Selecione a Sala:", list(TURMAS_CONFIG.keys()), key="pad_sala_select")
+            # Usa cache — não faz nova leitura da API
             df_b = ler_planilha(s_busca_p)
             if "PADRINHO/MADRINHA" in df_b.columns:
                 lista_lib = sorted(df_b[df_b["PADRINHO/MADRINHA"].astype(str).isin(["", "-", "nan", "0"])]["ALUNO"].unique())
@@ -672,6 +678,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
 
     st.divider()
 
+    # ── Tabela da sala selecionada (usa cache) ──
     render_botoes_salas("btn_pad", "sel_pad")
     sala_v = st.session_state.get("sel_pad", "SALA ROSA")
     cfg_sala = TURMAS_CONFIG.get(sala_v, {"cor": "#333", "icon": "🏫"})
@@ -695,35 +702,34 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
             </div>""", unsafe_allow_html=True)
 
         v_cols = ["ALUNO", "TURMA", "IDADE", "COMUNIDADE", "PADRINHO/MADRINHA"]
-        TH = "padding:12px 10px;border:1px solid #eee;font-size:12px;font-weight:700;text-align:center;color:#2C3E50;"
-        TD = "padding:10px;border:1px solid #eee;font-size:12px;color:#2C3E50;"
-        table_html = (
-            f'<table style="width:100%;border-collapse:collapse;margin-top:15px;background:white;'
-            f'border:1px solid #eee;color:#2C3E50;font-family:Inter,sans-serif;">'
-            f'<thead><tr style="background-color:#F8F9FA;">'
-        )
+        table_html = f'<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:11px;border:1px solid #ddd;">'
+        table_html += f'<thead style="background-color:{cor_h};color:white;text-align:left;"><tr>'
         for col in v_cols:
-            table_html += f'<th style="{TH}">{col}</th>'
+            table_html += f'<th style="padding:6px;border:1px solid #ddd;">{col}</th>'
         table_html += "</tr></thead><tbody>"
 
-        for _, r in df_f.iterrows():
+        for i, (_, r) in enumerate(df_f.iterrows()):
+            bg = "#ffffff" if i % 2 == 0 else "#f9f9f9"
             p_nome = str(r.get("PADRINHO/MADRINHA", "-")).strip()
             if p_nome in ["", "0", "nan", "None", "-"]:
                 p_nome = "-"
             nome_aluno = r.get("ALUNO", "-")
             marcador_te = " <span title='Turno Estendido' style='color:#2b5e2b;'>📖</span>" if nome_aluno in set_matriculados_te else ""
-            table_html += "<tr>"
-            table_html += f'<td style="{TD}font-weight:700;">{nome_aluno}{marcador_te}</td>'
-            table_html += f'<td style="{TD}text-align:center;">{r.get("TURMA","-")}</td>'
-            table_html += f'<td style="{TD}text-align:center;">{r.get("IDADE","-")}</td>'
-            table_html += f'<td style="{TD}">{r.get("COMUNIDADE","-")}</td>'
-            table_html += f'<td style="{TD}font-weight:600;">{p_nome}</td>'
+            table_html += f'<tr style="background-color:{bg};color:#333;">'
+            table_html += f'<td style="padding:6px;border:1px solid #eee;font-weight:bold;">{nome_aluno}{marcador_te}</td>'
+            table_html += f'<td style="padding:6px;border:1px solid #eee;text-align:center;">{r.get("TURMA","-")}</td>'
+            table_html += f'<td style="padding:6px;border:1px solid #eee;text-align:center;">{r.get("IDADE","-")}</td>'
+            table_html += f'<td style="padding:6px;border:1px solid #eee;">{r.get("COMUNIDADE","-")}</td>'
+            table_html += f'<td style="padding:6px;border:1px solid #eee;font-weight:600;">{p_nome}</td>'
             table_html += "</tr>"
 
         st.markdown(table_html + "</tbody></table>", unsafe_allow_html=True)
     else:
         st.info(f"A {sala_v} ainda não possui alunos matriculados.")
 
+# ─────────────────────────────────────────────
+# ABA: AVALIAÇÃO DA TÁBUA DA MARÉ
+# ─────────────────────────────────────────────
 elif menu == "📊 Avaliação da Tábua da Maré":
     st.markdown(f"### 📊 Lançar Avaliação (Google Sheets)")
 
@@ -788,6 +794,10 @@ elif menu == "📊 Avaliação da Tábua da Maré":
     else:
         st.warning(f"Nenhum aluno encontrado na {sala_atual}.")
 
+# ─────────────────────────────────────────────
+# ABA: TURNO ESTENDIDO
+# Registros salvos LOCALMENTE. Use "Dados - Turno Estendido" para sincronizar.
+# ─────────────────────────────────────────────
 elif menu == "📖 Turno Estendido":
     st.markdown(f"<h3 style='color:{C_ROXO}'>📖 Turno Estendido</h3>", unsafe_allow_html=True)
     st.info("ℹ️ As avaliações registradas aqui são salvas localmente. Acesse **Dados - Turno Estendido** para enviar ao Google Sheets.")
@@ -807,6 +817,7 @@ elif menu == "📖 Turno Estendido":
     else:
         dict_alunos_geral = {}
 
+    # Complementa com dados do buffer local (alunos recém-matriculados ainda não sincronizados)
     if os.path.exists(ARQUIVO_BUFFER):
         df_buf = pd.read_csv(ARQUIVO_BUFFER)
         for _, row in df_buf.iterrows():
@@ -816,53 +827,7 @@ elif menu == "📖 Turno Estendido":
                 dict_alunos_geral[nome] = sala
 
     st.write("### 🔍 Localizar Aluno")
-
-    salas_disponiveis = sorted(set(dict_alunos_geral.values()))
-    salas_com_todas = ["TODAS"] + salas_disponiveis
-
-    if "filtro_sala_te" not in st.session_state:
-        st.session_state["filtro_sala_te"] = "TODAS"
-
-    st.markdown("**Filtrar por Sala:**")
-    filtro_cores = []
-    filtro_labels = []
-    for sala_f in salas_com_todas:
-        if sala_f == "TODAS":
-            filtro_cores.append("#888888")
-            filtro_labels.append("TODAS")
-        else:
-            cfg_f = TURMAS_CONFIG.get(sala_f, {"cor": "#888888"})
-            filtro_cores.append(cfg_f.get("cor", "#888888"))
-            filtro_labels.append(BADGE_LABEL.get(sala_f, sala_f.replace("SALA ", "")))
-
-    css_f = "<style>"
-    for i, sala_f in enumerate(salas_com_todas):
-        cor_f = filtro_cores[i]
-        is_active_f = st.session_state.get("filtro_sala_te") == sala_f
-        borda_f = "3px solid #000000" if is_active_f else "2px solid transparent"
-        op_f = "1.0" if is_active_f else "0.6"
-        css_f += (
-            f'div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child({i+1}) button {{'
-            f'background-color:{cor_f} !important;color:white !important;font-weight:800 !important;'
-            f'border:{borda_f} !important;border-radius:20px !important;opacity:{op_f} !important;}}'
-        )
-    css_f += "</style>"
-    st.markdown(css_f, unsafe_allow_html=True)
-
-    cols_filtro = st.columns(len(salas_com_todas))
-    for i, sala_f in enumerate(salas_com_todas):
-        if cols_filtro[i].button(filtro_labels[i], key=f"filtro_sala_te_{i}", use_container_width=True):
-            st.session_state["filtro_sala_te"] = sala_f
-            st.rerun()
-
-    sala_filtro_sel = st.session_state.get("filtro_sala_te", "TODAS")
-
-    if sala_filtro_sel != "TODAS":
-        dict_alunos_filtrado = {n: s for n, s in dict_alunos_geral.items() if s == sala_filtro_sel}
-    else:
-        dict_alunos_filtrado = dict_alunos_geral
-
-    lista_nomes_completa = sorted(list(dict_alunos_filtrado.keys()))
+    lista_nomes_completa = sorted(list(dict_alunos_geral.keys()))
     busca_nome = st.text_input("Digite o nome para buscar:", placeholder="Ex: João Silva...").strip().upper()
     lista_filtrada = [n for n in lista_nomes_completa if busca_nome in n.upper()] if busca_nome else lista_nomes_completa
 
@@ -886,20 +851,27 @@ elif menu == "📖 Turno Estendido":
 
         st.divider()
 
-        ultimo_nv = obter_ultimo_diagnostico(aluno_sel, df_logica, col_aluno, col_diag)
+        df_al = df_logica[df_logica["ALUNO"].astype(str).str.strip() == aluno_sel] if col_aluno else pd.DataFrame()
+        ultimo_nv = df_al[col_diag].iloc[-1] if not df_al.empty and col_diag else "Sem registro"
+
+        # Verifica também no buffer local
+        if os.path.exists(ARQUIVO_BUFFER):
+            df_buf_local = pd.read_csv(ARQUIVO_BUFFER)
+            buf_aluno = df_buf_local[df_buf_local["ALUNO"].astype(str).str.strip() == aluno_sel]
+            if not buf_aluno.empty and "NIVEL" in buf_aluno.columns:
+                ultimo_nv_buf = buf_aluno["NIVEL"].iloc[-1]
+                if ultimo_nv_buf and str(ultimo_nv_buf).strip():
+                    ultimo_nv = ultimo_nv_buf
 
         st.markdown(f"Diagnóstico atual: <span class='sala-badge' style='background:{C_ROXO}'>{ultimo_nv}</span>", unsafe_allow_html=True)
-
-        if f"nivel_diag_te_{aluno_sel}" not in st.session_state:
-            if ultimo_nv in NIVEIS_ALF:
-                st.session_state[f"nivel_diag_te_{aluno_sel}"] = ultimo_nv
-
-        novo_nv = render_legenda_niveis_botoes(aluno_sel, key_prefix="te")
-
-        if not novo_nv:
-            novo_nv = ultimo_nv if ultimo_nv in NIVEIS_ALF else NIVEIS_ALF[0]
+        render_legenda_niveis()
 
         st.write("### 📝 Critérios de Avaliação")
+        try:
+            idx_ini = NIVEIS_ALF.index(ultimo_nv) if ultimo_nv in NIVEIS_ALF else 0
+        except Exception:
+            idx_ini = 0
+        novo_nv = st.selectbox("Novo Nível de Diagnóstico:", NIVEIS_ALF, index=idx_ini)
 
         with st.form("form_te_unificado_v3"):
             ano_form = st.selectbox("Ano Letivo da Avaliação:", [2026, 2025])
@@ -922,9 +894,15 @@ elif menu == "📖 Turno Estendido":
     else:
         st.warning("Nenhum aluno encontrado.")
 
+# ─────────────────────────────────────────────
+# ABA: DADOS - TURNO ESTENDIDO
+# Tabela existente preenchida com dados do Google Sheets + buffer local.
+# O botão de sincronização envia TODOS os campos (incluindo evidências e obs).
+# ─────────────────────────────────────────────
 elif menu == "📊 Dados - Turno Estendido":
     st.markdown("### 📋 Panorama de Avaliações")
 
+    # ── BOTÃO DE SINCRONIZAÇÃO (no topo, visível) ──
     tem_pendentes = os.path.exists(ARQUIVO_BUFFER) and not pd.read_csv(ARQUIVO_BUFFER).empty if os.path.exists(ARQUIVO_BUFFER) else False
 
     if tem_pendentes:
@@ -943,6 +921,7 @@ elif menu == "📊 Dados - Turno Estendido":
 
     st.divider()
 
+    # ── SELEÇÃO DE ANO ──
     if "ano_ativo_te" not in st.session_state:
         st.session_state.ano_ativo_te = 2025
 
@@ -969,21 +948,30 @@ elif menu == "📊 Dados - Turno Estendido":
 
     render_legenda_niveis()
 
+    # ──────────────────────────────────────────────────────────────────────
+    # CONSTRUÇÃO DO DATAFRAME PARA EXIBIÇÃO
+    # Fonte principal: banco de dados local permanente (dados_turno_estendido.csv)
+    # Complemento:    dados do Google Sheets em cache (df_alf)
+    # Prioridade:     dados locais sobrescrevem os do Sheets na mesma chave aluno+ano
+    # ──────────────────────────────────────────────────────────────────────
     COLUNAS_TE = ["ALUNO", "SALA", "ANO", "1ª AVALIAÇÃO", "2ª AVALIAÇÃO",
                   "AVALIAÇÃO FINAL", "DIAGNÓSTICO", "EVIDÊNCIAS", "OBSERVAÇÕES"]
 
+    # 1. Começa com o Google Sheets (cache)
     df_sheets = df_alf.copy()
     if "ANO" not in df_sheets.columns:
         df_sheets["ANO"] = "2025"
     for col in COLUNAS_TE:
         if col not in df_sheets.columns:
             df_sheets[col] = ""
+    # Normaliza ANO: Google Sheets retorna floats (2025.0) → converte para "2025"
     df_sheets["ANO"] = (
         pd.to_numeric(df_sheets["ANO"], errors="coerce")
         .fillna(0).astype(int).astype(str)
         .replace("0", "")
     )
 
+    # 2. Carrega o banco local permanente
     if os.path.exists(ARQUIVO_DADOS_TE):
         df_local = pd.read_csv(ARQUIVO_DADOS_TE).fillna("")
         df_local.columns = [str(c).strip().upper() for c in df_local.columns]
@@ -998,11 +986,13 @@ elif menu == "📊 Dados - Turno Estendido":
     else:
         df_local = pd.DataFrame(columns=COLUNAS_TE)
 
+    # 3. Mescla: para cada linha do banco local, atualiza ou adiciona no df_sheets
     for _, row_loc in df_local.iterrows():
         aluno_loc = str(row_loc.get("ALUNO", "")).strip()
         ano_loc   = str(row_loc.get("ANO",   "")).strip()
         if not aluno_loc:
             continue
+
         mask = (
             (df_sheets["ALUNO"].astype(str).str.strip() == aluno_loc) &
             (df_sheets["ANO"].astype(str).str.strip()   == ano_loc)
@@ -1012,13 +1002,14 @@ elif menu == "📊 Dados - Turno Estendido":
             for col in ["1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL",
                         "DIAGNÓSTICO", "EVIDÊNCIAS", "OBSERVAÇÕES", "SALA"]:
                 val_loc = str(row_loc.get(col, "")).strip()
-                if val_loc:
+                if val_loc:  # dados locais têm prioridade quando preenchidos
                     df_sheets.at[idx, col] = val_loc
         else:
             df_sheets = pd.concat([df_sheets, pd.DataFrame([row_loc])], ignore_index=True)
 
     df_h = df_sheets.copy()
 
+    # ── NORMALIZAR ANO (Google Sheets retorna 2025.0; convertemos para "2025") ──
     if "ANO" in df_h.columns:
         df_h["ANO"] = (
             pd.to_numeric(df_h["ANO"], errors="coerce")
@@ -1026,6 +1017,7 @@ elif menu == "📊 Dados - Turno Estendido":
             .replace("0", "")
         )
 
+    # ── FUNÇÃO STATUS MARÉ ──
     def get_status_mare_html(nv_atual, hist):
         pct, txt = 85, "maré baixa"
         if nv_atual == "7. Alfabético Ortográfico":
@@ -1038,6 +1030,7 @@ elif menu == "📊 Dados - Turno Estendido":
                 f'<div class="mare-mini-tabela" style="background:linear-gradient(to bottom,#f0f0f0 {pct}%,#5DADE2 {pct}%);"></div>'
                 f'<span class="mare-texto-tabela">{txt}</span></div>')
 
+    # ── CONSTRUÇÃO DA TABELA (mesma lógica original, com dados já mesclados) ──
     cols_header = ["Nome do Aluno", "1ª Sondagem", "2ª Sondagem", "3ª Sondagem", "STATUS MARÉ"]
     if ano_sel == 2026:
         cols_header.insert(1, "Diagnóstico Atual")
@@ -1054,6 +1047,15 @@ elif menu == "📊 Dados - Turno Estendido":
         if a and a not in ["nan", "None", ""]
     ]) if not df_h.empty else []
 
+    # Rótulo curto para o badge (sem emoji, estilo pílula com texto branco)
+    BADGE_LABEL = {
+        "SALA ROSA":     "ROSA",
+        "SALA AMARELA":  "AMARELA",
+        "SALA VERDE":    "VERDE",
+        "SALA AZUL":     "AZUL",
+        "CIRAND. MUNDO": "MUNDO",
+    }
+
     for al in alunos_nesta_aba:
         dados_aluno_ano = df_h[
             (df_h["ALUNO"].astype(str).str.strip() == al) &
@@ -1062,6 +1064,7 @@ elif menu == "📊 Dados - Turno Estendido":
         if dados_aluno_ano.empty:
             continue
 
+        # Badge pílula com a cor da sala (fundo colorido, texto branco)
         sala_al   = str(dados_aluno_ano["SALA"].iloc[0]).strip().upper() if "SALA" in dados_aluno_ano.columns else ""
         cfg_sala  = TURMAS_CONFIG.get(sala_al, {})
         cor_badge = cfg_sala.get("cor", "#aaa")
@@ -1078,20 +1081,17 @@ elif menu == "📊 Dados - Turno Estendido":
         )
 
         if ano_sel == 2026:
+            # Diagnóstico Atual = 3ª Sondagem (AVALIAÇÃO FINAL) do mesmo aluno em 2025
             dados_2025 = df_h[
                 (df_h["ALUNO"].astype(str).str.strip() == al) &
                 (df_h["ANO"].astype(str).str.strip() == "2025")
             ]
             diag_2025 = ""
-            if not dados_2025.empty:
-                for c_av in ["AVALIAÇÃO FINAL", "2ª AVALIAÇÃO", "1ª AVALIAÇÃO", "DIAGNÓSTICO"]:
-                    if c_av in dados_2025.columns:
-                        val = str(dados_2025[c_av].iloc[0]).strip()
-                        if val and val not in ["nan", "None", ""]:
-                            diag_2025 = val
-                            break
+            if not dados_2025.empty and "AVALIAÇÃO FINAL" in dados_2025.columns:
+                diag_2025 = str(dados_2025["AVALIAÇÃO FINAL"].iloc[0]).strip()
             if not diag_2025 or diag_2025 in ["nan", "None", ""]:
                 diag_2025 = "-"
+            # Exibe com cor de nível, igual às outras colunas
             if diag_2025 != "-":
                 cor_d  = CORES_EXCLUSIVAS.get(diag_2025, "#eee")
                 txt_d  = diag_2025.split(". ")[1] if ". " in diag_2025 else diag_2025
@@ -1128,6 +1128,9 @@ elif menu == "📊 Dados - Turno Estendido":
 
     st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)
 
+# ─────────────────────────────────────────────
+# ABA: INDICADORES PEDAGÓGICOS
+# ─────────────────────────────────────────────
 elif menu == "📈 Indicadores pedagógicos":
     st.markdown(f"### 📈 Indicadores")
     render_botoes_salas("btn_ind", "sel_ind")
@@ -1138,9 +1141,13 @@ elif menu == "📈 Indicadores pedagógicos":
     else:
         st.info("Sem dados.")
 
+# ─────────────────────────────────────────────
+# ABA: CANAL DO APADRINHAMENTO
+# ─────────────────────────────────────────────
 elif menu == "🌊 Canal do Apadrinhamento":
     st.markdown(f"### 🤝 Canal do Apadrinhamento")
 
+    # Usa cache para todas as salas — sem chamadas extras à API
     lista_salas = []
     for nome_aba in TURMAS_CONFIG.keys():
         df_t = ler_planilha(nome_aba)
@@ -1272,6 +1279,9 @@ elif menu == "🌊 Canal do Apadrinhamento":
                 else:
                     st.warning("Dados não localizados para este aluno no Turno Estendido.")
 
+# ─────────────────────────────────────────────
+# ABA: TÁBUA DA MARÉ
+# ─────────────────────────────────────────────
 elif menu == "🌊 Tábua da Maré":
     st.markdown(f"### 🌊 Tábua da Maré")
 

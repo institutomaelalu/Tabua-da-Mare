@@ -960,10 +960,16 @@ elif menu == "📊 Dados - Turno Estendido":
     # 1. Começa com o Google Sheets (cache)
     df_sheets = df_alf.copy()
     if "ANO" not in df_sheets.columns:
-        df_sheets["ANO"] = 2025
+        df_sheets["ANO"] = "2025"
     for col in COLUNAS_TE:
         if col not in df_sheets.columns:
             df_sheets[col] = ""
+    # Normaliza ANO: Google Sheets retorna floats (2025.0) → converte para "2025"
+    df_sheets["ANO"] = (
+        pd.to_numeric(df_sheets["ANO"], errors="coerce")
+        .fillna(0).astype(int).astype(str)
+        .replace("0", "")
+    )
 
     # 2. Carrega o banco local permanente
     if os.path.exists(ARQUIVO_DADOS_TE):
@@ -972,6 +978,11 @@ elif menu == "📊 Dados - Turno Estendido":
         for col in COLUNAS_TE:
             if col not in df_local.columns:
                 df_local[col] = ""
+        df_local["ANO"] = (
+            pd.to_numeric(df_local["ANO"], errors="coerce")
+            .fillna(0).astype(int).astype(str)
+            .replace("0", "")
+        )
     else:
         df_local = pd.DataFrame(columns=COLUNAS_TE)
 
@@ -997,6 +1008,14 @@ elif menu == "📊 Dados - Turno Estendido":
             df_sheets = pd.concat([df_sheets, pd.DataFrame([row_loc])], ignore_index=True)
 
     df_h = df_sheets.copy()
+
+    # ── NORMALIZAR ANO (Google Sheets retorna 2025.0; convertemos para "2025") ──
+    if "ANO" in df_h.columns:
+        df_h["ANO"] = (
+            pd.to_numeric(df_h["ANO"], errors="coerce")
+            .fillna(0).astype(int).astype(str)
+            .replace("0", "")
+        )
 
     # ── FUNÇÃO STATUS MARÉ ──
     def get_status_mare_html(nv_atual, hist):
@@ -1028,13 +1047,22 @@ elif menu == "📊 Dados - Turno Estendido":
         if a and a not in ["nan", "None", ""]
     ]) if not df_h.empty else []
 
-    # Identifica quais alunos têm dados locais pendentes (para marcar visualmente)
-    alunos_pendentes = set()
-    if os.path.exists(ARQUIVO_BUFFER):
-        try:
-            alunos_pendentes = set(pd.read_csv(ARQUIVO_BUFFER)["ALUNO"].astype(str).str.strip().unique())
-        except Exception:
-            pass
+    # Mapa de cor de texto por luminosidade do fundo (salas escuras → branco)
+    BADGE_TEXTO = {
+        "SALA ROSA":     "#333",
+        "SALA AMARELA":  "#333",
+        "SALA VERDE":    "#333",
+        "SALA AZUL":     "#333",
+        "CIRAND. MUNDO": "#ffffff",
+    }
+    # Rótulo curto para o badge
+    BADGE_LABEL = {
+        "SALA ROSA":     "🌸 ROSA",
+        "SALA AMARELA":  "⭐ AMARELA",
+        "SALA VERDE":    "🌿 VERDE",
+        "SALA AZUL":     "💧 AZUL",
+        "CIRAND. MUNDO": "🌍 MUNDO",
+    }
 
     for al in alunos_nesta_aba:
         dados_aluno_ano = df_h[
@@ -1044,16 +1072,21 @@ elif menu == "📊 Dados - Turno Estendido":
         if dados_aluno_ano.empty:
             continue
 
-        # Indicador visual de dado local pendente
-        badge_pendente = (
-            ' <span title="Registro local ainda não enviado ao Google Sheets" '
-            'style="background:#ffc713;color:#333;border-radius:10px;padding:1px 7px;font-size:9px;font-weight:bold;">LOCAL</span>'
-            if al in alunos_pendentes else ""
+        # Badge com a sala do aluno (cor e ícone conforme identidade visual)
+        sala_al = str(dados_aluno_ano["SALA"].iloc[0]).strip().upper() if "SALA" in dados_aluno_ano.columns else ""
+        cfg_sala = TURMAS_CONFIG.get(sala_al, {})
+        cor_badge = cfg_sala.get("cor", "#e0e0e0")
+        txt_badge = BADGE_LABEL.get(sala_al, sala_al if sala_al else "—")
+        cor_txt   = BADGE_TEXTO.get(sala_al, "#333")
+        badge_sala = (
+            f' <span style="background:{cor_badge};color:{cor_txt};border-radius:10px;'
+            f'padding:2px 8px;font-size:9px;font-weight:bold;white-space:nowrap;">'
+            f'{txt_badge}</span>'
         )
 
         html_tab += (
             f'<tr><td style="font-weight:bold;padding:10px;border:1px solid #eee;font-size:12px;">'
-            f'{al}{badge_pendente}</td>'
+            f'{al}{badge_sala}</td>'
         )
 
         if ano_sel == 2026:

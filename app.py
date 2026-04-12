@@ -380,44 +380,17 @@ def render_legenda_niveis_botoes(aluno_sel, key_prefix="te"):
 
 def render_legenda_niveis():
     st.markdown("##### 📝 Legenda de Níveis")
-    st.write("<small>Clique no nível para filtrar a visualização:</small>", unsafe_allow_html=True)
-    
     cols_leg = st.columns(len(NIVEIS_ALF))
-    
     for i, nv in enumerate(NIVEIS_ALF):
         cor_fundo = CORES_EXCLUSIVAS.get(nv, "#eee")
         cor_txt = get_text_color(nv)
-        nome_nivel = nv.split(". ")[1]
-        
-        # O botão agora carrega o nome do nível e a funcionalidade
-        # Usamos uma chave (key) única para evitar conflitos
-        if cols_leg[i].button(nome_nivel, key=f"filter_nv_{i}", use_container_width=True):
-            st.session_state.nivel_selecionado = nv
-            # Se você tiver uma lógica de filtro global, ela será disparada aqui
-            st.rerun()
-
-        # Injetamos o CSS para que este botão específico tenha a cor da legenda
-        st.markdown(f"""
-            <style>
-            /* Alvos específicos para os botões desta legenda */
-            div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button {{
-                background-color: {cor_fundo} !important;
-                color: {cor_txt} !important;
-                height: 60px !important;
-                font-size: 10px !important;
-                font-weight: bold !important;
-                border-radius: 10px !important;
-                border: 1px solid rgba(0,0,0,0.1) !important;
-                line-height: 1.1 !important;
-                padding: 2px !important;
-            }}
-            /* Efeito de hover para indicar que é clicável */
-            div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button:hover {{
-                border: 2px solid #555 !important;
-                opacity: 0.9;
-            }}
-            </style>
-        """, unsafe_allow_html=True)
+        cols_leg[i].markdown(
+            f'<div style="background-color:{cor_fundo}; color:{cor_txt}; padding:8px 2px; border-radius:10px; '
+            f'text-align:center; font-size:10px; font-weight:bold; min-height:50px; display:flex; '
+            f'align-items:center; justify-content:center; line-height:1.1;">'
+            f'{nv.split(". ")[1]}</div>',
+            unsafe_allow_html=True
+        )
 
 
 def render_vasilha_mare(nivel_num, titulo):
@@ -508,42 +481,22 @@ def aplicar_filtros(df_alvo, df_geral, tn, cm):
 def render_botoes_salas(key_prefix, session_key, salas_permitidas=None):
     salas = salas_permitidas if salas_permitidas else list(TURMAS_CONFIG.keys())
     cols = st.columns(len(salas))
-    
     for i, nome_aba in enumerate(salas):
         cfg = TURMAS_CONFIG.get(nome_aba, {"cor": "#566573", "icon": "🏫"})
         label_exibicao = BADGE_LABEL.get(nome_aba, nome_aba.replace("SALA ", ""))
-        
         is_active = st.session_state.get(session_key) == nome_aba
-        
-        # Estilização baseada no estado ativo
-        cor_fundo = cfg["cor"]
-        borda = "3px solid #000" if is_active else "1px solid rgba(0,0,0,0.2)"
-        opacidade = "1.0" if is_active else "0.7"
-
-        # 1. CRIAMOS APENAS O BOTÃO (sem o markdown de div antes)
-        if cols[i].button(label_exibicao, key=f"{key_prefix}_{i}", use_container_width=True):
+        op = "1.0" if is_active else "0.5"
+        borda = "3px solid #000" if is_active else "2px solid rgba(0,0,0,0.1)"
+        cols[i].markdown(
+            f'<div style="background-color:{cfg["cor"]}; color:white; padding:10px 5px; border-radius:10px; '
+            f'text-align:center; font-size:12px; font-weight:bold; opacity:{op}; border:{borda}; '
+            f'margin-bottom:2px;">'
+            f'{label_exibicao}</div>',
+            unsafe_allow_html=True
+        )
+        if cols[i].button(f'{label_exibicao}', key=f"{key_prefix}_{i}", use_container_width=True):
             st.session_state[session_key] = nome_aba
             st.rerun()
-
-        # 2. INJETAMOS O CSS PARA COLORIR O BOTÃO
-        st.markdown(f"""
-            <style>
-            div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button {{
-                background-color: {cor_fundo} !important;
-                color: white !important;
-                height: 55px !important;
-                font-weight: bold !important;
-                border-radius: 10px !important;
-                border: {borda} !important;
-                opacity: {opacidade} !important;
-                transition: 0.3s;
-            }}
-            div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button:hover {{
-                opacity: 1.0 !important;
-                border: 3px solid #000 !important;
-            }}
-            </style>
-        """, unsafe_allow_html=True)
 
 
 st.markdown(f"""

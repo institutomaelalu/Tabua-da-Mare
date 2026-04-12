@@ -523,36 +523,48 @@ st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
 
-/* ── Fonte global ── */
-*, *::before, *::after,
-html, body, .stApp,
-h1, h2, h3, h4, h5, h6, p, span, div, li, td, th, label, input, select, textarea, button,
-[class*="st-"], [data-testid] {{
+/* ── Fonte global — SEM sobrescrever ícones Material ── */
+html, body, .stApp {{
+    font-family: 'Nunito', sans-serif !important;
+    background-color: #ffffff;
+}}
+h1, h2, h3, h4, h5, h6,
+p, li, td, th, label,
+input, select, textarea, button,
+[data-testid="stMarkdownContainer"],
+[data-testid="stMarkdownContainer"] * {{
     font-family: 'Nunito', sans-serif !important;
 }}
-
-.stApp {{ background-color: #ffffff; }}
+/* Protege ícones Material — NÃO sobrescrever */
+[data-testid="stIconMaterial"],
+[data-testid="stIconMaterial"] *,
+.material-icons, .material-icons-outlined,
+[class*="MaterialIcon"] {{
+    font-family: 'Material Icons', 'Material Icons Outlined' !important;
+}}
 
 /* ── Títulos ── */
-h1, .stApp h1, [data-testid="stMarkdownContainer"] h1 {{
+h1, [data-testid="stMarkdownContainer"] h1 {{
     font-size: 32px !important; font-weight: 900 !important; color: #1a1a2e !important;
 }}
-h2, .stApp h2, [data-testid="stMarkdownContainer"] h2 {{
+h2, [data-testid="stMarkdownContainer"] h2 {{
     font-size: 24px !important; font-weight: 800 !important; color: #1a1a2e !important;
 }}
-h3, .stApp h3, [data-testid="stMarkdownContainer"] h3 {{
+h3, [data-testid="stMarkdownContainer"] h3 {{
     font-size: 20px !important; font-weight: 800 !important; color: #2c3e50 !important;
 }}
-h4, h5, h6 {{
-    font-size: 15px !important; font-weight: 700 !important; color: #2c3e50 !important;
-}}
+h4, h5, h6 {{ font-size: 15px !important; font-weight: 700 !important; color: #2c3e50 !important; }}
 
 /* ── Corpo e labels ── */
-p, li, [data-testid="stMarkdownContainer"] p {{
+p, li {{ font-size: 14px !important; font-weight: 400 !important; line-height: 1.6 !important; }}
+[data-testid="stMarkdownContainer"] p {{
     font-size: 14px !important; font-weight: 400 !important; line-height: 1.6 !important;
 }}
-label, [data-testid="stWidgetLabel"] p, [data-testid="stSelectbox"] label p,
-[data-testid="stTextInput"] label p, [data-testid="stRadio"] label p {{
+label,
+[data-testid="stWidgetLabel"] p,
+[data-testid="stSelectbox"] label p,
+[data-testid="stTextInput"] label p,
+[data-testid="stRadio"] label p {{
     font-size: 13px !important; font-weight: 700 !important; color: #2c3e50 !important;
 }}
 
@@ -561,25 +573,23 @@ table {{ font-family: 'Nunito', sans-serif !important; font-size: 12px !importan
 table th {{ font-size: 12px !important; font-weight: 800 !important; }}
 table td {{ font-size: 12px !important; font-weight: 400 !important; }}
 thead tr th, th {{
-    color: #000000 !important; -webkit-text-fill-color: #000000 !important;
-    font-weight: 800 !important; background-color: #f8f9fa !important;
-    text-align: center !important; font-size: 12px !important;
+    font-weight: 800 !important;
+    text-align: center !important;
+    font-size: 12px !important;
+    font-family: 'Nunito', sans-serif !important;
 }}
 
-/* ── Botões ── */
-div.stButton > button, button, [data-testid="baseButton-secondary"],
-[data-testid="baseButton-primary"] {{
+/* ── Botões — apenas o texto, sem tocar no ícone ── */
+div.stButton > button {{
     font-family: 'Nunito', sans-serif !important;
-    font-weight: 800 !important;
-    font-size: 12px !important;
+    font-weight: 800 !important; font-size: 12px !important;
     width: 100%; border-radius: 8px !important;
     height: 42px; border: none !important; transition: all 0.3s;
 }}
+div.stButton > button p {{ font-family: 'Nunito', sans-serif !important; font-weight: 800 !important; }}
 
 /* ── Inputs / Selectbox ── */
-input, select, textarea,
-[data-testid="stTextInput"] input,
-[data-testid="stSelectbox"] div[data-baseweb="select"] span {{
+input, select, textarea {{
     font-family: 'Nunito', sans-serif !important;
     font-size: 13px !important; font-weight: 600 !important;
 }}
@@ -590,8 +600,11 @@ input, select, textarea,
 [data-testid="stAlert"] p, .stAlert p {{ font-size: 13px !important; font-weight: 600 !important; }}
 
 /* ── Sidebar / menu ── */
-[data-testid="stSidebarNav"] span, [data-testid="stSidebar"] p,
-[data-testid="stSidebar"] label {{ font-size: 13px !important; font-weight: 700 !important; }}
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] label {{
+    font-family: 'Nunito', sans-serif !important;
+    font-size: 13px !important; font-weight: 700 !important;
+}}
 
 /* ── Componentes custom reutilizados ── */
 .main-header {{ text-align: center; padding: 20px 0; }}
@@ -783,7 +796,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
         table_html += "</tr></thead><tbody>"
 
         for i, (_, r) in enumerate(df_f.iterrows()):
-            bg = f"{cor_h}18" if i % 2 == 0 else f"{cor_h}08"
+            bg = "#ffffff" if i % 2 == 0 else "#f8f9fa"
             p_nome = str(r.get("PADRINHO/MADRINHA", "-")).strip()
             if p_nome in ["", "0", "nan", "None", "-"]:
                 p_nome = "-"
@@ -1367,18 +1380,18 @@ elif menu == "🌊 Tábua da Maré":
             border: 1.5px solid {cor_sala_exp}55 !important;
             border-radius: 10px !important;
             margin-bottom: 6px !important;
-            overflow: hidden !important;
         }}
-        [data-testid="stExpander"] summary {{
+        [data-testid="stExpander"] details summary {{
             background: {cor_sala_exp}18 !important;
             border-radius: 10px !important;
-            font-weight: 600 !important;
+        }}
+        [data-testid="stExpander"] details summary:hover {{
+            background: {cor_sala_exp}2e !important;
+        }}
+        [data-testid="stExpander"] details summary p {{
+            font-weight: 700 !important;
             font-size: 13px !important;
             color: #2c3e50 !important;
-            padding: 10px 14px !important;
-        }}
-        [data-testid="stExpander"] summary:hover {{
-            background: {cor_sala_exp}30 !important;
         }}
         </style>""", unsafe_allow_html=True)
 

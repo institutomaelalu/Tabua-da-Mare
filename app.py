@@ -16,7 +16,8 @@ st.set_page_config(page_title="Gestão Instituto Mãe Lalu", layout="wide")
 # CONSTANTES
 # ─────────────────────────────────────────────
 ID_PLANILHA = "1Zj8u67oAWKgYRd2uOkGssdaxXnwdsKsZBDxeLChnBr4"
-ARQUIVO_BUFFER = "buffer_estendido.csv"
+ARQUIVO_BUFFER   = "buffer_estendido.csv"       # fila temporária para sync com Sheets
+ARQUIVO_DADOS_TE = "dados_turno_estendido.csv"  # banco de dados local permanente da aba
 
 C_ROSA, C_VERDE, C_AZUL, C_AMARELO, C_ROXO = "#ff81ba", "#a8cf45", "#5cc6d0", "#ffc713", "#6741d9"
 C_AZUL_MARE = "#8fd9fb"
@@ -101,41 +102,110 @@ def get_gspread_client():
 # FUNÇÕES DE GRAVAÇÃO
 # ─────────────────────────────────────────────
 
+def _upsert_csv(caminho, chaves, novo_registro):
+    """
+    Atualiza ou insere um registro em um CSV local.
+    chaves: lista de colunas que identificam a linha (ex: ["ALUNO", "ANO", "ETAPA"])
+    """
+    if os.path.exists(caminho):
+        df = pd.read_csv(caminho).fillna("")
+    else:
+        df = pd.DataFrame(columns=list(novo_registro.keys()))
+
+    # garante que todas as colunas existam
+    for col in novo_registro:
+        if col not in df.columns:
+            df[col] = ""
+
+    mask = pd.Series([True] * len(df))
+    for k in chaves:
+        mask = mask & (df[k].astype(str) == str(novo_registro[k]))
+
+    if mask.any():
+        for k, v in novo_registro.items():
+            df.loc[mask, k] = v
+    else:
+        df = pd.concat([df, pd.DataFrame([novo_registro])], ignore_index=True)
+
+    df.to_csv(caminho, index=False)
+
+
+def salvar_dados_locais_te(aluno, sala, avaliacao_tipo, nivel, evidencias_str, obs, ano):
+    """
+    Atualiza o banco de dados local permanente de Turno Estendido.
+    Esse arquivo NUNCA é apagado — garante que os dados fiquem visíveis
+    na aba 'Dados - Turno Estendido' mesmo após a sincronização com o Sheets.
+    """
+    MAP_ETAPA_COL = {
+        "1ª Avaliação":    "1ª AVALIAÇÃO",
+        "2ª Avaliação":    "2ª AVALIAÇÃO",
+        "Avaliação Final": "AVALIAÇÃO FINAL",
+    }
+    col_destino = MAP_ETAPA_COL.get(avaliacao_tipo)
+    if not col_destino:
+        return  # MATRÍCULA e outros tipos não geram linha na tabela de avaliação
+
+    if os.path.exists(ARQUIVO_DADOS_TE):
+        df = pd.read_csv(ARQUIVO_DADOS_TE).fillna("")
+    else:
+        df = pd.DataFrame(columns=["ALUNO", "SALA", "ANO",
+                                    "1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL",
+                                    "DIAGNÓSTICO", "EVIDÊNCIAS", "OBSERVAÇÕES"])
+
+    # Garante colunas
+    for col in ["ALUNO", "SALA", "ANO", "1ª AVALIAÇÃO", "2ª AVALIAÇÃO",
+                "AVALIAÇÃO FINAL", "DIAGNÓSTICO", "EVIDÊNCIAS", "OBSERVAÇÕES"]:
+        if col not in df.columns:
+            df[col] = ""
+
+    mask = (
+        (df["ALUNO"].astype(str).str.strip() == str(aluno).strip()) &
+        (df["ANO"].astype(str).str.strip() == str(ano).strip())
+    )
+
+    if mask.any():
+        idx = df.index[mask][0]
+        df.at[idx, col_destino] = nivel
+        df.at[idx, "SALA"] = sala
+        if avaliacao_tipo == "Avaliação Final":
+            df.at[idx, "DIAGNÓSTICO"] = nivel
+        if evidencias_str:
+            df.at[idx, "EVIDÊNCIAS"] = evidencias_str
+        if obs:
+            df.at[idx, "OBSERVAÇÕES"] = obs
+    else:
+        nova = {
+            "ALUNO": aluno, "SALA": sala, "ANO": str(ano),
+            "1ª AVALIAÇÃO": "", "2ª AVALIAÇÃO": "", "AVALIAÇÃO FINAL": "",
+            "DIAGNÓSTICO": nivel if avaliacao_tipo == "Avaliação Final" else "",
+            "EVIDÊNCIAS": evidencias_str, "OBSERVAÇÕES": obs,
+        }
+        nova[col_destino] = nivel
+        df = pd.concat([df, pd.DataFrame([nova])], ignore_index=True)
+
+    df.to_csv(ARQUIVO_DADOS_TE, index=False)
+
+
 def salvar_buffer_local(aluno, sala, avaliacao_tipo, nivel, evidencias_list, obs, ano):
     """
-    Salva o registro de avaliação localmente (CSV buffer).
-    Os dados ficam armazenados até serem sincronizados com o Google Sheets.
+    Salva o registro de avaliação em:
+    1. buffer_estendido.csv  — fila para sync com Google Sheets (apagado após envio)
+    2. dados_turno_estendido.csv — banco local permanente (nunca apagado)
     """
     hoje = datetime.now().strftime("%d/%m/%Y")
     evid_str = ", ".join(evidencias_list) if evidencias_list else ""
-    novo = {
-        "ALUNO":     aluno,
-        "SALA":      sala,
-        "ETAPA":     avaliacao_tipo,
-        "NIVEL":     nivel,
-        "EVIDENCIAS": evid_str,
-        "OBS":       obs,
-        "ANO":       str(ano),
-        "DATA":      hoje,
+
+    # ── 1. Buffer de sincronização ──
+    novo_buf = {
+        "ALUNO": aluno, "SALA": sala, "ETAPA": avaliacao_tipo,
+        "NIVEL": nivel, "EVIDENCIAS": evid_str, "OBS": obs,
+        "ANO": str(ano), "DATA": hoje,
     }
-    if os.path.exists(ARQUIVO_BUFFER):
-        df_buf = pd.read_csv(ARQUIVO_BUFFER)
-    else:
-        df_buf = pd.DataFrame(columns=list(novo.keys()))
+    _upsert_csv(ARQUIVO_BUFFER, ["ALUNO", "ANO", "ETAPA"], novo_buf)
 
-    # Atualiza se já existir registro do mesmo aluno+ano+etapa, senão adiciona
-    mask = (
-        (df_buf["ALUNO"].astype(str) == str(aluno)) &
-        (df_buf["ANO"].astype(str) == str(ano)) &
-        (df_buf["ETAPA"].astype(str) == str(avaliacao_tipo))
-    )
-    if mask.any():
-        for k, v in novo.items():
-            df_buf.loc[mask, k] = v
-    else:
-        df_buf = pd.concat([df_buf, pd.DataFrame([novo])], ignore_index=True)
+    # ── 2. Banco de dados local permanente ──
+    salvar_dados_locais_te(aluno, sala, avaliacao_tipo, nivel, evid_str, obs, ano)
 
-    df_buf.to_csv(ARQUIVO_BUFFER, index=False)
     return True
 
 
@@ -878,64 +948,55 @@ elif menu == "📊 Dados - Turno Estendido":
 
     render_legenda_niveis()
 
-    # ── MESCLAR DADOS DO GOOGLE SHEETS COM O BUFFER LOCAL ──
-    # Parte 1: dados do Sheets (já em cache)
-    df_h = df_alf.copy()
-    if "ANO" not in df_h.columns:
-        df_h["ANO"] = 2025
+    # ──────────────────────────────────────────────────────────────────────
+    # CONSTRUÇÃO DO DATAFRAME PARA EXIBIÇÃO
+    # Fonte principal: banco de dados local permanente (dados_turno_estendido.csv)
+    # Complemento:    dados do Google Sheets em cache (df_alf)
+    # Prioridade:     dados locais sobrescrevem os do Sheets na mesma chave aluno+ano
+    # ──────────────────────────────────────────────────────────────────────
+    COLUNAS_TE = ["ALUNO", "SALA", "ANO", "1ª AVALIAÇÃO", "2ª AVALIAÇÃO",
+                  "AVALIAÇÃO FINAL", "DIAGNÓSTICO", "EVIDÊNCIAS", "OBSERVAÇÕES"]
 
-    # Mapeamento de etapa do buffer para coluna do df_h
-    MAP_ETAPA_COL = {
-        "1ª Avaliação":   "1ª AVALIAÇÃO",
-        "2ª Avaliação":   "2ª AVALIAÇÃO",
-        "Avaliação Final":"AVALIAÇÃO FINAL",
-    }
+    # 1. Começa com o Google Sheets (cache)
+    df_sheets = df_alf.copy()
+    if "ANO" not in df_sheets.columns:
+        df_sheets["ANO"] = 2025
+    for col in COLUNAS_TE:
+        if col not in df_sheets.columns:
+            df_sheets[col] = ""
 
-    # Parte 2: aplica o buffer local sobre o df_h (sobrescreve ou adiciona linhas)
-    if os.path.exists(ARQUIVO_BUFFER):
-        df_buf = pd.read_csv(ARQUIVO_BUFFER).fillna("")
-        df_buf.columns = [str(c).strip().upper() for c in df_buf.columns]
+    # 2. Carrega o banco local permanente
+    if os.path.exists(ARQUIVO_DADOS_TE):
+        df_local = pd.read_csv(ARQUIVO_DADOS_TE).fillna("")
+        df_local.columns = [str(c).strip().upper() for c in df_local.columns]
+        for col in COLUNAS_TE:
+            if col not in df_local.columns:
+                df_local[col] = ""
+    else:
+        df_local = pd.DataFrame(columns=COLUNAS_TE)
 
-        for _, row_buf in df_buf.iterrows():
-            aluno_buf = str(row_buf.get("ALUNO", "")).strip()
-            sala_buf  = str(row_buf.get("SALA",  "")).strip()
-            etapa_buf = str(row_buf.get("ETAPA", "")).strip()
-            nivel_buf = str(row_buf.get("NIVEL", "")).strip()
-            ano_buf   = str(row_buf.get("ANO",   "")).strip()
-            evid_buf  = str(row_buf.get("EVIDENCIAS", "")).strip()
-            obs_buf   = str(row_buf.get("OBS",   "")).strip()
-            col_destino = MAP_ETAPA_COL.get(etapa_buf)
+    # 3. Mescla: para cada linha do banco local, atualiza ou adiciona no df_sheets
+    for _, row_loc in df_local.iterrows():
+        aluno_loc = str(row_loc.get("ALUNO", "")).strip()
+        ano_loc   = str(row_loc.get("ANO",   "")).strip()
+        if not aluno_loc:
+            continue
 
-            if not aluno_buf or not col_destino:
-                continue
+        mask = (
+            (df_sheets["ALUNO"].astype(str).str.strip() == aluno_loc) &
+            (df_sheets["ANO"].astype(str).str.strip()   == ano_loc)
+        )
+        if mask.any():
+            idx = df_sheets.index[mask][0]
+            for col in ["1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL",
+                        "DIAGNÓSTICO", "EVIDÊNCIAS", "OBSERVAÇÕES", "SALA"]:
+                val_loc = str(row_loc.get(col, "")).strip()
+                if val_loc:  # dados locais têm prioridade quando preenchidos
+                    df_sheets.at[idx, col] = val_loc
+        else:
+            df_sheets = pd.concat([df_sheets, pd.DataFrame([row_loc])], ignore_index=True)
 
-            # Garante que as colunas necessárias existam no df_h
-            for col_extra in ["1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL", "DIAGNÓSTICO", "EVIDÊNCIAS", "OBSERVAÇÕES"]:
-                if col_extra not in df_h.columns:
-                    df_h[col_extra] = ""
-
-            # Tenta encontrar a linha do aluno+ano no df_h
-            mask = (df_h["ALUNO"].astype(str).str.strip() == aluno_buf) & \
-                   (df_h["ANO"].astype(str).str.strip() == ano_buf)
-
-            if mask.any():
-                idx = df_h.index[mask][0]
-                df_h.at[idx, col_destino] = nivel_buf
-                if etapa_buf == "Avaliação Final":
-                    df_h.at[idx, "DIAGNÓSTICO"] = nivel_buf
-                if evid_buf: df_h.at[idx, "EVIDÊNCIAS"]  = evid_buf
-                if obs_buf:  df_h.at[idx, "OBSERVAÇÕES"] = obs_buf
-            else:
-                # Aluno novo ou ano diferente: cria linha
-                nova = {
-                    "ALUNO": aluno_buf, "SALA": sala_buf, "ANO": ano_buf,
-                    "1ª AVALIAÇÃO": "", "2ª AVALIAÇÃO": "", "AVALIAÇÃO FINAL": "",
-                    "DIAGNÓSTICO": "", "EVIDÊNCIAS": evid_buf, "OBSERVAÇÕES": obs_buf,
-                }
-                nova[col_destino] = nivel_buf
-                if etapa_buf == "Avaliação Final":
-                    nova["DIAGNÓSTICO"] = nivel_buf
-                df_h = pd.concat([df_h, pd.DataFrame([nova])], ignore_index=True)
+    df_h = df_sheets.copy()
 
     # ── FUNÇÃO STATUS MARÉ ──
     def get_status_mare_html(nv_atual, hist):
@@ -962,7 +1023,10 @@ elif menu == "📊 Dados - Turno Estendido":
         + "</tr></thead><tbody>"
     )
 
-    alunos_nesta_aba = sorted(df_h["ALUNO"].astype(str).str.strip().unique()) if not df_h.empty else []
+    alunos_nesta_aba = sorted([
+        a for a in df_h["ALUNO"].astype(str).str.strip().unique()
+        if a and a not in ["nan", "None", ""]
+    ]) if not df_h.empty else []
 
     # Identifica quais alunos têm dados locais pendentes (para marcar visualmente)
     alunos_pendentes = set()

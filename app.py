@@ -1194,20 +1194,27 @@ elif menu == "🌊 Canal do Apadrinhamento":
                                 # MENSAGEM AMIGÁVEL QUANDO NÃO HÁ NADA LANÇADO
                                 st.info(f"ℹ️ **Nenhuma avaliação registrada.**\nAinda não foram realizados lançamentos para a Tábua da Maré deste aluno.")
 
-# --- VISUALIZAÇÃO 2: TURNO ESTENDIDO ---
+# --- VISUALIZAÇÃO 2: TURNO ESTENDIDO (DENTRO DO CANAL DO APADRINHAMENTO) ---
 elif modo == "📚 Turno Estendido":
-    # 1. Fazemos a cópia e garantimos que as colunas estejam em MAIÚSCULO para evitar o KeyError
+    # 1. Padronização das Colunas
     df_h = (df_alf.copy()).fillna("")
-    df_h.columns = [str(c).strip().upper() for c in df_h.columns] # <--- LINHA ESSENCIAL
+    df_h.columns = [str(c).strip().upper() for c in df_h.columns]
     
-    # 2. Atualizamos a busca para usar nomes em MAIÚSCULO
-    # Antes era "Aluno", "Ano", "Avaliacao". Agora é "ALUNO", "ANO", "AVALIAÇÃO"
-    dados_al = df_h[df_h["ALUNO"] == al_af].sort_values(["ANO", "AVALIAÇÃO"])
-    dados_al = dados_al.drop_duplicates(subset=['AVALIAÇÃO', 'ANO'], keep='last')
+    # 2. Filtro do Aluno (Usando a coluna ALUNO em maiúsculo)
+    dados_al = df_h[df_h["ALUNO"] == al_af]
     
     if not dados_al.empty:
-        # 3. Atualizamos os acessos internos para MAIÚSCULO também
-        u_nv = dados_al['NIVEL'].iloc[-1]
+        # Pegamos a linha mais recente (normalmente o ano atual)
+        info_al = dados_al.iloc[-1]
+        
+        # Identificar o nível mais atual preenchido para a Maré
+        niveis_seq = []
+        for c_av in ["1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL"]:
+            if info_al.get(c_av):
+                niveis_seq.append(info_al[c_av])
+        
+        u_nv = niveis_seq[-1] if niveis_seq else "1. Pré-Silábico"
+        
         c_inf, c_mare = st.columns([1.2, 1])
         with c_inf:
             cor_bg_nivel = CORES_EXCLUSIVAS.get(u_nv, "#ddd")
@@ -1215,22 +1222,52 @@ elif modo == "📚 Turno Estendido":
             <div style="border:1px solid #ddd; padding:15px; border-radius:12px; background:#f9f9f9; color:black; height:220px; overflow-y: auto;">
                 <h4 style="margin:0;">{al_af}</h4>
                 <p style="margin: 10px 0;"><b>Nível Atual:</b> <span style="background:{cor_bg_nivel}; color:#2C3E50; padding:6px 12px; border-radius:20px; font-weight:bold; border: 1px solid rgba(0,0,0,0.1);">{u_nv}</span></p>
-                <p style="font-size: 13px;"><b>Evidências:</b><br>{dados_al.iloc[-1]['EVIDÊNCIAS']}</p>
+                <p style="font-size: 13px;"><b>Últimas Evidências:</b><br>{info_al.get('EVIDÊNCIAS', 'Nenhuma evidência registrada.')}</p>
+                <p style="font-size: 13px;"><b>Obs. Pedagógicas:</b><br>{info_al.get('OBSERVAÇÕES PEDAGÓGICAS', 'Sem observações.')}</p>
             </div>""", unsafe_allow_html=True)
         
         with c_mare:
-            # Aqui também mudamos para 'NIVEL'
-            vols = [MAPA_NIVEIS.get(n, 0) for n in dados_al['NIVEL']]
-            # ... resto do código da maré (continua igual)
+            # Lógica do Gráfico da Maré baseada na evolução
+            vols = [MAPA_NIVEIS.get(n, 0) for n in niveis_seq]
+            pct_g, s_txt = 85, "Maré Baixa"
+            if u_nv == "7. Alfabético Ortográfico": pct_g, s_txt = 15, "Maré Cheia"
+            elif len(vols) >= 2:
+                if vols[-1] > vols[-2]: pct_g, s_txt = 45, "Maré Enchente"
+                elif vols[-1] < vols[-2]: pct_g, s_txt = 70, "Maré Vazante"
             
-        # ... no histórico, também atualizar as chaves:
-        st.markdown("##### 📂 Histórico")
-        for _, r in dados_al.iterrows():
-            t_av = str(r["AVALIAÇÃO"]).replace("Avaliação Final", "3ª Avaliação")
-            st.markdown(f"""<div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee; font-size:13px; color:black;">
-                <span>📅 <b>{t_av}/{r['ANO']}</b></span>
-                <span style="background:{CORES_EXCLUSIVAS.get(r['NIVEL'], '#ddd')}; padding:4px 10px; border-radius:12px; font-weight:bold; border:1px solid rgba(0,0,0,0.1);">{r['NIVEL']}</span>
-            </div>""", unsafe_allow_html=True)
+            cl_vas, cl_leg = st.columns([1, 1])
+            with cl_vas:
+                st.markdown(f"""<div style="width:140px; height:75px; background:linear-gradient(to bottom, #f0f0f0 {pct_g}%, #5DADE2 {pct_g}%); clip-path: path('M 0 20 Q 40 5 80 20 T 160 20 L 160 80 Q 160 100 140 100 L 20 100 Q 0 100 0 80 Z'); border:1px solid #ccc; margin-top:20px;"></div>
+                <center><b style="color:#1A5276; font-size:14px;">{s_txt}</b></center>""", unsafe_allow_html=True)
+            with cl_leg:
+                st.markdown("""<div style="font-size: 11px; color: #555; padding-top: 15px; line-height: 1.4;">
+                    <b>Legenda da Maré:</b><br>
+                    🔵 <b>Cheia:</b> Ortográfico<br>🟢 <b>Enchente:</b> Evoluiu<br>🟡 <b>Vazante:</b> Oscilação<br>⚪ <b>Baixa:</b> Inicial
+                </div>""", unsafe_allow_html=True)
+
+        # --- TRILHA DE NÍVEIS ---
+        st.markdown("##### 🚀 Jornada de Alfabetização")
+        html_t = '<div class="trilha-ap-container">'
+        for i, nv_ref in enumerate(NIVEIS_ALF):
+            is_current = (u_nv == nv_ref)
+            cor_bg = CORES_EXCLUSIVAS.get(nv_ref, "#eee")
+            borda = "3px solid #2C3E50" if is_current else "1px solid rgba(0,0,0,0.15)"
+            opacidade = "1.0" if is_current else "0.4"
+            html_t += f'<div class="caixa-trilha-ap" style="background-color:{cor_bg}; border:{borda}; opacity:{opacidade}; color:#2C3E50;">{nv_ref.split(". ")[1]}</div>'
+            if i < len(NIVEIS_ALF)-1: html_t += '<div class="seta-ap">→</div>'
+        st.markdown(html_t + '</div>', unsafe_allow_html=True)
+
+        # --- HISTÓRICO DE LANÇAMENTOS ---
+        st.markdown("##### 📂 Histórico do Ano")
+        for c_av in ["1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL"]:
+            nivel_f = info_al.get(c_av)
+            if nivel_f:
+                st.markdown(f"""<div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee; font-size:13px; color:black;">
+                    <span>📅 <b>{c_av.title()} / {info_al['ANO']}</b></span>
+                    <span style="background:{CORES_EXCLUSIVAS.get(nivel_f, '#ddd')}; padding:4px 10px; border-radius:12px; font-weight:bold; border:1px solid rgba(0,0,0,0.1);">{nivel_f}</span>
+                </div>""", unsafe_allow_html=True)
+    else:
+        st.info("Ainda não há dados de alfabetização para este aluno no Turno Estendido.")
 elif menu == "🌊 Tábua da Maré":
     st.markdown(f"### 🌊 Tábua da Maré")
     

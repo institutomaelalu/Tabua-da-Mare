@@ -102,32 +102,72 @@ MARE_LABELS = {
 
 # --- FUNÇÕES DE REGISTRO (ESCRITA NA NUVEM) ---
 
-def registrar_turno_estendido(aluno, sala, avaliacao_tipo, nivel, evidencias_list, obs, ano=2026):
-    """Salva dados na aba TURNO_ESTENDIDO"""
+def registrar_turno_estendido(aluno, sala, avaliacao_tipo, nivel, evidencias_list, obs, ano):
     try:
-        # Lê a aba atual
-        df_atual = conn.read(worksheet="TURNO_ESTENDIDO").fillna("")
-        evidencias_str = "; ".join(evidencias_list) if isinstance(evidencias_list, list) else evidencias_list
+        client = get_gspread_client_seguro()
+        sh = client.open_by_key(ID_PLANILHA)
+        wks = sh.worksheet("TURNO_ESTENDIDO")
         
-        novo_registro = {
-            "DATA": datetime.now().strftime("%d/%m/%Y"),
-            "ALUNO": aluno,
-            "SALA": sala,
-            "1 AVALIAÇÃO": nivel if avaliacao_tipo == "1ª Avaliação" else "",
-            "2 AVALIAÇÃO": nivel if avaliacao_tipo == "2ª Avaliação" else "",
-            "3 AVALIAÇÃO": nivel if avaliacao_tipo == "3ª Avaliação" else "",
-            "ANO": ano,
-            "DIAGNÓSTICO": nivel,
-            "EVIDÊNCIAS": evidencias_str,
-            "OBSERVAÇÕES PEDAGÓGICAS": obs
-        }
+        dados = wks.get_all_records()
+        df_temp = pd.DataFrame(dados)
         
-        df_final = pd.concat([df_atual, pd.DataFrame([novo_registro])], ignore_index=True)
-        conn.update(worksheet="TURNO_ESTENDIDO", data=df_final)
-        st.cache_data.clear()
+        # Mapeamento de colunas: A=ALUNO, B=SALA, C=1ª AV, D=2ª AV, E=AV FINAL, F=ANO, G=DIAG, H=EVID, I=OBS
+        col_map = {"1ª Avaliação": "C", "2ª Avaliação": "D", "Avaliação Final": "E"}
+        
+        linha_encontrada = -1
+        
+        if not df_temp.empty:
+            df_temp.columns = [str(c).strip().upper() for c in df_temp.columns]
+            
+            # --- LÓGICA DE BUSCA REFINADA ---
+            # 1. Tenta achar uma linha do aluno que ainda esteja com o ANO vazio (a matrícula inicial)
+            filtro_vazio = (df_temp['ALUNO'].astype(str).str.strip() == str(aluno).strip()) & \
+                           (df_temp['ANO'].astype(str).str.strip() == "")
+            
+            indices_vazios = df_temp.index[filtro_vazio].tolist()
+            
+            if indices_vazios:
+                linha_encontrada = indices_vazios[0] + 2
+            else:
+                # 2. Se não tem linha com ano vazio, tenta achar uma linha que já tenha ESSE ANO selecionado
+                filtro_ano = (df_temp['ALUNO'].astype(str).str.strip() == str(aluno).strip()) & \
+                             (df_temp['ANO'].astype(str).str.strip() == str(ano).strip())
+                
+                indices_ano = df_temp.index[filtro_ano].tolist()
+                if indices_ano:
+                    linha_encontrada = indices_ano[0] + 2
+
+        evid_str = ", ".join(evidencias_list) if evidencias_list else ""
+        hoje = datetime.now().strftime("%d/%m/%Y")
+
+        if linha_encontrada != -1:
+            # --- ATUALIZA LINHA (Seja a que estava com ano vazio ou a do ano correspondente) ---
+            letra_col = col_map.get(avaliacao_tipo, "C")
+            
+            # Atualiza o Ano (caso estivesse em branco) e os dados da avaliação
+            wks.update(range_name=f"F{linha_encontrada}", values=[[str(ano)]]) # Coluna do ANO
+            wks.update(range_name=f"{letra_col}{linha_encontrada}", values=[[nivel]])
+            
+            if avaliacao_tipo == "Avaliação Final":
+                wks.update(range_name=f"G{linha_encontrada}", values=[[nivel]]) # Diagnóstico Final
+            
+            if obs: wks.update(range_name=f"I{linha_encontrada}", values=[[obs]])
+            if evid_str: wks.update(range_name=f"H{linha_encontrada}", values=[[evid_str]])
+            
+        else:
+            # --- CRIA NOVA LINHA (Se o aluno mudar de ano ou for um registro totalmente novo) ---
+            nova_linha = [aluno, sala, "", "", "", str(ano), "", evid_str, obs, hoje]
+            
+            # Preenche a coluna correta conforme a etapa
+            idx_etapa = {"1ª Avaliação": 2, "2ª Avaliação": 3, "Avaliação Final": 4}.get(avaliacao_tipo, 2)
+            nova_linha[idx_etapa] = nivel
+            if avaliacao_tipo == "Avaliação Final": nova_linha[6] = nivel
+            
+            wks.append_row(nova_linha)
+            
         return True
     except Exception as e:
-        st.error(f"Erro ao salvar Turno Estendido: {e}")
+        print(f"Erro na gravação: {e}")
         return False
 
 def registrar_tabua_mare(aluno, sala, semestre, notas_dict, obs):

@@ -570,6 +570,186 @@ def render_legenda_niveis():
         )
 
 
+def detectar_sala_config(valor):
+    texto = normalizar_texto(valor)
+    for sala in TURMAS_CONFIG:
+        sala_norm = normalizar_texto(sala)
+        if texto == sala_norm or texto in sala_norm or sala_norm in texto:
+            return sala
+    if "ROSA" in texto:
+        return "SALA ROSA"
+    if "AMARELA" in texto or "AMARELO" in texto:
+        return "SALA AMARELA"
+    if "VERDE" in texto:
+        return "SALA VERDE"
+    if "AZUL" in texto:
+        return "SALA AZUL"
+    if "MUNDO" in texto or "CIRAND" in texto:
+        return "CIRAND. MUNDO"
+    return ""
+
+
+def render_badge_sala_html(sala):
+    sala_key = detectar_sala_config(sala)
+    cor = TURMAS_CONFIG.get(sala_key, {}).get("cor", "#95a5a6")
+    label = BADGE_LABEL.get(sala_key, str(sala).replace("SALA ", "").strip() or "—")
+    return (
+        f'<span style="background:{cor};color:#fff;border-radius:50px;'
+        f'padding:5px 14px;font-size:10px;font-weight:800;letter-spacing:0.5px;'
+        f'text-transform:uppercase;white-space:nowrap;">{label}</span>'
+    )
+
+
+def render_status_mare_te_html(nv_atual, hist):
+    n_at = MAPA_NIVEIS.get(nv_atual, 0)
+    if n_at == 0:
+        return '<div class="mare-box"><span class="mare-texto-tabela">—</span></div>'
+    fill_pct = max(6, round(n_at * 90 / 7))
+    if n_at <= 2:
+        txt = "maré baixa"
+    elif n_at == 7:
+        txt = "maré cheia"
+    else:
+        n_ant = MAPA_NIVEIS.get(hist[-2], 0) if len(hist) >= 2 else 0
+        if n_ant != 0 and n_at > n_ant:
+            txt = "maré enchente"
+        elif n_ant != 0 and n_at < n_ant:
+            txt = "maré vazante"
+        else:
+            if n_at in [3, 4]:
+                txt = "maré enchente"
+            elif n_at in [5, 6]:
+                txt = "maré alta"
+            else:
+                txt = "maré estável"
+    vasilha = (
+        f'<div style="width:100px;height:58px;border:1px solid #bbb;border-radius:8px;'
+        f'overflow:hidden;position:relative;background:#f5f8fa;display:inline-block;">'
+        f'<div style="position:absolute;bottom:0;left:0;width:100%;height:{fill_pct}%;">'
+        f'<svg width="100" height="14" viewBox="0 0 100 14" preserveAspectRatio="none" '
+        f'style="position:absolute;top:-9px;left:0;width:100%;height:14px;display:block;">'
+        f'<path d="M0,9 Q25,3 50,9 Q75,15 100,9 L100,14 L0,14 Z" fill="{C_AZUL_MARE}"/>'
+        f'</svg><div style="width:100%;height:100%;background:{C_AZUL_MARE};"></div>'
+        f'</div></div>'
+    )
+    return (
+        f'<div style="background:#fff;border:1px solid #dbeafe;border-radius:14px;padding:18px;text-align:center;color:#2c3e50;">'
+        f'<div style="font-weight:800;margin-bottom:10px;">STATUS MARÉ</div>'
+        f'{vasilha}'
+        f'<div style="font-size:12px;color:#2E86C1;font-weight:900;text-transform:uppercase;margin-top:8px;">{txt}</div>'
+        f'</div>'
+    )
+
+
+def carregar_turno_estendido_completo():
+    colunas_te = ["ALUNO", "SALA", "ANO", "1ª AVALIAÇÃO", "2ª AVALIAÇÃO",
+                  "AVALIAÇÃO FINAL", "DIAGNÓSTICO", "EVIDÊNCIAS", "OBSERVAÇÕES"]
+    df_sheets = df_alf.copy()
+    df_sheets.columns = [str(c).strip().upper() for c in df_sheets.columns]
+    if "ANO" not in df_sheets.columns:
+        df_sheets["ANO"] = "2025"
+    for col in colunas_te:
+        if col not in df_sheets.columns:
+            df_sheets[col] = ""
+    df_sheets["ANO"] = (
+        pd.to_numeric(df_sheets["ANO"], errors="coerce")
+        .fillna(0).astype(int).astype(str)
+        .replace("0", "")
+    )
+    if os.path.exists(ARQUIVO_DADOS_TE):
+        df_local = pd.read_csv(ARQUIVO_DADOS_TE).fillna("")
+        df_local.columns = [str(c).strip().upper() for c in df_local.columns]
+        for col in colunas_te:
+            if col not in df_local.columns:
+                df_local[col] = ""
+        df_local["ANO"] = (
+            pd.to_numeric(df_local["ANO"], errors="coerce")
+            .fillna(0).astype(int).astype(str)
+            .replace("0", "")
+        )
+    else:
+        df_local = pd.DataFrame(columns=colunas_te)
+    for _, row_loc in df_local.iterrows():
+        aluno_loc = str(row_loc.get("ALUNO", "")).strip()
+        ano_loc = str(row_loc.get("ANO", "")).strip()
+        if not aluno_loc:
+            continue
+        mask = (
+            (df_sheets["ALUNO"].astype(str).str.strip() == aluno_loc) &
+            (df_sheets["ANO"].astype(str).str.strip() == ano_loc)
+        )
+        if mask.any():
+            idx = df_sheets.index[mask][0]
+            for col in ["1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL",
+                        "DIAGNÓSTICO", "EVIDÊNCIAS", "OBSERVAÇÕES", "SALA"]:
+                val_loc = str(row_loc.get(col, "")).strip()
+                if val_loc:
+                    df_sheets.at[idx, col] = val_loc
+        else:
+            df_sheets = pd.concat([df_sheets, pd.DataFrame([row_loc])], ignore_index=True)
+    return df_sheets.fillna("")
+
+
+def obter_historico_te_aluno(aluno):
+    df_h = carregar_turno_estendido_completo()
+    if df_h.empty or "ALUNO" not in df_h.columns:
+        return pd.DataFrame()
+    df_al = df_h[df_h["ALUNO"].apply(normalizar_texto) == normalizar_texto(aluno)].copy()
+    if df_al.empty:
+        return df_al
+    df_al["_ANO_NUM"] = pd.to_numeric(df_al.get("ANO", ""), errors="coerce").fillna(0)
+    df_al = df_al.sort_values("_ANO_NUM")
+    return df_al.drop(columns=["_ANO_NUM"])
+
+
+def extrair_resumo_te(df_al):
+    niveis_seq = []
+    avaliacoes_por_ano = {}
+    for _, row in df_al.iterrows():
+        ano = str(row.get("ANO", "")).strip() or "Sem ano"
+        avaliacoes_por_ano.setdefault(ano, [])
+        for label, col in [("1ª Avaliação", "1ª AVALIAÇÃO"), ("2ª Avaliação", "2ª AVALIAÇÃO"), ("Avaliação Final", "AVALIAÇÃO FINAL")]:
+            val = str(row.get(col, "")).strip()
+            if val and val not in ["nan", "None"]:
+                avaliacoes_por_ano[ano].append((label, val))
+                niveis_seq.append(val)
+    ultimo = df_al.iloc[-1] if not df_al.empty else pd.Series(dtype=object)
+    ultimo_nivel = ""
+    for _, row in df_al.iloc[::-1].iterrows():
+        for col in ["AVALIAÇÃO FINAL", "2ª AVALIAÇÃO", "1ª AVALIAÇÃO", "DIAGNÓSTICO"]:
+            val = str(row.get(col, "")).strip()
+            if val and val not in ["nan", "None"]:
+                ultimo_nivel = val
+                break
+        if ultimo_nivel:
+            break
+    evidencias = next((str(row.get("EVIDÊNCIAS", "")).strip() for _, row in df_al.iloc[::-1].iterrows()
+                       if str(row.get("EVIDÊNCIAS", "")).strip()), "---")
+    observacoes = next((str(row.get("OBSERVAÇÕES", "")).strip() for _, row in df_al.iloc[::-1].iterrows()
+                        if str(row.get("OBSERVAÇÕES", "")).strip()), "---")
+    if not ultimo_nivel:
+        ultimo_nivel = str(ultimo.get("DIAGNÓSTICO", "Sem diagnóstico")).strip() or "Sem diagnóstico"
+    return ultimo_nivel, evidencias, observacoes, niveis_seq, avaliacoes_por_ano
+
+
+def render_trilha_desenvolvimento_html(niveis_seq):
+    niveis_passados = set(niveis_seq)
+    atual = niveis_seq[-1] if niveis_seq else ""
+    html = '<div style="display:flex;gap:6px;overflow-x:auto;margin-top:8px;">'
+    for nv_ref in NIVEIS_ALF:
+        passou = nv_ref in niveis_passados
+        atual_css = "border:3px solid #2c3e50;transform:scale(1.03);" if nv_ref == atual else "border:1px solid #ffffff;"
+        opac = "1" if passou else "0.28"
+        cor = CORES_EXCLUSIVAS.get(nv_ref, "#eee")
+        txt = get_text_color(nv_ref)
+        html += (
+            f'<div style="background:{cor};color:{txt};opacity:{opac};{atual_css}'
+            f'padding:8px;border-radius:8px;font-size:10px;font-weight:800;min-width:95px;'
+            f'text-align:center;line-height:1.15;">{nv_ref.split(". ")[1]}</div>'
+        )
+    return html + "</div>"
+
+
 def render_vasilha_mare(nivel_num, titulo):
     config = {
         1: {"pct": 85, "txt": "Maré Baixa",    "seta": ""},
@@ -1403,7 +1583,7 @@ elif menu == "🌊 Canal do Apadrinhamento":
             lista_nomes = sorted([str(n).strip() for n in afils_df["ALUNO"].unique()])
             al_af = st.selectbox("👶 Selecione o afilhado:", lista_nomes)
 
-            is_turno = al_af in st.session_state.get("alunos_te_dict", {})
+            is_turno = al_af in st.session_state.get("alunos_te_dict", {}) or not obter_historico_te_aluno(al_af).empty
             modo = "🌊 Tábua da Maré (Geral)"
 
             if is_turno:
@@ -1423,6 +1603,30 @@ elif menu == "🌊 Canal do Apadrinhamento":
                 dados_aluno_mare = df_av_canal[df_av_canal["ALUNO"].astype(str).str.strip() == al_af.strip()]
                 if not dados_aluno_mare.empty:
                     dados_aluno_mare = dados_aluno_mare[dados_aluno_mare.apply(linha_tem_avaliacao_tabua, axis=1)]
+
+                aluno_cad = afils_df[afils_df["ALUNO"].astype(str).str.strip() == al_af.strip()].iloc[0]
+                sala_cad = aluno_cad.get("SALA_NOME", aluno_cad.get("SALA", ""))
+                obs_mare_lista = []
+                if not dados_aluno_mare.empty:
+                    for _, row_obs in dados_aluno_mare.iterrows():
+                        obs_val = str(row_obs.get("OBSERVAÇÕES PEDAGÓGICAS", row_obs.get("OBSERVACOES", ""))).strip()
+                        if obs_val and obs_val not in ["nan", "None"] and obs_val not in obs_mare_lista:
+                            obs_mare_lista.append(obs_val)
+                obs_mare_ficha = "<br>".join(obs_mare_lista) if obs_mare_lista else "Sem observações registradas."
+
+                st.markdown(f"""
+                <div style="background:#ffffff;border:1px solid #d1e9ff;border-radius:14px;padding:18px;margin-bottom:18px;color:#2c3e50;">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+                        <h4 style="margin:0;">{al_af}</h4>
+                        {render_badge_sala_html(sala_cad)}
+                    </div>
+                    <p style="margin:6px 0;font-size:13px;"><b>Idade:</b> {aluno_cad.get("IDADE", "---")}</p>
+                    <p style="margin:6px 0;font-size:13px;"><b>Comunidade:</b> {aluno_cad.get("COMUNIDADE", "---")}</p>
+                    <div style="margin-top:12px;background:#f8fbff;border-left:4px solid {C_AZUL_MARE};padding:10px;border-radius:8px;">
+                        <b>Observações pedagógicas da Tábua da Maré:</b><br>{obs_mare_ficha}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
                 if not dados_aluno_mare.empty:
                     for _, r in dados_aluno_mare.iterrows():
@@ -1458,47 +1662,53 @@ elif menu == "🌊 Canal do Apadrinhamento":
                     st.info("Nenhuma avaliação da Tábua da Maré encontrada para este afilhado.")
 
             elif modo == "📚 Turno Estendido":
-                df_h = df_alf.copy()
-                df_h.columns = [str(c).strip().upper() for c in df_h.columns]
-                dados_al = df_h[df_h["ALUNO"] == al_af]
+                dados_al = obter_historico_te_aluno(al_af)
 
                 if not dados_al.empty:
+                    aluno_cad = afils_df[afils_df["ALUNO"].astype(str).str.strip() == al_af.strip()].iloc[0]
+                    u_nv, evidencias, observacoes, niveis_seq, avaliacoes_por_ano = extrair_resumo_te(dados_al)
                     info_al = dados_al.iloc[-1]
-                    niveis_seq = []
-                    for c_av in ["1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL"]:
-                        val = info_al.get(c_av, "")
-                        if val and str(val).strip():
-                            niveis_seq.append(str(val))
-                    u_nv = niveis_seq[-1] if niveis_seq else str(info_al.get("DIAGNÓSTICO", "1. Pré-Silábico"))
+                    sala_te = info_al.get("SALA", aluno_cad.get("SALA_NOME", ""))
+                    hist_status = niveis_seq if niveis_seq else ([u_nv] if u_nv in MAPA_NIVEIS else [])
 
-                    col_info, col_graf = st.columns([1.2, 1])
+                    col_info, col_status = st.columns([1.35, 0.85])
                     with col_info:
                         cor_bg = CORES_EXCLUSIVAS.get(u_nv, "#ddd")
                         st.markdown(f"""
-                        <div style="border:1px solid #ddd;padding:15px;border-radius:12px;background:#f9f9f9;color:black;">
-                            <h4 style="margin:0;">{al_af}</h4>
-                            <p style="margin:10px 0;"><b>Nível:</b> <span style="background:{cor_bg};padding:5px 10px;border-radius:15px;">{u_nv}</span></p>
-                            <p style="font-size:13px;"><b>Evidências:</b> {info_al.get("EVIDÊNCIAS", "---")}</p>
+                        <div style="background:#ffffff;border:1px solid #ddd;padding:18px;border-radius:14px;color:#2c3e50;">
+                            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+                                <h4 style="margin:0;">{al_af}</h4>
+                                {render_badge_sala_html(sala_te)}
+                            </div>
+                            <p style="margin:6px 0;font-size:13px;"><b>Idade:</b> {aluno_cad.get("IDADE", "---")}</p>
+                            <p style="margin:6px 0;font-size:13px;"><b>Comunidade:</b> {aluno_cad.get("COMUNIDADE", "---")}</p>
+                            <p style="margin:10px 0;"><b>Último diagnóstico:</b> <span style="background:{cor_bg};color:{get_text_color(u_nv)};padding:5px 10px;border-radius:15px;font-weight:800;">{u_nv}</span></p>
+                            <p style="font-size:13px;margin:8px 0;"><b>Evidências:</b> {evidencias}</p>
+                            <p style="font-size:13px;margin:8px 0;"><b>Observações pedagógicas:</b> {observacoes}</p>
                         </div>""", unsafe_allow_html=True)
 
-                    with col_graf:
-                        vols = [MAPA_NIVEIS.get(n, 0) for n in niveis_seq]
-                        pct = 85
-                        if "7." in u_nv: pct = 15
-                        elif len(vols) >= 2 and vols[-1] > vols[-2]: pct = 45
-                        st.markdown(
-                            f'<div style="width:100px;height:50px;background:linear-gradient(to bottom,#f0f0f0 {pct}%,#5DADE2 {pct}%);'
-                            f'clip-path:path(\'M 0 10 Q 25 0 50 10 T 100 10 L 100 40 Q 100 50 90 50 L 10 50 Q 0 50 0 40 Z\');border:1px solid #ccc;"></div>',
-                            unsafe_allow_html=True,
-                        )
+                    with col_status:
+                        st.markdown(render_status_mare_te_html(u_nv, hist_status), unsafe_allow_html=True)
+                        st.markdown("##### Últimas avaliações")
+                        if avaliacoes_por_ano:
+                            for ano, itens in sorted(avaliacoes_por_ano.items()):
+                                if not itens:
+                                    continue
+                                itens_html = "".join([
+                                    f'<li style="margin-bottom:4px;"><b>{label}:</b> {nivel}</li>'
+                                    for label, nivel in itens
+                                ])
+                                st.markdown(
+                                    f'<div style="background:#f8f9fa;border:1px solid #eee;border-radius:10px;'
+                                    f'padding:10px;margin-bottom:8px;color:#2c3e50;"><b>{ano}</b><ul style="margin:6px 0 0 16px;padding:0;">{itens_html}</ul></div>',
+                                    unsafe_allow_html=True,
+                                )
+                        else:
+                            st.info("Sem avaliações registradas.")
 
-                    st.markdown("##### 🚀 Jornada")
-                    html_trilha = '<div style="display:flex;gap:5px;overflow-x:auto;">'
-                    for nv_ref in NIVEIS_ALF:
-                        opac = "1.0" if u_nv == nv_ref else "0.3"
-                        cor = CORES_EXCLUSIVAS.get(nv_ref, "#eee")
-                        html_trilha += f'<div style="background:{cor};opacity:{opac};padding:5px;border-radius:5px;font-size:10px;min-width:80px;text-align:center;">{nv_ref.split(". ")[1]}</div>'
-                    st.markdown(html_trilha + "</div>", unsafe_allow_html=True)
+                    st.markdown("##### 🚀 Trilha de desenvolvimento")
+                    render_legenda_niveis()
+                    st.markdown(render_trilha_desenvolvimento_html(niveis_seq), unsafe_allow_html=True)
                 else:
                     st.warning("Dados não localizados para este aluno no Turno Estendido.")
 

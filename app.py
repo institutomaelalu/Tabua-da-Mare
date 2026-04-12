@@ -1047,21 +1047,13 @@ elif menu == "📊 Dados - Turno Estendido":
         if a and a not in ["nan", "None", ""]
     ]) if not df_h.empty else []
 
-    # Mapa de cor de texto por luminosidade do fundo (salas escuras → branco)
-    BADGE_TEXTO = {
-        "SALA ROSA":     "#333",
-        "SALA AMARELA":  "#333",
-        "SALA VERDE":    "#333",
-        "SALA AZUL":     "#333",
-        "CIRAND. MUNDO": "#ffffff",
-    }
-    # Rótulo curto para o badge
+    # Rótulo curto para o badge (sem emoji, estilo pílula com texto branco)
     BADGE_LABEL = {
-        "SALA ROSA":     "🌸 ROSA",
-        "SALA AMARELA":  "⭐ AMARELA",
-        "SALA VERDE":    "🌿 VERDE",
-        "SALA AZUL":     "💧 AZUL",
-        "CIRAND. MUNDO": "🌍 MUNDO",
+        "SALA ROSA":     "ROSA",
+        "SALA AMARELA":  "AMARELA",
+        "SALA VERDE":    "VERDE",
+        "SALA AZUL":     "AZUL",
+        "CIRAND. MUNDO": "MUNDO",
     }
 
     for al in alunos_nesta_aba:
@@ -1072,15 +1064,14 @@ elif menu == "📊 Dados - Turno Estendido":
         if dados_aluno_ano.empty:
             continue
 
-        # Badge com a sala do aluno (cor e ícone conforme identidade visual)
-        sala_al = str(dados_aluno_ano["SALA"].iloc[0]).strip().upper() if "SALA" in dados_aluno_ano.columns else ""
-        cfg_sala = TURMAS_CONFIG.get(sala_al, {})
-        cor_badge = cfg_sala.get("cor", "#e0e0e0")
+        # Badge pílula com a cor da sala (fundo colorido, texto branco)
+        sala_al   = str(dados_aluno_ano["SALA"].iloc[0]).strip().upper() if "SALA" in dados_aluno_ano.columns else ""
+        cfg_sala  = TURMAS_CONFIG.get(sala_al, {})
+        cor_badge = cfg_sala.get("cor", "#aaa")
         txt_badge = BADGE_LABEL.get(sala_al, sala_al if sala_al else "—")
-        cor_txt   = BADGE_TEXTO.get(sala_al, "#333")
         badge_sala = (
-            f' <span style="background:{cor_badge};color:{cor_txt};border-radius:10px;'
-            f'padding:2px 8px;font-size:9px;font-weight:bold;white-space:nowrap;">'
+            f' <span style="background:{cor_badge};color:#fff;border-radius:50px;'
+            f'padding:3px 10px;font-size:9px;font-weight:bold;letter-spacing:0.5px;white-space:nowrap;">'
             f'{txt_badge}</span>'
         )
 
@@ -1090,9 +1081,26 @@ elif menu == "📊 Dados - Turno Estendido":
         )
 
         if ano_sel == 2026:
-            diag = dados_aluno_ano["DIAGNÓSTICO"].iloc[0] if "DIAGNÓSTICO" in dados_aluno_ano.columns else "-"
-            diag = diag if str(diag).strip() else "-"
-            html_tab += f'<td style="text-align:center;border:1px solid #eee;font-size:10px;">{diag}</td>'
+            # Diagnóstico Atual = 3ª Sondagem (AVALIAÇÃO FINAL) do mesmo aluno em 2025
+            dados_2025 = df_h[
+                (df_h["ALUNO"].astype(str).str.strip() == al) &
+                (df_h["ANO"].astype(str).str.strip() == "2025")
+            ]
+            diag_2025 = ""
+            if not dados_2025.empty and "AVALIAÇÃO FINAL" in dados_2025.columns:
+                diag_2025 = str(dados_2025["AVALIAÇÃO FINAL"].iloc[0]).strip()
+            if not diag_2025 or diag_2025 in ["nan", "None", ""]:
+                diag_2025 = "-"
+            # Exibe com cor de nível, igual às outras colunas
+            if diag_2025 != "-":
+                cor_d  = CORES_EXCLUSIVAS.get(diag_2025, "#eee")
+                txt_d  = diag_2025.split(". ")[1] if ". " in diag_2025 else diag_2025
+                html_tab += (
+                    f'<td style="background:{cor_d};color:{get_text_color(diag_2025)};'
+                    f'text-align:center;font-weight:bold;border:1px solid #eee;font-size:11px;">{txt_d}</td>'
+                )
+            else:
+                html_tab += '<td style="border:1px solid #eee;text-align:center;color:#aaa;">—</td>'
 
         for col_av in ["1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL"]:
             nv = dados_aluno_ano[col_av].iloc[0] if col_av in dados_aluno_ano.columns else ""

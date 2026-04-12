@@ -523,27 +523,32 @@ st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
 
-/* ── Fonte global — SEM sobrescrever ícones Material ── */
-html, body, .stApp {{
-    font-family: 'Nunito', sans-serif !important;
-    background-color: #ffffff;
-}}
-h1, h2, h3, h4, h5, h6,
-p, li, td, th, label,
-input, select, textarea, button,
-[data-testid="stMarkdownContainer"],
-[data-testid="stMarkdownContainer"] * {{
-    font-family: 'Nunito', sans-serif !important;
-}}
-/* Protege ícones Material — NÃO sobrescrever */
-[data-testid="stIconMaterial"],
-[data-testid="stIconMaterial"] *,
-.material-icons, .material-icons-outlined,
-[class*="MaterialIcon"] {{
-    font-family: 'Material Icons', 'Material Icons Outlined' !important;
-}}
+/* ── Nunito via herança — NÃO toca em containers com ícones ── */
+html, body {{ font-family: 'Nunito', sans-serif; background-color: #ffffff; }}
 
-/* ── Títulos ── */
+/* Somente elementos de texto puro — sem button, sem span, sem div */
+h1, h2, h3, h4, h5, h6 {{
+    font-family: 'Nunito', sans-serif !important;
+}}
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] h1,
+[data-testid="stMarkdownContainer"] h2,
+[data-testid="stMarkdownContainer"] h3,
+[data-testid="stMarkdownContainer"] h4,
+[data-testid="stMarkdownContainer"] li {{
+    font-family: 'Nunito', sans-serif !important;
+}}
+[data-testid="stWidgetLabel"] p,
+[data-testid="stCheckbox"] p,
+[data-testid="stRadio"] p,
+[data-testid="stSelectbox"] label,
+[data-testid="stTextInput"] label {{ font-family: 'Nunito', sans-serif !important; }}
+input, select, textarea {{ font-family: 'Nunito', sans-serif !important; }}
+table, td, th {{ font-family: 'Nunito', sans-serif !important; }}
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] label {{ font-family: 'Nunito', sans-serif !important; }}
+
+/* ── Tamanhos ── */
 h1, [data-testid="stMarkdownContainer"] h1 {{
     font-size: 32px !important; font-weight: 900 !important; color: #1a1a2e !important;
 }}
@@ -554,57 +559,31 @@ h3, [data-testid="stMarkdownContainer"] h3 {{
     font-size: 20px !important; font-weight: 800 !important; color: #2c3e50 !important;
 }}
 h4, h5, h6 {{ font-size: 15px !important; font-weight: 700 !important; color: #2c3e50 !important; }}
-
-/* ── Corpo e labels ── */
-p, li {{ font-size: 14px !important; font-weight: 400 !important; line-height: 1.6 !important; }}
 [data-testid="stMarkdownContainer"] p {{
     font-size: 14px !important; font-weight: 400 !important; line-height: 1.6 !important;
 }}
-label,
-[data-testid="stWidgetLabel"] p,
-[data-testid="stSelectbox"] label p,
-[data-testid="stTextInput"] label p,
-[data-testid="stRadio"] label p {{
+[data-testid="stWidgetLabel"] p {{
     font-size: 13px !important; font-weight: 700 !important; color: #2c3e50 !important;
 }}
 
 /* ── Tabelas HTML inline ── */
-table {{ font-family: 'Nunito', sans-serif !important; font-size: 12px !important; }}
+table {{ font-size: 12px !important; }}
 table th {{ font-size: 12px !important; font-weight: 800 !important; }}
 table td {{ font-size: 12px !important; font-weight: 400 !important; }}
-thead tr th, th {{
-    font-weight: 800 !important;
-    text-align: center !important;
-    font-size: 12px !important;
-    font-family: 'Nunito', sans-serif !important;
-}}
 
-/* ── Botões — apenas o texto, sem tocar no ícone ── */
+/* ── Botões: layout + peso, SEM font-family no container ── */
 div.stButton > button {{
-    font-family: 'Nunito', sans-serif !important;
     font-weight: 800 !important; font-size: 12px !important;
     width: 100%; border-radius: 8px !important;
     height: 42px; border: none !important; transition: all 0.3s;
 }}
-div.stButton > button p {{ font-family: 'Nunito', sans-serif !important; font-weight: 800 !important; }}
 
-/* ── Inputs / Selectbox ── */
-input, select, textarea {{
-    font-family: 'Nunito', sans-serif !important;
-    font-size: 13px !important; font-weight: 600 !important;
-}}
-
-/* ── Métricas e info boxes ── */
+/* ── Métricas e alertas ── */
 [data-testid="stMetricValue"] {{ font-size: 26px !important; font-weight: 800 !important; }}
 [data-testid="stMetricLabel"] {{ font-size: 12px !important; font-weight: 700 !important; }}
-[data-testid="stAlert"] p, .stAlert p {{ font-size: 13px !important; font-weight: 600 !important; }}
-
-/* ── Sidebar / menu ── */
+[data-testid="stAlert"] p {{ font-size: 13px !important; font-weight: 600 !important; }}
 [data-testid="stSidebar"] p,
-[data-testid="stSidebar"] label {{
-    font-family: 'Nunito', sans-serif !important;
-    font-size: 13px !important; font-weight: 700 !important;
-}}
+[data-testid="stSidebar"] label {{ font-size: 13px !important; font-weight: 700 !important; }}
 
 /* ── Componentes custom reutilizados ── */
 .main-header {{ text-align: center; padding: 20px 0; }}
@@ -796,7 +775,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
         table_html += "</tr></thead><tbody>"
 
         for i, (_, r) in enumerate(df_f.iterrows()):
-            bg = "#ffffff" if i % 2 == 0 else "#f8f9fa"
+            bg = "#ffffff"
             p_nome = str(r.get("PADRINHO/MADRINHA", "-")).strip()
             if p_nome in ["", "0", "nan", "None", "-"]:
                 p_nome = "-"

@@ -990,16 +990,44 @@ elif menu == "📊 Dados - Turno Estendido":
         )
 
     def get_status_mare_html(nv_atual, hist):
-        pct, txt = 85, "maré baixa"
-        if nv_atual == "7. Alfabético Ortográfico":
-            pct, txt = 15, "maré cheia"
-        elif len(hist) >= 2:
-            n_at, n_ant = MAPA_NIVEIS.get(nv_atual, 0), MAPA_NIVEIS.get(hist[-2], 0)
-            if n_at > n_ant:   pct, txt = 45, "maré enchente"
-            elif n_at < n_ant: pct, txt = 70, "maré vazante"
-        return (f'<div class="mare-box">'
-                f'<div class="mare-mini-tabela" style="background:linear-gradient(to bottom,#f0f0f0 {pct}%,#5DADE2 {pct}%);"></div>'
-                f'<span class="mare-texto-tabela">{txt}</span></div>')
+        COR_AGUA = "#8fd9fb"
+        n_at = MAPA_NIVEIS.get(nv_atual, 0)
+        if n_at == 0:
+            return '<div class="mare-box"><span class="mare-texto-tabela">—</span></div>'
+
+        fill_pct = max(6, round(n_at * 90 / 7))
+
+        if n_at <= 2:
+            txt = "maré baixa"
+        elif n_at == 7:
+            txt = "maré cheia"
+        else:
+            n_ant = MAPA_NIVEIS.get(hist[-2], 0) if len(hist) >= 2 else 0
+            if n_ant != 0 and n_at > n_ant:
+                txt = "maré enchente"
+            elif n_ant != 0 and n_at < n_ant:
+                txt = "maré vazante"
+            else:
+                if n_at in [3, 4]:   txt = "maré enchente"
+                elif n_at in [5, 6]: txt = "maré alta"
+                else:                txt = "maré estável"
+
+        vasilha = (
+            f'<div style="width:44px;height:26px;border:1px solid #bbb;border-radius:4px;'
+            f'overflow:hidden;position:relative;background:#f5f8fa;display:inline-block;vertical-align:middle;">'
+            f'<div style="position:absolute;bottom:0;left:0;width:100%;height:{fill_pct}%;">'
+            f'<svg width="44" height="8" viewBox="0 0 44 8" preserveAspectRatio="none" '
+            f'style="position:absolute;top:-5px;left:0;width:100%;height:8px;display:block;">'
+            f'<path d="M0,5 Q11,2 22,5 Q33,8 44,5 L44,8 L0,8 Z" fill="{COR_AGUA}"/>'
+            f'</svg>'
+            f'<div style="width:100%;height:100%;background:{COR_AGUA};"></div>'
+            f'</div>'
+            f'</div>'
+        )
+        return (
+            f'<div class="mare-box">{vasilha}'
+            f'<span class="mare-texto-tabela">{txt}</span></div>'
+        )
 
     cols_header = ["Nome do Aluno", "1ª Sondagem", "2ª Sondagem", "3ª Sondagem", "STATUS MARÉ"]
     if ano_sel == 2026:

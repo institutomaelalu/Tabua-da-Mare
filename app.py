@@ -521,19 +521,89 @@ def render_botoes_salas(key_prefix, session_key, salas_permitidas=None):
 
 st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-.stApp {{ background-color: #ffffff; font-family: 'Inter', sans-serif; }}
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
+/* ── Fonte global ── */
+*, *::before, *::after,
+html, body, .stApp,
+h1, h2, h3, h4, h5, h6, p, span, div, li, td, th, label, input, select, textarea, button,
+[class*="st-"], [data-testid] {{
+    font-family: 'Nunito', sans-serif !important;
+}}
+
+.stApp {{ background-color: #ffffff; }}
+
+/* ── Títulos ── */
+h1, .stApp h1, [data-testid="stMarkdownContainer"] h1 {{
+    font-size: 32px !important; font-weight: 900 !important; color: #1a1a2e !important;
+}}
+h2, .stApp h2, [data-testid="stMarkdownContainer"] h2 {{
+    font-size: 24px !important; font-weight: 800 !important; color: #1a1a2e !important;
+}}
+h3, .stApp h3, [data-testid="stMarkdownContainer"] h3 {{
+    font-size: 20px !important; font-weight: 800 !important; color: #2c3e50 !important;
+}}
+h4, h5, h6 {{
+    font-size: 15px !important; font-weight: 700 !important; color: #2c3e50 !important;
+}}
+
+/* ── Corpo e labels ── */
+p, li, [data-testid="stMarkdownContainer"] p {{
+    font-size: 14px !important; font-weight: 400 !important; line-height: 1.6 !important;
+}}
+label, [data-testid="stWidgetLabel"] p, [data-testid="stSelectbox"] label p,
+[data-testid="stTextInput"] label p, [data-testid="stRadio"] label p {{
+    font-size: 13px !important; font-weight: 700 !important; color: #2c3e50 !important;
+}}
+
+/* ── Tabelas HTML inline ── */
+table {{ font-family: 'Nunito', sans-serif !important; font-size: 12px !important; }}
+table th {{ font-size: 12px !important; font-weight: 800 !important; }}
+table td {{ font-size: 12px !important; font-weight: 400 !important; }}
+thead tr th, th {{
+    color: #000000 !important; -webkit-text-fill-color: #000000 !important;
+    font-weight: 800 !important; background-color: #f8f9fa !important;
+    text-align: center !important; font-size: 12px !important;
+}}
+
+/* ── Botões ── */
+div.stButton > button, button, [data-testid="baseButton-secondary"],
+[data-testid="baseButton-primary"] {{
+    font-family: 'Nunito', sans-serif !important;
+    font-weight: 800 !important;
+    font-size: 12px !important;
+    width: 100%; border-radius: 8px !important;
+    height: 42px; border: none !important; transition: all 0.3s;
+}}
+
+/* ── Inputs / Selectbox ── */
+input, select, textarea,
+[data-testid="stTextInput"] input,
+[data-testid="stSelectbox"] div[data-baseweb="select"] span {{
+    font-family: 'Nunito', sans-serif !important;
+    font-size: 13px !important; font-weight: 600 !important;
+}}
+
+/* ── Métricas e info boxes ── */
+[data-testid="stMetricValue"] {{ font-size: 26px !important; font-weight: 800 !important; }}
+[data-testid="stMetricLabel"] {{ font-size: 12px !important; font-weight: 700 !important; }}
+[data-testid="stAlert"] p, .stAlert p {{ font-size: 13px !important; font-weight: 600 !important; }}
+
+/* ── Sidebar / menu ── */
+[data-testid="stSidebarNav"] span, [data-testid="stSidebar"] p,
+[data-testid="stSidebar"] label {{ font-size: 13px !important; font-weight: 700 !important; }}
+
+/* ── Componentes custom reutilizados ── */
 .main-header {{ text-align: center; padding: 20px 0; }}
-.main-header h1 {{ font-size: 42px !important; font-weight: 800; }}
+.main-header h1 {{ font-size: 38px !important; font-weight: 900; }}
 .custom-table {{ width: 100%; border-collapse: separate; border-spacing: 0;
     border: 1px solid #f0f0f0; border-radius: 10px; overflow: hidden;
-    font-size: 13px; margin-top: 5px; margin-bottom: 15px; }}
-.custom-table thead th {{ padding: 12px 10px; text-align: left; color: white !important; font-weight: 700; border: none; }}
-.custom-table td {{ padding: 10px; border-bottom: 1px solid #f9f9f9; }}
-div.stButton > button {{ width: 100%; border-radius: 8px !important; font-weight: 700 !important;
-    height: 42px; font-size: 11px !important; border: none !important; transition: all 0.3s; }}
+    font-size: 12px; margin-top: 5px; margin-bottom: 15px; }}
+.custom-table thead th {{ padding: 12px 10px; text-align: left; color: white !important;
+    font-weight: 800; border: none; font-size: 12px; }}
+.custom-table td {{ padding: 10px; border-bottom: 1px solid #f9f9f9; font-size: 12px; }}
 .sala-badge {{ display: inline-block; padding: 4px 12px; border-radius: 20px;
-    color: white; font-weight: 700; font-size: 10px; margin-top: 5px; text-transform: uppercase; }}
+    color: white; font-weight: 800; font-size: 10px; margin-top: 5px; text-transform: uppercase; }}
 .trilha-container {{ display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 0; }}
 .caixa-trilha {{ flex: 1; height: 85px; border-radius: 15px; display: flex; align-items: center;
     justify-content: center; text-align: center; font-size: 10px; font-weight: 800; padding: 5px;
@@ -541,9 +611,8 @@ div.stButton > button {{ width: 100%; border-radius: 8px !important; font-weight
 .seta-trilha {{ padding: 0 5px; color: #ccc; font-size: 18px; font-weight: bold; }}
 .mare-box {{ display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 2px; }}
 .mare-mini-tabela {{ width: 35px; height: 20px; border: 1px solid #999; border-radius: 3px; }}
-.mare-texto-tabela {{ font-size: 10px; color: #555; font-weight: bold; line-height: 1; text-transform: lowercase; }}
-thead tr th, th {{ color: #000000 !important; -webkit-text-fill-color: #000000 !important;
-    font-weight: bold !important; background-color: #f8f9fa !important; text-align: center !important; }}
+.mare-texto-tabela {{ font-size: 10px !important; color: #555; font-weight: 700 !important;
+    line-height: 1; text-transform: lowercase; font-family: 'Nunito', sans-serif !important; }}
 </style>""", unsafe_allow_html=True)
 
 if "logado" not in st.session_state:

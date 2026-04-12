@@ -714,7 +714,7 @@ if menu == "📝 Controle de Matrícula e Apadrinhamento":
         table_html += "</tr></thead><tbody>"
 
         for i, (_, r) in enumerate(df_f.iterrows()):
-            bg = "#ffffff" if i % 2 == 0 else "#f9f9f9"
+            bg = f"{cor_h}18" if i % 2 == 0 else f"{cor_h}08"
             p_nome = str(r.get("PADRINHO/MADRINHA", "-")).strip()
             if p_nome in ["", "0", "nan", "None", "-"]:
                 p_nome = "-"
@@ -1292,6 +1292,27 @@ elif menu == "🌊 Tábua da Maré":
     if not df_s.empty:
         alunos_sala = sorted([str(n).replace("**", "").strip() for n in df_s["ALUNO"].dropna().unique()])
 
+        cor_sala_exp = TURMAS_CONFIG.get(st.session_state.sel_int, {}).get("cor", "#5cc6d0")
+        st.markdown(f"""<style>
+        [data-testid="stExpander"] {{
+            border: 1.5px solid {cor_sala_exp}55 !important;
+            border-radius: 10px !important;
+            margin-bottom: 6px !important;
+            overflow: hidden !important;
+        }}
+        [data-testid="stExpander"] summary {{
+            background: {cor_sala_exp}18 !important;
+            border-radius: 10px !important;
+            font-weight: 600 !important;
+            font-size: 13px !important;
+            color: #2c3e50 !important;
+            padding: 10px 14px !important;
+        }}
+        [data-testid="stExpander"] summary:hover {{
+            background: {cor_sala_exp}30 !important;
+        }}
+        </style>""", unsafe_allow_html=True)
+
         for al in alunos_sala:
             with st.expander(f"👤 {al}"):
                 filtro_aluno = df_s[df_s["ALUNO"].str.strip() == al.strip()]
@@ -1342,7 +1363,6 @@ elif menu == "🌊 Tábua da Maré":
                             with c2[i - 5]:
                                 st.markdown(render_vasilha_mare(valores[i], CATEGORIAS[i]), unsafe_allow_html=True)
 
-                        st.plotly_chart(criar_grafico_mare(CATEGORIAS, valores), use_container_width=True, key=f"gen_{al}_{periodo}")
                         obs_pedag = r.get("OBSERVAÇÕES PEDAGÓGICAS", r.get("OBSERVACOES", "Sem registro."))
                         st.info(f"**Observação:** {obs_pedag}")
                 else:

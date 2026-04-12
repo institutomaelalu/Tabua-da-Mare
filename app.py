@@ -826,36 +826,32 @@ elif menu == "📖 Turno Estendido":
 
 # ─────────────────────────────────────────────
 # ABA: DADOS - TURNO ESTENDIDO
-# Exibe dados locais + Google Sheets e permite sincronização.
+# Tabela existente preenchida com dados do Google Sheets + buffer local.
+# O botão de sincronização envia TODOS os campos (incluindo evidências e obs).
 # ─────────────────────────────────────────────
 elif menu == "📊 Dados - Turno Estendido":
-    st.markdown("### 📋 Dados - Turno Estendido")
+    st.markdown("### 📋 Panorama de Avaliações")
 
-    # ── BLOCO DE SINCRONIZAÇÃO ──
-    if os.path.exists(ARQUIVO_BUFFER):
+    # ── BOTÃO DE SINCRONIZAÇÃO (no topo, visível) ──
+    tem_pendentes = os.path.exists(ARQUIVO_BUFFER) and not pd.read_csv(ARQUIVO_BUFFER).empty if os.path.exists(ARQUIVO_BUFFER) else False
+
+    if tem_pendentes:
         df_pendente = pd.read_csv(ARQUIVO_BUFFER)
-        if not df_pendente.empty:
-            with st.expander(f"📥 Fila Local — {len(df_pendente)} registro(s) pendente(s)", expanded=True):
-                st.dataframe(df_pendente, use_container_width=True)
-                c1, c2 = st.columns([1, 3])
-                if c1.button("📤 Sincronizar com Google Sheets", type="primary", use_container_width=True):
-                    with st.spinner("Enviando para a planilha oficial..."):
-                        enviar_buffer_para_sheets()
-                if c2.button("🗑️ Descartar Fila Local", use_container_width=True):
-                    os.remove(ARQUIVO_BUFFER)
-                    st.rerun()
+        qtd = len(df_pendente)
+        col_sync1, col_sync2, col_sync3 = st.columns([1.5, 1, 3])
+        col_sync1.warning(f"⏳ **{qtd} registro(s) local(is) não sincronizado(s)**")
+        if col_sync2.button("📤 Enviar para Google Sheets", type="primary", use_container_width=True):
+            with st.spinner("Enviando registros para a planilha oficial (incluindo evidências e observações)..."):
+                enviar_buffer_para_sheets()
+        if col_sync3.button("🗑️ Descartar registros locais", use_container_width=True):
+            os.remove(ARQUIVO_BUFFER)
+            st.rerun()
     else:
-        st.success("✅ Nenhum registro pendente — tudo sincronizado com o Google Sheets.")
+        st.success("✅ Tudo sincronizado com o Google Sheets.")
 
     st.divider()
 
-    # ── PANORAMA DE AVALIAÇÕES (dados do Google Sheets em cache) ──
-    st.markdown("#### 📊 Panorama de Avaliações")
-
-    df_h = df_alf.copy()
-    if "ANO" not in df_h.columns:
-        df_h["ANO"] = 2025
-
+    # ── SELEÇÃO DE ANO ──
     if "ano_ativo_te" not in st.session_state:
         st.session_state.ano_ativo_te = 2025
 
@@ -882,6 +878,66 @@ elif menu == "📊 Dados - Turno Estendido":
 
     render_legenda_niveis()
 
+    # ── MESCLAR DADOS DO GOOGLE SHEETS COM O BUFFER LOCAL ──
+    # Parte 1: dados do Sheets (já em cache)
+    df_h = df_alf.copy()
+    if "ANO" not in df_h.columns:
+        df_h["ANO"] = 2025
+
+    # Mapeamento de etapa do buffer para coluna do df_h
+    MAP_ETAPA_COL = {
+        "1ª Avaliação":   "1ª AVALIAÇÃO",
+        "2ª Avaliação":   "2ª AVALIAÇÃO",
+        "Avaliação Final":"AVALIAÇÃO FINAL",
+    }
+
+    # Parte 2: aplica o buffer local sobre o df_h (sobrescreve ou adiciona linhas)
+    if os.path.exists(ARQUIVO_BUFFER):
+        df_buf = pd.read_csv(ARQUIVO_BUFFER).fillna("")
+        df_buf.columns = [str(c).strip().upper() for c in df_buf.columns]
+
+        for _, row_buf in df_buf.iterrows():
+            aluno_buf = str(row_buf.get("ALUNO", "")).strip()
+            sala_buf  = str(row_buf.get("SALA",  "")).strip()
+            etapa_buf = str(row_buf.get("ETAPA", "")).strip()
+            nivel_buf = str(row_buf.get("NIVEL", "")).strip()
+            ano_buf   = str(row_buf.get("ANO",   "")).strip()
+            evid_buf  = str(row_buf.get("EVIDENCIAS", "")).strip()
+            obs_buf   = str(row_buf.get("OBS",   "")).strip()
+            col_destino = MAP_ETAPA_COL.get(etapa_buf)
+
+            if not aluno_buf or not col_destino:
+                continue
+
+            # Garante que as colunas necessárias existam no df_h
+            for col_extra in ["1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL", "DIAGNÓSTICO", "EVIDÊNCIAS", "OBSERVAÇÕES"]:
+                if col_extra not in df_h.columns:
+                    df_h[col_extra] = ""
+
+            # Tenta encontrar a linha do aluno+ano no df_h
+            mask = (df_h["ALUNO"].astype(str).str.strip() == aluno_buf) & \
+                   (df_h["ANO"].astype(str).str.strip() == ano_buf)
+
+            if mask.any():
+                idx = df_h.index[mask][0]
+                df_h.at[idx, col_destino] = nivel_buf
+                if etapa_buf == "Avaliação Final":
+                    df_h.at[idx, "DIAGNÓSTICO"] = nivel_buf
+                if evid_buf: df_h.at[idx, "EVIDÊNCIAS"]  = evid_buf
+                if obs_buf:  df_h.at[idx, "OBSERVAÇÕES"] = obs_buf
+            else:
+                # Aluno novo ou ano diferente: cria linha
+                nova = {
+                    "ALUNO": aluno_buf, "SALA": sala_buf, "ANO": ano_buf,
+                    "1ª AVALIAÇÃO": "", "2ª AVALIAÇÃO": "", "AVALIAÇÃO FINAL": "",
+                    "DIAGNÓSTICO": "", "EVIDÊNCIAS": evid_buf, "OBSERVAÇÕES": obs_buf,
+                }
+                nova[col_destino] = nivel_buf
+                if etapa_buf == "Avaliação Final":
+                    nova["DIAGNÓSTICO"] = nivel_buf
+                df_h = pd.concat([df_h, pd.DataFrame([nova])], ignore_index=True)
+
+    # ── FUNÇÃO STATUS MARÉ ──
     def get_status_mare_html(nv_atual, hist):
         pct, txt = 85, "maré baixa"
         if nv_atual == "7. Alfabético Ortográfico":
@@ -894,6 +950,7 @@ elif menu == "📊 Dados - Turno Estendido":
                 f'<div class="mare-mini-tabela" style="background:linear-gradient(to bottom,#f0f0f0 {pct}%,#5DADE2 {pct}%);"></div>'
                 f'<span class="mare-texto-tabela">{txt}</span></div>')
 
+    # ── CONSTRUÇÃO DA TABELA (mesma lógica original, com dados já mesclados) ──
     cols_header = ["Nome do Aluno", "1ª Sondagem", "2ª Sondagem", "3ª Sondagem", "STATUS MARÉ"]
     if ano_sel == 2026:
         cols_header.insert(1, "Diagnóstico Atual")
@@ -905,27 +962,63 @@ elif menu == "📊 Dados - Turno Estendido":
         + "</tr></thead><tbody>"
     )
 
-    alunos_nesta_aba = sorted(df_h["ALUNO"].unique()) if not df_h.empty else []
+    alunos_nesta_aba = sorted(df_h["ALUNO"].astype(str).str.strip().unique()) if not df_h.empty else []
+
+    # Identifica quais alunos têm dados locais pendentes (para marcar visualmente)
+    alunos_pendentes = set()
+    if os.path.exists(ARQUIVO_BUFFER):
+        try:
+            alunos_pendentes = set(pd.read_csv(ARQUIVO_BUFFER)["ALUNO"].astype(str).str.strip().unique())
+        except Exception:
+            pass
+
     for al in alunos_nesta_aba:
-        dados_aluno_ano = df_h[(df_h["ALUNO"] == al) & (df_h["ANO"].astype(str) == str(ano_sel))]
+        dados_aluno_ano = df_h[
+            (df_h["ALUNO"].astype(str).str.strip() == al) &
+            (df_h["ANO"].astype(str).str.strip() == str(ano_sel))
+        ]
         if dados_aluno_ano.empty:
             continue
-        html_tab += f'<tr><td style="font-weight:bold;padding:10px;border:1px solid #eee;font-size:12px;">{al}</td>'
+
+        # Indicador visual de dado local pendente
+        badge_pendente = (
+            ' <span title="Registro local ainda não enviado ao Google Sheets" '
+            'style="background:#ffc713;color:#333;border-radius:10px;padding:1px 7px;font-size:9px;font-weight:bold;">LOCAL</span>'
+            if al in alunos_pendentes else ""
+        )
+
+        html_tab += (
+            f'<tr><td style="font-weight:bold;padding:10px;border:1px solid #eee;font-size:12px;">'
+            f'{al}{badge_pendente}</td>'
+        )
+
         if ano_sel == 2026:
-            diag = dados_aluno_ano["DIAGNÓSTICO"].iloc[0] if "DIAGNÓSTICO" in df_h.columns else "-"
+            diag = dados_aluno_ano["DIAGNÓSTICO"].iloc[0] if "DIAGNÓSTICO" in dados_aluno_ano.columns else "-"
+            diag = diag if str(diag).strip() else "-"
             html_tab += f'<td style="text-align:center;border:1px solid #eee;font-size:10px;">{diag}</td>'
+
         for col_av in ["1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL"]:
             nv = dados_aluno_ano[col_av].iloc[0] if col_av in dados_aluno_ano.columns else ""
+            nv = str(nv).strip() if nv else ""
             if nv:
-                cor = CORES_EXCLUSIVAS.get(nv, "#eee")
+                cor    = CORES_EXCLUSIVAS.get(nv, "#eee")
                 txt_nv = nv.split(". ")[1] if ". " in nv else nv
-                html_tab += f'<td style="background:{cor};color:{get_text_color(nv)};text-align:center;font-weight:bold;border:1px solid #eee;font-size:11px;">{txt_nv}</td>'
+                html_tab += (
+                    f'<td style="background:{cor};color:{get_text_color(nv)};text-align:center;'
+                    f'font-weight:bold;border:1px solid #eee;font-size:11px;">{txt_nv}</td>'
+                )
             else:
                 html_tab += '<td style="border:1px solid #eee;"></td>'
-        niveis_preenchidos = [dados_aluno_ano[c].iloc[0] for c in ["1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL"] if c in dados_aluno_ano.columns and dados_aluno_ano[c].iloc[0]]
+
+        niveis_preenchidos = [
+            str(dados_aluno_ano[c].iloc[0]).strip()
+            for c in ["1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL"]
+            if c in dados_aluno_ano.columns and str(dados_aluno_ano[c].iloc[0]).strip()
+        ]
         status_html = '<td style="border:1px solid #eee;text-align:center;">-</td>'
         if niveis_preenchidos:
             status_html = f'<td style="border:1px solid #eee;">{get_status_mare_html(niveis_preenchidos[-1], niveis_preenchidos)}</td>'
+
         html_tab += status_html + "</tr>"
 
     st.markdown(html_tab + "</tbody></table>", unsafe_allow_html=True)

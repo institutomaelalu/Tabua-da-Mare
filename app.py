@@ -348,20 +348,26 @@ def render_legenda_niveis_botoes(aluno_sel, key_prefix="te"):
 
     session_key = f"nivel_diag_{key_prefix}_{aluno_sel}"
 
-    cols_leg = st.columns(len(NIVEIS_ALF))
+    css_niveis = ""
     for i, nv in enumerate(NIVEIS_ALF):
         cor_fundo = CORES_EXCLUSIVAS.get(nv, "#eee")
         cor_txt = get_text_color(nv)
         is_selected = st.session_state.get(session_key) == nv
         borda = "3px solid #000000" if is_selected else "2px solid transparent"
-        cols_leg[i].markdown(
-            f'<div style="background-color:{cor_fundo}; color:{cor_txt}; padding:8px 2px; border-radius:10px; '
-            f'text-align:center; font-size:10px; font-weight:bold; min-height:50px; display:flex; '
-            f'align-items:center; justify-content:center; line-height:1.1; border:{borda}; cursor:pointer;">'
-            f'{nv.split(". ")[1]}</div>',
-            unsafe_allow_html=True
+        css_niveis += (
+            f'div[data-testid="stHorizontalBlock"] > div:nth-child({i+1}) button {{'
+            f'background-color:{cor_fundo} !important;color:{cor_txt} !important;'
+            f'border:{borda} !important;border-radius:10px !important;'
+            f'font-weight:bold !important;font-size:10px !important;'
+            f'min-height:52px !important;white-space:normal !important;'
+            f'line-height:1.2 !important;}}\n'
         )
-        if cols_leg[i].button("Selecionar", key=f"btn_nivel_{key_prefix}_{i}", use_container_width=True):
+    st.markdown(f"<style>{css_niveis}</style>", unsafe_allow_html=True)
+
+    cols_leg = st.columns(len(NIVEIS_ALF))
+    for i, nv in enumerate(NIVEIS_ALF):
+        label_nv = nv.split(". ")[1] if ". " in nv else nv
+        if cols_leg[i].button(label_nv, key=f"btn_nivel_{key_prefix}_{i}", use_container_width=True):
             st.session_state[session_key] = nv
             st.rerun()
 
@@ -480,21 +486,27 @@ def aplicar_filtros(df_alvo, df_geral, tn, cm):
 
 def render_botoes_salas(key_prefix, session_key, salas_permitidas=None):
     salas = salas_permitidas if salas_permitidas else list(TURMAS_CONFIG.keys())
-    cols = st.columns(len(salas))
+    css_rules = ""
     for i, nome_aba in enumerate(salas):
         cfg = TURMAS_CONFIG.get(nome_aba, {"cor": "#566573", "icon": "🏫"})
-        label_exibicao = BADGE_LABEL.get(nome_aba, nome_aba.replace("SALA ", ""))
         is_active = st.session_state.get(session_key) == nome_aba
-        op = "1.0" if is_active else "0.5"
+        op = "1" if is_active else "0.55"
         borda = "3px solid #000" if is_active else "2px solid rgba(0,0,0,0.1)"
-        cols[i].markdown(
-            f'<div style="background-color:{cfg["cor"]}; color:white; padding:10px 5px; border-radius:10px; '
-            f'text-align:center; font-size:12px; font-weight:bold; opacity:{op}; border:{borda}; '
-            f'margin-bottom:2px;">'
-            f'{label_exibicao}</div>',
-            unsafe_allow_html=True
+        cor = cfg["cor"]
+        css_rules += (
+            f'div[data-testid="stButton"]:has(button[kind="secondary"][data-testid="baseButton-secondary"]'
+            f'[aria-label="{BADGE_LABEL.get(nome_aba, nome_aba.replace(chr(32), chr(32)))}"])'
+            f' button {{'
+            f'background-color:{cor} !important;color:white !important;'
+            f'opacity:{op} !important;border:{borda} !important;'
+            f'border-radius:10px !important;font-weight:bold !important;}}\n'
         )
-        if cols[i].button(f'{label_exibicao}', key=f"{key_prefix}_{i}", use_container_width=True):
+    st.markdown(f"<style>{css_rules}</style>", unsafe_allow_html=True)
+
+    cols = st.columns(len(salas))
+    for i, nome_aba in enumerate(salas):
+        label_exibicao = BADGE_LABEL.get(nome_aba, nome_aba.replace("SALA ", ""))
+        if cols[i].button(label_exibicao, key=f"{key_prefix}_{i}", use_container_width=True):
             st.session_state[session_key] = nome_aba
             st.rerun()
 
@@ -812,28 +824,29 @@ elif menu == "📖 Turno Estendido":
         st.session_state["filtro_sala_te"] = "TODAS"
 
     st.markdown("**Filtrar por Sala:**")
+
+    css_filtro_te = ""
+    for i, sala_f in enumerate(salas_com_todas):
+        cor_p = "#888" if sala_f == "TODAS" else TURMAS_CONFIG.get(sala_f, {"cor": "#888"}).get("cor", "#888")
+        is_active_f = st.session_state.get("filtro_sala_te") == sala_f
+        op_p = "1" if is_active_f else "0.55"
+        borda_p = "3px solid #000" if is_active_f else f"2px solid {cor_p}"
+        key_f = f"filtro_sala_te_{i}"
+        css_filtro_te += (
+            f'button[kind="secondary"][data-testid="baseButton-secondary"][aria-label="'
+            f'{"TODAS" if sala_f == "TODAS" else BADGE_LABEL.get(sala_f, sala_f.replace("SALA ", ""))}"] {{'
+            f'background-color:{cor_p} !important;color:white !important;'
+            f'opacity:{op_p} !important;border:{borda_p} !important;'
+            f'border-radius:20px !important;font-size:10px !important;'
+            f'font-weight:bold !important;height:30px !important;'
+            f'padding:0 10px !important;min-height:0 !important;}}\n'
+        )
+    st.markdown(f"<style>{css_filtro_te}</style>", unsafe_allow_html=True)
+
     cols_filtro = st.columns(len(salas_com_todas))
     for i, sala_f in enumerate(salas_com_todas):
-        if sala_f == "TODAS":
-            cor_badge_f = "#888"
-            txt_badge_f = "TODAS"
-        else:
-            cfg_f = TURMAS_CONFIG.get(sala_f, {"cor": "#888"})
-            cor_badge_f = cfg_f.get("cor", "#888")
-            txt_badge_f = BADGE_LABEL.get(sala_f, sala_f.replace("SALA ", ""))
-
-        is_active_f = st.session_state.get("filtro_sala_te") == sala_f
-        borda_f = "3px solid #000" if is_active_f else "2px solid transparent"
-        op_f = "1.0" if is_active_f else "0.5"
-
-        cols_filtro[i].markdown(
-            f'<div style="background-color:{cor_badge_f}; color:white; padding:6px 10px; border-radius:20px; '
-            f'text-align:center; font-size:11px; font-weight:bold; opacity:{op_f}; border:{borda_f}; '
-            f'margin-bottom:2px; white-space:nowrap;">'
-            f'{txt_badge_f}</div>',
-            unsafe_allow_html=True
-        )
-        if cols_filtro[i].button(txt_badge_f, key=f"filtro_sala_te_{i}", use_container_width=True):
+        txt_p = "TODAS" if sala_f == "TODAS" else BADGE_LABEL.get(sala_f, sala_f.replace("SALA ", ""))
+        if cols_filtro[i].button(txt_p, key=f"filtro_sala_te_{i}", use_container_width=True):
             st.session_state["filtro_sala_te"] = sala_f
             st.rerun()
 

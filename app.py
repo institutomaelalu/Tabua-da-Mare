@@ -1446,7 +1446,7 @@ elif menu == "📊 Dados - Turno Estendido":
             f'<span class="mare-texto-tabela">{txt}</span></div>'
         )
 
-    cols_header = ["Nome do Aluno", "1ª Sondagem", "2ª Sondagem", "3ª Sondagem", "STATUS MARÉ"]
+    cols_header = ["Nome do Aluno", "1ª AVALIAÇÃO", "2ª AVALIAÇÃO", "AVALIAÇÃO FINAL", "STATUS MARÉ"]
     if ano_sel == 2026:
         cols_header.insert(1, "Diagnóstico Atual")
 
